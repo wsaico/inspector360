@@ -87,7 +87,7 @@ export default function InspectionsPage() {
           </p>
         </div>
         {canCreateInspections && (
-          <Link href="/dashboard/inspections/new">
+          <Link href="/inspections/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Nueva Inspección
@@ -112,7 +112,7 @@ export default function InspectionsPage() {
                 Comienza creando tu primera inspección técnica
               </p>
               {canCreateInspections && (
-                <Link href="/dashboard/inspections/new">
+                <Link href="/inspections/new">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Crear Primera Inspección
@@ -168,7 +168,7 @@ export default function InspectionsPage() {
                     </TableCell>
                     <TableCell>{getStatusBadge(inspection.status)}</TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/dashboard/inspections/${inspection.id}`}>
+                      <Link href={`/inspections/${inspection.id}`}>
                         <Button variant="ghost" size="sm">
                           <Eye className="mr-2 h-4 w-4" />
                           Ver

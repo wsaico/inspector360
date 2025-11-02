@@ -42,7 +42,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {canCreateInspections && (
-          <Link href="/dashboard/inspections/new">
+          <Link href="/inspections/new">
             <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -59,7 +59,7 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        <Link href="/dashboard/inspections">
+        <Link href="/inspections">
           <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
@@ -75,7 +75,7 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/compliance">
+        <Link href="/compliance">
           <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Cumplimiento</CardTitle>
@@ -159,7 +159,7 @@ export default function DashboardPage() {
               No hay inspecciones recientes
             </p>
             {canCreateInspections && (
-              <Link href="/dashboard/inspections/new">
+              <Link href="/inspections/new">
                 <Button className="mt-4">
                   <Plus className="mr-2 h-4 w-4" />
                   Crear Primera Inspección

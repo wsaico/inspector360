@@ -5,12 +5,12 @@ import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const pageTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/dashboard/inspections': 'Inspecciones',
-  '/dashboard/inspections/new': 'Nueva Inspección',
-  '/dashboard/compliance': 'Panel de Cumplimiento',
-  '/dashboard/settings': 'Configuración',
-  '/dashboard/settings/users': 'Gestión de Usuarios',
+  '/': 'Dashboard',
+  '/inspections': 'Inspecciones',
+  '/inspections/new': 'Nueva Inspección',
+  '/compliance': 'Panel de Cumplimiento',
+  '/settings': 'Configuración',
+  '/settings/users': 'Gestión de Usuarios',
 };
 
 export function Navbar() {

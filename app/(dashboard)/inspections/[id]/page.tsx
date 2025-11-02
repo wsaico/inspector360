@@ -55,7 +55,7 @@ export default function InspectionDetailPage() {
     if (error) {
       toast.error('Error al cargar la inspección');
       console.error(error);
-      router.push('/dashboard/inspections');
+      router.push('/inspections');
     } else {
       setInspection(data);
     }

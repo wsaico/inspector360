@@ -18,31 +18,31 @@ import { toast } from 'sonner';
 const navigation = [
   {
     name: 'Dashboard',
-    href: '/dashboard',
+    href: '/',
     icon: LayoutDashboard,
     permission: null,
   },
   {
     name: 'Inspecciones',
-    href: '/dashboard/inspections',
+    href: '/inspections',
     icon: ClipboardList,
     permission: null,
   },
   {
     name: 'Cumplimiento',
-    href: '/dashboard/compliance',
+    href: '/compliance',
     icon: BarChart3,
     permission: null,
   },
   {
     name: 'Usuarios',
-    href: '/dashboard/settings/users',
+    href: '/settings/users',
     icon: Users,
     permission: 'canManageUsers' as const,
   },
   {
     name: 'Configuración',
-    href: '/dashboard/settings',
+    href: '/settings',
     icon: Settings,
     permission: 'canAccessSettings' as const,
   },

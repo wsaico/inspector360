@@ -58,7 +58,7 @@ export default function Step4Finalize() {
 
       toast.success('Inspección completada exitosamente');
       resetForm();
-      router.push(`/dashboard/inspections/${inspection.id}`);
+      router.push(`/inspections/${inspection.id}`);
     } catch (error: any) {
       console.error('Error:', error);
       toast.error('Error al completar la inspección');
