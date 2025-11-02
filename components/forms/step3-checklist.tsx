@@ -7,17 +7,21 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CHECKLIST_TEMPLATE, getChecklistGroupedByCategory } from '@/lib/checklist-template';
 import { CHECKLIST_CATEGORIES, ChecklistItem } from '@/types';
-import { CheckCircle2, XCircle, MinusCircle, Package } from 'lucide-react';
+import { CheckCircle2, XCircle, MinusCircle, Package, PenLine } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import SignaturePad from './signature-pad';
+import { toast } from 'sonner';
 
 export default function Step3Checklist() {
-  const { formData, updateChecklist } = useInspectionForm();
+  const { formData, updateChecklist, setEquipmentSignature } = useInspectionForm();
   const [selectedEquipment, setSelectedEquipment] = useState(0);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
   const grouped = getChecklistGroupedByCategory();
 
   const currentEquipment = formData.equipment[selectedEquipment];
   const currentChecklist = formData.checklists[currentEquipment?.code] || {};
+  const currentSignature = formData.equipmentSignatures[currentEquipment?.code];
 
   const handleStatusChange = (itemCode: string, status: ChecklistItem['status']) => {
     updateChecklist(currentEquipment.code, itemCode, {
@@ -27,9 +31,19 @@ export default function Step3Checklist() {
   };
 
   const getProgress = () => {
-    const total = 50;
+    const total = CHECKLIST_TEMPLATE.length; // 15 items
     const completed = Object.keys(currentChecklist).length;
     return Math.round((completed / total) * 100);
+  };
+
+  const handleSaveSignature = (signature: string) => {
+    setEquipmentSignature(currentEquipment.code, signature);
+    setShowSignaturePad(false);
+    toast.success('Firma del inspector guardada');
+  };
+
+  const isChecklistComplete = () => {
+    return Object.keys(currentChecklist).length === CHECKLIST_TEMPLATE.length;
   };
 
   return (
@@ -119,6 +133,60 @@ export default function Step3Checklist() {
           </CardContent>
         </Card>
       ))}
+
+      {/* Firma del Inspector por Equipo */}
+      {isChecklistComplete() && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PenLine className="h-5 w-5" />
+              Firma del Inspector - {currentEquipment.code}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {currentSignature ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border-2 border-green-200 bg-green-50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <p className="font-semibold text-green-900">Equipo firmado</p>
+                  </div>
+                  <img
+                    src={currentSignature}
+                    alt="Firma del inspector"
+                    className="h-32 border rounded bg-white"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSignaturePad(true)}
+                  className="w-full"
+                >
+                  <PenLine className="mr-2 h-4 w-4" />
+                  Cambiar Firma
+                </Button>
+              </div>
+            ) : showSignaturePad ? (
+              <SignaturePad
+                label="Firma del Inspector"
+                required
+                onSave={handleSaveSignature}
+                onCancel={() => setShowSignaturePad(false)}
+              />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  El checklist de este equipo está completo. Firme para confirmar la inspección.
+                </p>
+                <Button onClick={() => setShowSignaturePad(true)}>
+                  <PenLine className="mr-2 h-4 w-4" />
+                  Firmar Checklist
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

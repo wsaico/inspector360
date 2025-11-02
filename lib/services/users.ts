@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase/client';
-import { User, CreateUserData, UpdateUserData } from '@/types';
+import { UserProfile, UserRole } from '@/types/roles';
 
 export class UserService {
   /**
@@ -13,7 +13,7 @@ export class UserService {
   static async getUsers() {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -31,7 +31,7 @@ export class UserService {
   static async getUserById(id: string) {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .select('*')
         .eq('id', id)
         .single();
@@ -46,23 +46,17 @@ export class UserService {
 
   /**
    * Crea un nuevo usuario (solo admin)
-   * Requiere permisos de admin en Supabase
+   * Llama a la API backend para crear usuario con Supabase Admin
    */
-  static async createUser(userData: CreateUserData) {
+  static async createUser(userData: {
+    email: string;
+    password: string;
+    full_name: string;
+    role: UserRole;
+    station?: string;
+    phone?: string;
+  }) {
     try {
-      // Nota: Esta función requiere configuración adicional en Supabase
-      // para permitir la creación de usuarios desde el cliente
-      // Normalmente se haría desde el backend con el service_role key
-
-      // Por ahora, retornamos un mensaje indicando que debe configurarse
-      return {
-        data: null,
-        error:
-          'La creación de usuarios debe configurarse en el backend con Supabase Admin API',
-      };
-
-      // Código de ejemplo (requiere backend):
-      /*
       const response = await fetch('/api/users/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,8 +64,12 @@ export class UserService {
       });
 
       const result = await response.json();
-      return result;
-      */
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error creando usuario');
+      }
+
+      return { data: result.data, error: null };
     } catch (error: any) {
       console.error('Error creating user:', error);
       return { data: null, error: error.message };
@@ -81,10 +79,10 @@ export class UserService {
   /**
    * Actualiza un usuario existente
    */
-  static async updateUser(userId: string, updates: UpdateUserData) {
+  static async updateUser(userId: string, updates: Partial<UserProfile>) {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
@@ -107,7 +105,7 @@ export class UserService {
   static async toggleUserStatus(userId: string, isActive: boolean) {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .update({
           is_active: isActive,
           updated_at: new Date().toISOString(),
@@ -130,7 +128,7 @@ export class UserService {
   static async getUsersByStation(station: string) {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .select('*')
         .eq('station', station)
         .eq('is_active', true)
@@ -147,10 +145,10 @@ export class UserService {
   /**
    * Obtiene usuarios por rol
    */
-  static async getUsersByRole(role: string) {
+  static async getUsersByRole(role: UserRole) {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .select('*')
         .eq('role', role)
         .eq('is_active', true)

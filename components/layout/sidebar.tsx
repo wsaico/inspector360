@@ -50,7 +50,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const permissions = usePermissions();
 
   const handleSignOut = async () => {
@@ -83,21 +83,21 @@ export function Sidebar() {
       </div>
 
       {/* User Info */}
-      {user && (
+      {profile && (
         <div className="border-b border-white/10 p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
               <span className="text-sm font-semibold text-white">
-                {user.full_name.charAt(0).toUpperCase()}
+                {profile.full_name.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">
-                {user.full_name}
+                {profile.full_name}
               </p>
-              <p className="text-xs text-white/70 capitalize">{user.role}</p>
-              {user.station && (
-                <p className="text-xs text-white/70">{user.station}</p>
+              <p className="text-xs text-white/70 capitalize">{profile.role}</p>
+              {profile.station && (
+                <p className="text-xs text-white/70">{profile.station}</p>
               )}
             </div>
           </div>

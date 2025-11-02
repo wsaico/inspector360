@@ -15,15 +15,22 @@ import { toast } from 'sonner';
 
 export default function Step4Finalize() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const { formData, setSignatures, resetForm } = useInspectionForm();
   const [supervisorName, setSupervisorName] = useState('');
-  const [signature, setSignature] = useState<string | null>(null);
+  const [supervisorSignature, setSupervisorSignature] = useState<string | null>(null);
+  const [mechanicName, setMechanicName] = useState('');
+  const [mechanicSignature, setMechanicSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleComplete = async () => {
-    if (!supervisorName || !signature) {
-      toast.error('Complete todos los campos requeridos');
+    if (!supervisorName || !supervisorSignature || !mechanicName || !mechanicSignature) {
+      toast.error('Complete todos los campos requeridos (ambas firmas)');
+      return;
+    }
+
+    if (!profile?.id) {
+      toast.error('Usuario no autenticado');
       return;
     }
 
@@ -31,37 +38,53 @@ export default function Step4Finalize() {
 
     try {
       // 1. Crear inspección
-      const { data: inspection, error: inspectionError } = await InspectionService.createInspection({
-        user_id: user?.id,
+      const { data: inspection, error: inspectionError} = await InspectionService.createInspection({
+        user_id: profile.id,
         station: formData.general!.station,
         inspection_date: formData.general!.inspection_date,
         inspection_type: formData.general!.inspection_type,
         inspector_name: formData.general!.inspector_name,
       });
 
-      if (inspectionError || !inspection) throw new Error(inspectionError);
-
-      // 2. Agregar equipos
-      for (const eq of formData.equipment) {
-        const checklistData = formData.checklists[eq.code];
-        await InspectionService.addEquipment(inspection.id!, {
-          ...eq,
-          checklist_data: checklistData,
-        });
+      if (inspectionError || !inspection) {
+        throw new Error(inspectionError);
       }
 
-      // 3. Completar con firma
+      // 2. Agregar equipos
+      for (let i = 0; i < formData.equipment.length; i++) {
+        const eq = formData.equipment[i];
+        const checklistData = formData.checklists[eq.code];
+        const equipmentSignature = formData.equipmentSignatures[eq.code];
+
+        const { data: equipmentResult, error: equipmentError } = await InspectionService.addEquipment(inspection.id!, {
+          ...eq,
+          checklist_data: checklistData,
+          order_index: i,
+        });
+
+        if (equipmentError) {
+          throw new Error(`Error agregando equipo: ${equipmentError}`);
+        }
+
+        // 2.1 Guardar firma del inspector por equipo si existe
+        if (equipmentSignature && equipmentResult) {
+          await InspectionService.uploadInspectorSignature(equipmentResult.id!, equipmentSignature);
+        }
+      }
+
+      // 3. Completar con firmas
       await InspectionService.completeInspection(inspection.id!, {
-        name: supervisorName,
-        signature,
+        supervisorName,
+        supervisorSignature,
+        mechanicName,
+        mechanicSignature,
       });
 
       toast.success('Inspección completada exitosamente');
       resetForm();
       router.push(`/inspections/${inspection.id}`);
     } catch (error: any) {
-      console.error('Error:', error);
-      toast.error('Error al completar la inspección');
+      toast.error(`Error al completar la inspección: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -101,7 +124,7 @@ export default function Step4Finalize() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Firma del Supervisor</CardTitle>
+          <CardTitle>Firma del Supervisor o Encargado de Estación</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -109,10 +132,35 @@ export default function Step4Finalize() {
             <Input
               value={supervisorName}
               onChange={(e) => setSupervisorName(e.target.value)}
-              placeholder="Nombre completo"
+              placeholder="Nombre completo del supervisor"
             />
           </div>
-          <SignaturePad onSave={setSignature} required />
+          <SignaturePad
+            label="Firma del Supervisor"
+            onSave={setSupervisorSignature}
+            required
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Firma del Mecánico de Estación</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Nombre del Mecánico *</Label>
+            <Input
+              value={mechanicName}
+              onChange={(e) => setMechanicName(e.target.value)}
+              placeholder="Nombre completo del mecánico"
+            />
+          </div>
+          <SignaturePad
+            label="Firma del Mecánico"
+            onSave={setMechanicSignature}
+            required
+          />
         </CardContent>
       </Card>
 
@@ -120,7 +168,7 @@ export default function Step4Finalize() {
         className="w-full"
         size="lg"
         onClick={handleComplete}
-        disabled={!supervisorName || !signature || isSubmitting}
+        disabled={!supervisorName || !supervisorSignature || !mechanicName || !mechanicSignature || isSubmitting}
       >
         {isSubmitting ? (
           <>

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { profile, error } = useAuth();
   const { canCreateInspections } = usePermissions();
 
   // Datos mock - serán reemplazados con datos reales
@@ -27,14 +27,29 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Error message if profile failed to load */}
+      {error && !profile && (
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Error al cargar perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Por favor contacta al administrador del sistema.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Welcome Section */}
       <div>
         <h2 className="text-3xl font-bold text-gray-900">
-          Bienvenido, {user?.full_name}
+          Bienvenido{profile?.full_name ? `, ${profile.full_name}` : ''}
         </h2>
         <p className="mt-2 text-gray-600">
-          {user?.station
-            ? `Estación: ${user.station}`
+          {profile?.station
+            ? `Estación: ${profile.station}`
             : 'Acceso a todas las estaciones'}
         </p>
       </div>

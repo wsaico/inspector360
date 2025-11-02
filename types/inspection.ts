@@ -47,10 +47,23 @@ export interface Equipment {
   year: number;
   serial_number: string;
   motor_serial?: string;
+  station: Station;
   inspector_signature_url?: string;
   checklist_data: Record<string, ChecklistItem>;
   order_index: number;
   description?: string;
+}
+
+export interface Observation {
+  id?: string;
+  inspection_id?: string;
+  obs_id: string;
+  equipment_code: string;
+  obs_operator: string;
+  obs_maintenance: string;
+  order_index: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Inspection {
@@ -64,6 +77,9 @@ export interface Inspection {
   supervisor_name?: string;
   supervisor_signature_url?: string;
   supervisor_signature_date?: string;
+  mechanic_name?: string;
+  mechanic_signature_url?: string;
+  mechanic_signature_date?: string;
   status: InspectionStatus;
   created_at?: string;
   updated_at?: string;
@@ -78,11 +94,15 @@ export interface InspectionFormData {
     station: Station;
   } | null;
   equipment: Equipment[];
+  observations: Observation[];
   checklists: Record<string, Record<string, ChecklistItem>>;
   signatures: {
     supervisor_name?: string;
     supervisor_signature?: string;
+    mechanic_name?: string;
+    mechanic_signature?: string;
   };
+  equipmentSignatures: Record<string, string>; // equipment code -> signature URL
 }
 
 export interface ChecklistTemplateItem {

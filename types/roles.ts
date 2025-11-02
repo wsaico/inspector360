@@ -3,18 +3,18 @@
  * Define los roles de usuario y sus permisos en el sistema
  */
 
-export type UserRole = 'admin' | 'supervisor' | 'sig';
+export type UserRole = 'admin' | 'supervisor' | 'inspector';
 
 export const ROLES = {
   ADMIN: 'admin',
   SUPERVISOR: 'supervisor',
-  SIG: 'sig',
+  INSPECTOR: 'inspector',
 } as const;
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
   supervisor: 'Supervisor',
-  sig: 'SIG',
+  inspector: 'Inspector',
 };
 
 export interface RolePermissions {
@@ -37,15 +37,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canExportReports: true,
     canAccessSettings: true,
   },
-  sig: {
-    canManageUsers: false,
-    canViewAllStations: true,
-    canCreateInspections: false,
-    canEditInspections: false,
-    canDeleteInspections: false,
-    canExportReports: true,
-    canAccessSettings: false,
-  },
   supervisor: {
     canManageUsers: false,
     canViewAllStations: false,
@@ -55,7 +46,31 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canExportReports: true,
     canAccessSettings: false,
   },
+  inspector: {
+    canManageUsers: false,
+    canViewAllStations: false,
+    canCreateInspections: true,
+    canEditInspections: false,
+    canDeleteInspections: false,
+    canExportReports: false,
+    canAccessSettings: false,
+  },
 };
+
+/**
+ * Interface de Perfil de Usuario
+ */
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  station?: Station;
+  phone?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export type Station = 'AQP' | 'CUZ' | 'CIX' | 'TRU' | 'CJA' | 'TPP' | 'PIU';
 

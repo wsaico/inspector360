@@ -6,7 +6,7 @@
  */
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { InspectionFormData, Equipment, ChecklistItem } from '@/types';
+import { InspectionFormData, Equipment, ChecklistItem, Observation } from '@/types';
 import { Station, InspectionType } from '@/types';
 
 interface InspectionContextType {
@@ -19,8 +19,12 @@ interface InspectionContextType {
   addEquipment: (equipment: Equipment) => void;
   updateEquipment: (index: number, equipment: Equipment) => void;
   removeEquipment: (index: number) => void;
+  addObservation: (observation: Observation) => void;
+  updateObservation: (index: number, observation: Observation) => void;
+  removeObservation: (index: number) => void;
   updateChecklist: (equipmentCode: string, itemCode: string, value: ChecklistItem) => void;
   setSignatures: (data: InspectionFormData['signatures']) => void;
+  setEquipmentSignature: (equipmentCode: string, signature: string) => void;
 
   // Navegación
   nextStep: () => void;
@@ -37,8 +41,10 @@ const InspectionContext = createContext<InspectionContextType | undefined>(undef
 const initialFormData: InspectionFormData = {
   general: null,
   equipment: [],
+  observations: [],
   checklists: {},
   signatures: {},
+  equipmentSignatures: {},
 };
 
 export function InspectionProvider({ children }: { children: ReactNode }) {
@@ -98,6 +104,35 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const addObservation = useCallback((observation: Observation) => {
+    setFormData(prev => ({
+      ...prev,
+      observations: [...prev.observations, observation],
+    }));
+  }, []);
+
+  const updateObservation = useCallback((index: number, observation: Observation) => {
+    setFormData(prev => {
+      const newObservations = [...prev.observations];
+      newObservations[index] = observation;
+      return {
+        ...prev,
+        observations: newObservations,
+      };
+    });
+  }, []);
+
+  const removeObservation = useCallback((index: number) => {
+    setFormData(prev => {
+      const newObservations = [...prev.observations];
+      newObservations.splice(index, 1);
+      return {
+        ...prev,
+        observations: newObservations,
+      };
+    });
+  }, []);
+
   const updateChecklist = useCallback(
     (equipmentCode: string, itemCode: string, value: ChecklistItem) => {
       setFormData(prev => ({
@@ -118,8 +153,18 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
     setFormData(prev => ({ ...prev, signatures: data }));
   }, []);
 
+  const setEquipmentSignature = useCallback((equipmentCode: string, signature: string) => {
+    setFormData(prev => ({
+      ...prev,
+      equipmentSignatures: {
+        ...prev.equipmentSignatures,
+        [equipmentCode]: signature,
+      },
+    }));
+  }, []);
+
   const nextStep = useCallback(() => {
-    setCurrentStep(prev => Math.min(prev + 1, 4));
+    setCurrentStep(prev => Math.min(prev + 1, 5));
   }, []);
 
   const prevStep = useCallback(() => {
@@ -127,7 +172,7 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const goToStep = useCallback((step: number) => {
-    setCurrentStep(Math.max(1, Math.min(step, 4)));
+    setCurrentStep(Math.max(1, Math.min(step, 5)));
   }, []);
 
   const resetForm = useCallback(() => {
@@ -142,12 +187,15 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
       case 2:
         return formData.equipment.length > 0;
       case 3:
-        // Verificar que todos los equipos tengan checklist completo
+        // Observaciones son opcionales, siempre puede proceder
+        return true;
+      case 4:
+        // Verificar que todos los equipos tengan checklist completo (15 items)
         return formData.equipment.every(eq => {
           const checklist = formData.checklists[eq.code];
-          return checklist && Object.keys(checklist).length === 50;
+          return checklist && Object.keys(checklist).length === 15;
         });
-      case 4:
+      case 5:
         return (
           formData.signatures.supervisor_name !== undefined &&
           formData.signatures.supervisor_signature !== undefined
@@ -164,8 +212,12 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
     addEquipment,
     updateEquipment,
     removeEquipment,
+    addObservation,
+    updateObservation,
+    removeObservation,
     updateChecklist,
     setSignatures,
+    setEquipmentSignature,
     nextStep,
     prevStep,
     goToStep,

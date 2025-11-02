@@ -8,10 +8,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { User } from '@/types';
+import { UserProfile } from '@/types/roles';
 
 interface AuthState {
-  user: User | null;
+  user: SupabaseUser | null;
+  profile: UserProfile | null;
   loading: boolean;
   error: string | null;
 }
@@ -19,6 +20,7 @@ interface AuthState {
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
+    profile: null,
     loading: true,
     error: null,
   });
@@ -34,11 +36,11 @@ export function useAuth() {
         if (session?.user) {
           await loadUserProfile(session.user);
         } else {
-          setAuthState({ user: null, loading: false, error: null });
+          setAuthState({ user: null, profile: null, loading: false, error: null });
         }
       } catch (error) {
         console.error('Error loading session:', error);
-        setAuthState({ user: null, loading: false, error: 'Error al cargar la sesión' });
+        setAuthState({ user: null, profile: null, loading: false, error: 'Error al cargar la sesión' });
       }
     };
 
@@ -50,7 +52,7 @@ export function useAuth() {
         if (session?.user) {
           await loadUserProfile(session.user);
         } else {
-          setAuthState({ user: null, loading: false, error: null });
+          setAuthState({ user: null, profile: null, loading: false, error: null });
         }
       }
     );
@@ -63,32 +65,42 @@ export function useAuth() {
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
       const { data: profile, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .select('*')
         .eq('id', supabaseUser.id)
         .single();
 
-      if (error) throw error;
-
-      if (profile && profile.is_active) {
-        setAuthState({
-          user: profile as User,
-          loading: false,
-          error: null,
-        });
-      } else {
-        setAuthState({
-          user: null,
-          loading: false,
-          error: 'Usuario inactivo',
-        });
+      if (error) {
+        console.error('Error loading user profile:', error);
+        throw error;
       }
-    } catch (error) {
-      console.error('Error loading user profile:', error);
+
+      if (!profile) {
+        throw new Error('No se encontró el perfil del usuario');
+      }
+
+      const isActive = profile.is_active === true || profile.is_active === 'true';
+
+      if (!isActive) {
+        throw new Error('Usuario inactivo');
+      }
+
       setAuthState({
-        user: null,
+        user: supabaseUser,
+        profile: profile as UserProfile,
         loading: false,
-        error: 'Error al cargar el perfil',
+        error: null,
+      });
+    } catch (error: any) {
+      console.error('Failed to load user profile:', error.message);
+
+      // IMPORTANTE: NO cerrar sesión del usuario, solo mostrar error
+      // Esto previene el loop de login
+      setAuthState({
+        user: supabaseUser, // Mantener usuario autenticado
+        profile: null,
+        loading: false,
+        error: `Error al cargar perfil: ${error.message}`,
       });
     }
   };
@@ -120,7 +132,7 @@ export function useAuth() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      setAuthState({ user: null, loading: false, error: null });
+      setAuthState({ user: null, profile: null, loading: false, error: null });
       return { success: true, error: null };
     } catch (error: any) {
       const errorMessage = error.message || 'Error al cerrar sesión';
@@ -130,6 +142,7 @@ export function useAuth() {
 
   return {
     user: authState.user,
+    profile: authState.profile,
     loading: authState.loading,
     error: authState.error,
     signIn,

@@ -21,7 +21,11 @@ export class InspectionService {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching inspections:', error);
+        throw error;
+      }
+
       return { data, error: null };
     } catch (error: any) {
       console.error('Error fetching inspections:', error);
@@ -105,36 +109,58 @@ export class InspectionService {
    */
   static async completeInspection(
     inspectionId: string,
-    supervisorData: {
-      name: string;
-      signature: string;
+    signaturesData: {
+      supervisorName: string;
+      supervisorSignature: string;
+      mechanicName: string;
+      mechanicSignature: string;
     }
   ) {
     try {
-      // 1. Subir firma a Storage
-      const signatureBlob = await fetch(supervisorData.signature).then((r) =>
+      // 1. Subir firma del supervisor a Storage
+      const supervisorBlob = await fetch(signaturesData.supervisorSignature).then((r) =>
         r.blob()
       );
-      const fileName = `signatures/${inspectionId}/supervisor-${Date.now()}.png`;
+      const supervisorFileName = `signatures/${inspectionId}/supervisor-${Date.now()}.png`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: supervisorUploadError } = await supabase.storage
         .from('signatures')
-        .upload(fileName, signatureBlob, { upsert: true });
+        .upload(supervisorFileName, supervisorBlob, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (supervisorUploadError) throw supervisorUploadError;
 
-      // 2. Obtener URL pública
+      // 2. Obtener URL pública del supervisor
       const {
-        data: { publicUrl },
-      } = supabase.storage.from('signatures').getPublicUrl(fileName);
+        data: { publicUrl: supervisorUrl },
+      } = supabase.storage.from('signatures').getPublicUrl(supervisorFileName);
 
-      // 3. Actualizar inspección
+      // 3. Subir firma del mecánico a Storage
+      const mechanicBlob = await fetch(signaturesData.mechanicSignature).then((r) =>
+        r.blob()
+      );
+      const mechanicFileName = `signatures/${inspectionId}/mechanic-${Date.now()}.png`;
+
+      const { error: mechanicUploadError } = await supabase.storage
+        .from('signatures')
+        .upload(mechanicFileName, mechanicBlob, { upsert: true });
+
+      if (mechanicUploadError) throw mechanicUploadError;
+
+      // 4. Obtener URL pública del mecánico
+      const {
+        data: { publicUrl: mechanicUrl },
+      } = supabase.storage.from('signatures').getPublicUrl(mechanicFileName);
+
+      // 5. Actualizar inspección con ambas firmas
       const { data, error } = await supabase
         .from('inspections')
         .update({
-          supervisor_name: supervisorData.name,
-          supervisor_signature_url: publicUrl,
+          supervisor_name: signaturesData.supervisorName,
+          supervisor_signature_url: supervisorUrl,
           supervisor_signature_date: new Date().toISOString(),
+          mechanic_name: signaturesData.mechanicName,
+          mechanic_signature_url: mechanicUrl,
+          mechanic_signature_date: new Date().toISOString(),
           status: 'completed',
           updated_at: new Date().toISOString(),
         })
@@ -187,13 +213,18 @@ export class InspectionService {
           year: equipmentData.year,
           serial_number: equipmentData.serial_number,
           motor_serial: equipmentData.motor_serial,
+          station: equipmentData.station,
           checklist_data: equipmentData.checklist_data || {},
           order_index: equipmentData.order_index || 0,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding equipment:', error);
+        throw error;
+      }
+
       return { data, error: null };
     } catch (error: any) {
       console.error('Error adding equipment:', error);
@@ -306,6 +337,36 @@ export class InspectionService {
     } catch (error: any) {
       console.error('Error fetching statistics:', error);
       return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Obtiene todos los equipos únicos de inspecciones previas
+   * Para reutilización en nuevas inspecciones
+   * Filtrado por estación para seguridad de datos
+   */
+  static async getUniqueEquipment(station: string) {
+    try {
+      const { data, error } = await supabase
+        .from('equipment')
+        .select('*')
+        .eq('station', station)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Eliminar duplicados por código de equipo
+      const uniqueEquipment = data?.reduce((acc: Equipment[], curr: Equipment) => {
+        if (!acc.find(eq => eq.code === curr.code)) {
+          acc.push(curr);
+        }
+        return acc;
+      }, []);
+
+      return { data: uniqueEquipment || [], error: null };
+    } catch (error: any) {
+      console.error('Error fetching unique equipment:', error);
+      return { data: [], error: error.message };
     }
   }
 }

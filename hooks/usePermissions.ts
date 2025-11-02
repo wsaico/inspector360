@@ -19,13 +19,13 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
 };
 
 export function usePermissions(): RolePermissions {
-  const { user } = useAuth();
+  const { profile } = useAuth();
 
-  if (!user) {
+  if (!profile) {
     return DEFAULT_PERMISSIONS;
   }
 
-  return ROLE_PERMISSIONS[user.role];
+  return ROLE_PERMISSIONS[profile.role];
 }
 
 /**

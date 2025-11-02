@@ -1,33 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks';
 import { Loader2 } from 'lucide-react';
-import DashboardPage from './(dashboard)/page';
-import { Sidebar } from '@/components/layout/sidebar';
-import { Navbar } from '@/components/layout/navbar';
 
 export default function Home() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [hasSession, setHasSession] = useState(false);
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (session) {
-        setHasSession(true);
+    if (!loading) {
+      if (user) {
+        router.push('/dashboard');
       } else {
         router.push('/login');
       }
-
-      setLoading(false);
-    };
-
-    checkSession();
-  }, [router]);
+    }
+  }, [user, loading, router]);
 
   if (loading) {
     return (
@@ -37,19 +27,11 @@ export default function Home() {
     );
   }
 
-  if (!hasSession) {
+  if (!user) {
     return null;
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-          <DashboardPage />
-        </main>
-      </div>
-    </div>
-  );
+  // Si hay usuario, mostrar el contenido de dashboard
+  // Importar el componente de dashboard
+  return null; // El layout se encargará
 }

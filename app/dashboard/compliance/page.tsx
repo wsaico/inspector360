@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -30,7 +31,8 @@ import { ComplianceService } from '@/lib/services/compliance';
 import { toast } from 'sonner';
 
 export default function CompliancePage() {
-  const [loading, setLoading] = useState(true);
+  const { profile, loading: profileLoading } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     totalInspections: 0,
     completedThisMonth: 0,
@@ -42,34 +44,36 @@ export default function CompliancePage() {
   const [topIssues, setTopIssues] = useState<any[]>([]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (profileLoading) return;
 
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      const [statsData, trendsData, complianceResult, issuesData] = await Promise.all([
-        ComplianceService.getOverallStats(),
-        ComplianceService.getMonthlyTrends(),
-        ComplianceService.getComplianceBreakdown(),
-        ComplianceService.getTopIssues(),
-      ]);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [statsData, trendsData, complianceResult, issuesData] = await Promise.all([
+          ComplianceService.getOverallStats(),
+          ComplianceService.getMonthlyTrends(),
+          ComplianceService.getComplianceBreakdown(),
+          ComplianceService.getTopIssues(),
+        ]);
 
-      if (statsData.data) setStats(statsData.data);
-      if (trendsData.data) setMonthlyData(trendsData.data);
-      if (complianceResult.data) setComplianceData(complianceResult.data);
-      if (issuesData.data) setTopIssues(issuesData.data);
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-      toast.error('Error al cargar el dashboard');
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (statsData.data) setStats(statsData.data);
+        if (trendsData.data) setMonthlyData(trendsData.data);
+        if (complianceResult.data) setComplianceData(complianceResult.data);
+        if (issuesData.data) setTopIssues(issuesData.data);
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+        toast.error('Error al cargar el dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [profileLoading]);
 
   const COLORS = ['#093071', '#8EBB37', '#F59E0B', '#EF4444'];
 
-  if (loading) {
+  if (profileLoading || loading) {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
