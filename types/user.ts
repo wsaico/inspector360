@@ -21,12 +21,12 @@ export interface CreateUserData {
   password: string;
   full_name: string;
   role: UserRole;
-  station?: Station;
+  station?: Station | null;
 }
 
 export interface UpdateUserData {
   full_name?: string;
   role?: UserRole;
-  station?: Station;
+  station?: Station | null;
   is_active?: boolean;
 }

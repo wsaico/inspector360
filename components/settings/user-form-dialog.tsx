@@ -82,7 +82,7 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
         const updates: Partial<User> = {
           full_name: data.full_name,
           role: data.role,
-          station: data.station || null,
+          station: (data.station as any) || null,
         };
 
         const { error } = await UserService.updateUser(user!.id!, updates);
@@ -102,7 +102,7 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
           password: data.password,
           full_name: data.full_name,
           role: data.role,
-          station: data.station || null,
+          station: (data.station as any) || null,
         });
 
         if (error) throw new Error(error);
@@ -199,7 +199,7 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
                   <SelectValue placeholder="Seleccionar estación" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATIONS.map((station) => (
+                  {Object.keys(STATIONS).map((station) => (
                     <SelectItem key={station} value={station}>
                       {station}
                     </SelectItem>

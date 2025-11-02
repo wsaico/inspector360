@@ -34,6 +34,7 @@ export const CHECKLIST_CATEGORIES: Record<ChecklistCategory, string> = {
 export interface ChecklistItem {
   status: ChecklistStatus | null;
   observations: string;
+  description?: string;
 }
 
 export interface Equipment {

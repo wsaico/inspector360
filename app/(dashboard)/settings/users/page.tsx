@@ -44,7 +44,7 @@ export default function UsersPage() {
 
   const loadUsers = async () => {
     setLoading(true);
-    const { data, error } = await UserService.getAllUsers();
+    const { data, error } = await UserService.getUsers();
 
     if (error) {
       toast.error('Error al cargar usuarios');
@@ -67,16 +67,9 @@ export default function UsersPage() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
-
-    const { success, error } = await UserService.deleteUser(userId);
-
-    if (success) {
-      toast.success('Usuario eliminado exitosamente');
-      loadUsers();
-    } else {
-      toast.error(error || 'Error al eliminar usuario');
-    }
+    toast.info('La eliminación de usuarios aún no está implementada. Usa desactivar usuario.');
+    // TODO: Implement delete user functionality
+    // Requiere configuración de Supabase Admin API
   };
 
   const handleToggleActive = async (user: User) => {
@@ -222,7 +215,7 @@ export default function UsersPage() {
                         </Button>
                         <Button
                           size="sm"
-                          variant={user.is_active ? 'outline' : 'success'}
+                          variant={user.is_active ? 'outline' : 'default'}
                           onClick={() => handleToggleActive(user)}
                         >
                           {user.is_active ? 'Desactivar' : 'Activar'}

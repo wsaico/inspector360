@@ -87,7 +87,7 @@ export default function InspectionDetailPage() {
     return types[type] || type;
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | null) => {
     switch (status) {
       case 'conforme':
         return <CheckCircle2 className="h-4 w-4 text-green-600" />;
@@ -100,7 +100,7 @@ export default function InspectionDetailPage() {
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string | null) => {
     switch (status) {
       case 'conforme':
         return 'Conforme';
