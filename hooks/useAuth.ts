@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import { User as SupabaseUser } from '@supabase/supabase-js';
+import { User as SupabaseUser, type AuthChangeEvent, type Session } from '@supabase/supabase-js';
 import { UserProfile } from '@/types/roles';
 
 interface AuthState {
@@ -48,7 +48,7 @@ export function useAuth() {
 
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         if (session?.user) {
           await loadUserProfile(session.user);
         } else {

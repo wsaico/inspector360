@@ -6,6 +6,17 @@
 import { supabase } from '@/lib/supabase/client';
 import { ChecklistItem } from '@/types';
 
+// Tipos auxiliares para filas provenientes de Supabase
+type EquipmentChecklistRow = {
+  checklist_data: Record<string, ChecklistItem> | null;
+};
+
+type EquipmentWithMetaRow = {
+  code: string;
+  type: string;
+  checklist_data: Record<string, ChecklistItem> | null;
+};
+
 export class ComplianceService {
   /**
    * Obtiene estadísticas generales
@@ -52,7 +63,7 @@ export class ComplianceService {
       let totalItems = 0;
       let conformeItems = 0;
 
-      allEquipment?.forEach((eq) => {
+      allEquipment?.forEach((eq: EquipmentChecklistRow) => {
         const checklist = eq.checklist_data as Record<string, ChecklistItem>;
         if (checklist) {
           Object.values(checklist).forEach((item) => {
@@ -103,7 +114,7 @@ export class ComplianceService {
         'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
       ];
 
-      inspections?.forEach((inspection) => {
+      inspections?.forEach((inspection: { created_at: string }) => {
         const date = new Date(inspection.created_at);
         const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
         monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
@@ -137,7 +148,7 @@ export class ComplianceService {
       let noConforme = 0;
       let noAplica = 0;
 
-      allEquipment?.forEach((eq) => {
+      allEquipment?.forEach((eq: EquipmentChecklistRow) => {
         const checklist = eq.checklist_data as Record<string, ChecklistItem>;
         if (checklist) {
           Object.values(checklist).forEach((item) => {
@@ -174,7 +185,7 @@ export class ComplianceService {
 
       const issueCount: Record<string, { code: string; count: number }> = {};
 
-      allEquipment?.forEach((eq) => {
+      allEquipment?.forEach((eq: EquipmentChecklistRow) => {
         const checklist = eq.checklist_data as Record<string, ChecklistItem>;
         if (checklist) {
           Object.entries(checklist).forEach(([code, item]) => {
@@ -214,7 +225,7 @@ export class ComplianceService {
 
       const stationData: Record<string, number> = {};
 
-      inspections?.forEach((inspection) => {
+      inspections?.forEach((inspection: { station: string }) => {
         stationData[inspection.station] = (stationData[inspection.station] || 0) + 1;
       });
 
@@ -241,7 +252,7 @@ export class ComplianceService {
 
       if (error) throw error;
 
-      const equipmentIssues = allEquipment?.map((eq) => {
+      const equipmentIssues = allEquipment?.map((eq: EquipmentWithMetaRow) => {
         const checklist = eq.checklist_data as Record<string, ChecklistItem>;
         let noConformeCount = 0;
 
@@ -261,8 +272,8 @@ export class ComplianceService {
       });
 
       const sortedEquipment = equipmentIssues
-        ?.filter((eq) => eq.issues > 0)
-        .sort((a, b) => b.issues - a.issues)
+        ?.filter((eq: { issues: number }) => eq.issues > 0)
+        .sort((a: { issues: number }, b: { issues: number }) => b.issues - a.issues)
         .slice(0, limit);
 
       return { data: sortedEquipment, error: null };
@@ -294,7 +305,7 @@ export class ComplianceService {
         general: { conforme: 0, noConforme: 0, noAplica: 0 },
       };
 
-      allEquipment?.forEach((eq) => {
+      allEquipment?.forEach((eq: EquipmentChecklistRow) => {
         const checklist = eq.checklist_data as Record<string, ChecklistItem>;
         if (checklist) {
           Object.entries(checklist).forEach(([code, item]) => {

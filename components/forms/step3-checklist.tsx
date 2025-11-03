@@ -10,7 +10,8 @@ import { CHECKLIST_CATEGORIES, ChecklistItem } from '@/types';
 import { CheckCircle2, XCircle, MinusCircle, Package, PenLine } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import SignaturePad from './signature-pad';
+import dynamic from 'next/dynamic';
+const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
 import { toast } from 'sonner';
 
 export default function Step3Checklist() {
