@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth, usePermissions } from '@/hooks';
 import {
@@ -50,6 +50,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { profile, signOut } = useAuth();
   const permissions = usePermissions();
 
@@ -57,6 +58,7 @@ export function Sidebar() {
     const result = await signOut();
     if (result.success) {
       toast.success('Sesión cerrada correctamente');
+      router.push('/login');
     } else {
       toast.error(result.error || 'Error al cerrar sesión');
     }

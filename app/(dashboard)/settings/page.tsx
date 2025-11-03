@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Users, Shield, Settings as SettingsIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -12,10 +11,9 @@ export default function SettingsPage() {
   const { profile, loading } = useAuth();
   const router = useRouter();
 
-  // Redirect non-admins after profile loads
   useEffect(() => {
     if (!loading && profile && profile.role !== 'admin') {
-      router.push('/dashboard');
+      // No redirige a otra ruta; solo muestra mensaje si no es admin
     }
   }, [profile, loading, router]);
 
@@ -41,9 +39,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-gray-900">Configuración</h2>
-        <p className="mt-2 text-gray-600">
-          Administra los ajustes del sistema
-        </p>
+        <p className="mt-2 text-gray-600">Administra los ajustes del sistema</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -83,9 +79,7 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Próximamente
-            </p>
+            <p className="text-sm text-muted-foreground">Próximamente</p>
           </CardContent>
         </Card>
 
@@ -103,9 +97,7 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Próximamente
-            </p>
+            <p className="text-sm text-muted-foreground">Próximamente</p>
           </CardContent>
         </Card>
       </div>

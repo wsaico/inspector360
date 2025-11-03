@@ -28,19 +28,19 @@ import { User } from '@/types';
 import { UserFormDialog } from '@/components/settings/user-form-dialog';
 
 export default function UsersPage() {
-  const { canManageUsers } = usePermissions();
+  const { canManageUsers, canAccessSettings } = usePermissions();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (!canManageUsers) {
-      toast.error('No tienes permisos para acceder a esta página');
+    if (!canManageUsers && !canAccessSettings) {
+      // Sin permisos para ver
       return;
     }
     loadUsers();
-  }, [canManageUsers]);
+  }, [canManageUsers, canAccessSettings]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -113,7 +113,7 @@ export default function UsersPage() {
     );
   };
 
-  if (!canManageUsers) {
+  if (!canManageUsers && !canAccessSettings) {
     return (
       <div className="flex h-96 items-center justify-center">
         <p className="text-lg text-muted-foreground">
@@ -141,10 +141,12 @@ export default function UsersPage() {
             Administra usuarios y sus permisos
           </p>
         </div>
-        <Button onClick={handleCreateUser}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Usuario
-        </Button>
+        {canManageUsers && (
+          <Button onClick={handleCreateUser}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Usuario
+          </Button>
+        )}
       </div>
 
       {/* Users Table */}
@@ -162,10 +164,12 @@ export default function UsersPage() {
               <p className="mb-4 text-sm text-gray-500">
                 Comienza creando tu primer usuario
               </p>
-              <Button onClick={handleCreateUser}>
-                <Plus className="mr-2 h-4 w-4" />
-                Crear Primer Usuario
-              </Button>
+              {canManageUsers && (
+                <Button onClick={handleCreateUser}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Crear Primer Usuario
+                </Button>
+              )}
             </div>
           ) : (
             <Table>
@@ -206,27 +210,33 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditUser(user)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={user.is_active ? 'outline' : 'default'}
-                          onClick={() => handleToggleActive(user)}
-                        >
-                          {user.is_active ? 'Desactivar' : 'Activar'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeleteUser(user.id!)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canManageUsers ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditUser(user)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={user.is_active ? 'outline' : 'default'}
+                              onClick={() => handleToggleActive(user)}
+                            >
+                              {user.is_active ? 'Desactivar' : 'Activar'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteUser(user.id!)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Solo lectura</span>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
