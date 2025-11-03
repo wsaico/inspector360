@@ -32,8 +32,8 @@ export default function Step1General() {
     defaultValues: formData.general || {
       inspection_date: new Date(),
       inspection_type: 'periodica',
-      inspector_name: user?.full_name || '',
-      station: user?.station || 'AQP',
+      inspector_name: '',
+      station: 'AQP',
     },
   });
 
