@@ -303,8 +303,8 @@ export default function InspectionDetailPage() {
                                 <TableCell>{item.description || '-'}</TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-2">
-                                    {getStatusIcon(item.status)}
-                                    <span className="text-sm">{getStatusText(item.status)}</span>
+                                    {getStatusIcon(item.status || '')}
+                                    <span className="text-sm">{getStatusText(item.status || '')}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell className="max-w-xs">
