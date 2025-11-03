@@ -33,8 +33,14 @@ export default function Step2Equipment() {
   });
 
   const onSubmit = (data: EquipmentFormData) => {
+    // Validar que la información general tenga estación antes de agregar
+    if (!formData.general?.station) {
+      toast.error('Debe completar la información general primero');
+      return;
+    }
     const equipment: Equipment = {
       ...data,
+      station: formData.general.station,
       checklist_data: {},
       order_index: editingIndex !== null ? editingIndex : formData.equipment.length,
     };

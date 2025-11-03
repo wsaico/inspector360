@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { UserService } from '@/lib/services';
-import { User, STATIONS } from '@/types';
+import { User, STATIONS, UserProfile } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -25,10 +25,16 @@ import {
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
+// Mapea roles del formulario a UserRole del sistema
+const normalizeRole = (role: string): 'admin' | 'supervisor' | 'inspector' => {
+  return role === 'sig' ? 'inspector' : (role as 'admin' | 'supervisor' | 'inspector');
+};
+
 const userSchema = z.object({
   email: z.string().email('Email inválido'),
   full_name: z.string().min(3, 'Nombre debe tener al menos 3 caracteres'),
-  role: z.enum(['admin', 'supervisor', 'sig'], 'Rol requerido'),
+  // Aceptar ambos valores para compatibilidad con datos existentes
+  role: z.enum(['admin', 'supervisor', 'sig', 'inspector'], 'Rol requerido'),
   station: z.string().optional(),
   password: z.string().min(6, 'Contraseña debe tener al menos 6 caracteres').optional(),
 });
@@ -79,10 +85,10 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
     try {
       if (isEditing) {
         // Actualizar usuario
-        const updates: Partial<User> = {
+        const updates: Partial<UserProfile> = {
           full_name: data.full_name,
-          role: data.role,
-          station: (data.station as any) || null,
+          role: normalizeRole(data.role),
+          station: data.station ? (data.station as any) : undefined,
         };
 
         const { error } = await UserService.updateUser(user!.id!, updates);
@@ -101,8 +107,8 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
           email: data.email,
           password: data.password,
           full_name: data.full_name,
-          role: data.role,
-          station: (data.station as any) || null,
+          role: normalizeRole(data.role),
+          station: data.station ? (data.station as any) : undefined,
         });
 
         if (error) throw new Error(error);
@@ -172,7 +178,8 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
             <Label htmlFor="role">Rol *</Label>
             <Select
               onValueChange={(value) => setValue('role', value as any)}
-              defaultValue={user?.role || 'supervisor'}
+              // Si el usuario tiene rol 'inspector' (no listado), no preseleccionar
+              defaultValue={user?.role === 'inspector' ? undefined : (user?.role || 'supervisor')}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar rol" />
