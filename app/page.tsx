@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 import DashboardPage from './dashboard/page';
-import { Sidebar } from '@/components/layout/sidebar';
-import { Navbar } from '@/components/layout/navbar';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
 
 export default function Home() {
   const router = useRouter();
@@ -42,14 +41,8 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-          <DashboardPage />
-        </main>
-      </div>
-    </div>
+    <DashboardShell>
+      <DashboardPage />
+    </DashboardShell>
   );
 }
