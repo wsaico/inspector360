@@ -1,8 +1,9 @@
 'use client';
 
+import React from 'react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 
-export default function DashboardLayout({
+export default function DashboardGroupLayout({
   children,
 }: {
   children: React.ReactNode;
