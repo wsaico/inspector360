@@ -9,10 +9,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex">
+      {/* Sidebar fijo (asegurar visibilidad en todas las vistas de dashboard) */}
+      <aside className="flex w-64 shrink-0">
         <Sidebar />
-      </div>
+      </aside>
 
       {/* Mobile drawer */}
       {mobileOpen && (
