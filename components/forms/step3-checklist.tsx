@@ -102,9 +102,10 @@ export default function Step3Checklist() {
                     </div>
                     {value?.status && <CheckCircle2 className="h-5 w-5 text-green-600" />}
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Button
                       size="sm"
+                      className="w-full"
                       variant={value?.status === 'conforme' ? 'default' : 'outline'}
                       onClick={() => handleStatusChange(item.code, 'conforme')}
                     >
@@ -113,6 +114,7 @@ export default function Step3Checklist() {
                     </Button>
                     <Button
                       size="sm"
+                      className="w-full"
                       variant={value?.status === 'no_conforme' ? 'default' : 'outline'}
                       onClick={() => handleStatusChange(item.code, 'no_conforme')}
                     >
@@ -121,6 +123,7 @@ export default function Step3Checklist() {
                     </Button>
                     <Button
                       size="sm"
+                      className="w-full"
                       variant={value?.status === 'no_aplica' ? 'default' : 'outline'}
                       onClick={() => handleStatusChange(item.code, 'no_aplica')}
                     >

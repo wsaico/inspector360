@@ -38,8 +38,27 @@ function InspectionWizardContent() {
         </p>
       </div>
 
-      {/* Step Indicator */}
-      <Card>
+      {/* Step Indicator (Mobile) */}
+      <Card className="md:hidden">
+        <CardContent className="pt-6 pb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold truncate max-w-[60%]">{steps[currentStep - 1].title}</span>
+            <span className="text-xs text-muted-foreground">Paso {currentStep}/5</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-gray-200">
+            <div
+              className="h-2 rounded-full bg-primary transition-all"
+              style={{ width: `${(currentStep / 5) * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 truncate">
+            {steps[currentStep - 1].description}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Step Indicator (Desktop) */}
+      <Card className="hidden md:block">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             {steps.map((step, index) => (
@@ -49,36 +68,22 @@ function InspectionWizardContent() {
                   <div
                     className={cn(
                       'flex h-12 w-12 items-center justify-center rounded-full border-2 font-bold transition-all',
-                      currentStep === step.number &&
-                        'border-primary bg-primary text-white',
-                      currentStep > step.number &&
-                        'border-green-500 bg-green-500 text-white',
-                      currentStep < step.number &&
-                        'border-gray-300 bg-white text-gray-400'
+                      currentStep === step.number && 'border-primary bg-primary text-white',
+                      currentStep > step.number && 'border-green-500 bg-green-500 text-white',
+                      currentStep < step.number && 'border-gray-300 bg-white text-gray-400'
                     )}
                   >
-                    {currentStep > step.number ? (
-                      <Check className="h-6 w-6" />
-                    ) : (
-                      step.number
-                    )}
+                    {currentStep > step.number ? <Check className="h-6 w-6" /> : step.number}
                   </div>
                   {/* Step Info */}
                   <div className="mt-2 text-center">
                     <p className="text-sm font-semibold">{step.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {step.description}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{step.description}</p>
                   </div>
                 </div>
                 {/* Connector Line */}
                 {index < steps.length - 1 && (
-                  <div
-                    className={cn(
-                      'h-1 flex-1 transition-all',
-                      currentStep > step.number ? 'bg-green-500' : 'bg-gray-200'
-                    )}
-                  />
+                  <div className={cn('h-1 flex-1 transition-all', currentStep > step.number ? 'bg-green-500' : 'bg-gray-200')} />
                 )}
               </div>
             ))}
@@ -97,28 +102,31 @@ function InspectionWizardContent() {
 
       {/* Navigation Buttons */}
       <Card>
-        <CardContent className="flex items-center justify-between pt-6">
-          <Button
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Anterior
-          </Button>
-
-          <div className="text-sm text-muted-foreground">
-            Paso {currentStep} de 5
-          </div>
-
-          {currentStep < 5 ? (
-            <Button onClick={nextStep} disabled={!canProceed()}>
-              Siguiente
-              <ArrowRight className="ml-2 h-4 w-4" />
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              className="w-full sm:w-auto"
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Anterior
             </Button>
-          ) : (
-            <div className="w-[140px]" />
-          )}
+
+            <div className="text-sm text-muted-foreground text-center sm:text-left">
+              Paso {currentStep} de 5
+            </div>
+
+            {currentStep < 5 ? (
+              <Button className="w-full sm:w-auto" onClick={nextStep} disabled={!canProceed()}>
+                Siguiente
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <div className="w-full sm:w-[140px]" />
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
