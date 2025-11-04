@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
-  '/dashboard': 'Dashboard',
   '/inspections': 'Inspecciones',
   '/inspections/new': 'Nueva Inspección',
   '/compliance': 'Panel de Cumplimiento',

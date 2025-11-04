@@ -58,7 +58,7 @@ export function Sidebar() {
     const result = await signOut();
     if (result.success) {
       toast.success('Sesión cerrada correctamente');
-      router.push('/login');
+      router.replace('/login');
     } else {
       toast.error(result.error || 'Error al cerrar sesión');
     }

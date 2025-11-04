@@ -33,11 +33,15 @@ export default function DashboardGroupLayout({
           setAuthorized(false);
           router.replace('/login');
         } else {
-          setAuthorized(!!session);
-          if (!session) router.replace('/login');
+          if (session) {
+            setAuthorized(true);
+          } else {
+            setAuthorized(false);
+            router.replace('/login');
+          }
         }
       } catch (err) {
-        // Variables de entorno faltantes u otros errores no deben dejar spinner infinito
+        // Cualquier error: no autorizado y redirigir a login
         setAuthorized(false);
         router.replace('/login');
       } finally {

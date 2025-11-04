@@ -148,7 +148,7 @@ export default function InspectionDetailPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/inspections')}>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/inspections')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Button>

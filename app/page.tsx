@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
-import DashboardPage from './dashboard/page';
+import DashboardPage from '@/components/pages/dashboard-page';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 
 export default function Home() {
