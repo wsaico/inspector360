@@ -29,11 +29,23 @@ CREATE TABLE IF NOT EXISTS observations (
   obs_id TEXT NOT NULL,
   equipment_code TEXT NOT NULL,
   obs_operator TEXT NOT NULL,
-  obs_maintenance TEXT NOT NULL,
+  obs_maintenance TEXT,
   order_index INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Si la tabla ya existe y la columna quedó como NOT NULL en entornos previos,
+-- aseguramos que permita valores nulos:
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'observations' AND column_name = 'obs_maintenance' AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE observations ALTER COLUMN obs_maintenance DROP NOT NULL;
+  END IF;
+END $$;
 
 -- 2. Crear índices para equipment
 CREATE INDEX IF NOT EXISTS idx_equipment_inspection ON equipment(inspection_id);

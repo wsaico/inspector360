@@ -180,6 +180,9 @@ export default function Step2_5Observations() {
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-1">Obs. Mantenimiento:</p>
                     <p className="text-sm">{obs.obs_maintenance}</p>
+                    {!obs.obs_maintenance && (
+                      <p className="mt-1 text-xs text-amber-600">Pendiente respuesta de mecánico</p>
+                    )}
                   </div>
                 </div>
               </div>

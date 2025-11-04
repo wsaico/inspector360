@@ -60,7 +60,7 @@ export interface Observation {
   obs_id: string;
   equipment_code: string;
   obs_operator: string;
-  obs_maintenance: string;
+  obs_maintenance?: string | null;
   order_index: number;
   created_at?: string;
   updated_at?: string;
