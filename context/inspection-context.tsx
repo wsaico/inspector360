@@ -6,6 +6,7 @@
  */
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
 import { InspectionFormData, Equipment, ChecklistItem, Observation } from '@/types';
 import { Station, InspectionType } from '@/types';
 
@@ -190,10 +191,10 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
         // Observaciones son opcionales, siempre puede proceder
         return true;
       case 4:
-        // Verificar que todos los equipos tengan checklist completo (15 items)
+        // Verificar que todos los equipos tengan checklist completo (según template)
         return formData.equipment.every(eq => {
           const checklist = formData.checklists[eq.code];
-          return checklist && Object.keys(checklist).length === 15;
+          return checklist && Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
         });
       case 5:
         return (

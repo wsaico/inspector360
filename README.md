@@ -73,7 +73,7 @@ inspector360/
 
 1. **Paso 1**: Información general (fecha, tipo, inspector)
 2. **Paso 2**: Agregar equipos a inspeccionar
-3. **Paso 3**: Completar checklist de 50 items por equipo
+3. **Paso 3**: Completar checklist de 15 items por equipo
 4. **Paso 4**: Firma del supervisor y finalización
 
 ## Licencia

@@ -22,7 +22,7 @@ function InspectionWizardContent() {
   const steps = [
     { number: 1, title: 'Información General', description: 'Datos básicos de la inspección' },
     { number: 2, title: 'Equipos', description: 'Agregar equipos a inspeccionar' },
-    { number: 3, title: 'Checklist', description: 'Completar 50 items por equipo' },
+    { number: 3, title: 'Checklist', description: 'Completar 15 items por equipo' },
     { number: 4, title: 'Finalizar', description: 'Firmas y completar' },
   ];
 
@@ -114,10 +114,7 @@ function InspectionWizardContent() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={() => {}} disabled={!canProceed()}>
-              <Check className="mr-2 h-4 w-4" />
-              Completar Inspección
-            </Button>
+            <div className="w-[140px]" />
           )}
         </CardContent>
       </Card>

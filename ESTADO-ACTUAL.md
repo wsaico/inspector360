@@ -3,7 +3,7 @@
 ## ✅ PROBLEMAS RESUELTOS
 
 ### 1. Estructura de Checklist
-- **Problema anterior**: El checklist tenía 50 ítems (código viejo de otra IA)
+- **Problema anterior**: El checklist estaba desalineado con el template
 - **Solución**: Actualizado a **15 ítems** (CHK-01 a CHK-15) según template Excel
 - **Archivos corregidos**:
   - `lib/checklist-template.ts` - Template con 15 ítems

@@ -1,5 +1,5 @@
 /**
- * Template de Checklist - 50 Items
+ * Template de Checklist - 15 Items
  * Basado en FOR-ATA-057
  */
 

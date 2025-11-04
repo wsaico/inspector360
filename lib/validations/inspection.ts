@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { equipmentSchema } from './equipment';
 import { checklistItemSchema } from './checklist';
+import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
 
 export const inspectionGeneralSchema = z.object({
   inspection_date: z.date().max(new Date(), 'La fecha no puede ser futura'),
@@ -25,17 +26,17 @@ export const inspectionSchema = z
   })
   .refine(
     (data) => {
-      // Validar que cada equipo tenga su checklist completo (50 items)
+      // Validar que cada equipo tenga su checklist completo (según template)
       for (const eq of data.equipment) {
         const checklist = data.checklists[eq.code];
-        if (!checklist || Object.keys(checklist).length < 50) {
+        if (!checklist || Object.keys(checklist).length < CHECKLIST_TEMPLATE.length) {
           return false;
         }
       }
       return true;
     },
     {
-      message: 'Todos los equipos deben tener el checklist completo (50 items)',
+      message: 'Todos los equipos deben tener el checklist completo',
       path: ['checklists'],
     }
   );

@@ -358,6 +358,35 @@ export default function InspectionDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Firma del Mecánico */}
+      {inspection.status === 'completed' && inspection.mechanic_signature_url && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Firma del Mecánico</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Nombre del Mecánico</p>
+                <p className="font-semibold">{inspection.mechanic_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Firma Digital</p>
+                <div className="border rounded-lg p-4 bg-white inline-block">
+                  <Image
+                    src={inspection.mechanic_signature_url}
+                    alt="Firma del mecánico"
+                    width={400}
+                    height={150}
+                    className="max-w-full h-auto"
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

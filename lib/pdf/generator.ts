@@ -319,6 +319,50 @@ export class PDFGenerator {
       this.doc.setFontSize(8);
       this.doc.text('Firma del Supervisor', this.margin + 20, this.currentY);
     }
+
+    // Mecánico
+    if (inspection.mechanic_name) {
+      this.currentY += 10;
+      this.doc.setFontSize(11);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('Mecánico:', this.margin, this.currentY);
+      this.currentY += 6;
+
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.text(`Nombre: ${inspection.mechanic_name}`, this.margin + 5, this.currentY);
+      this.currentY += 6;
+
+      if (inspection.mechanic_signature_date) {
+        const mechDate = format(
+          new Date(inspection.mechanic_signature_date),
+          'dd/MM/yyyy HH:mm',
+          { locale: es }
+        );
+        this.doc.text(`Fecha: ${mechDate}`, this.margin + 5, this.currentY);
+        this.currentY += 8;
+      }
+
+      if (inspection.mechanic_signature_url) {
+        try {
+          const img = await this.loadImage(inspection.mechanic_signature_url);
+          this.doc.addImage(img, 'PNG', this.margin + 5, this.currentY, 60, 20);
+          this.currentY += 22;
+        } catch (error) {
+          console.error('Error loading mechanic signature:', error);
+          this.doc.rect(this.margin + 5, this.currentY, 60, 20);
+          this.currentY += 22;
+        }
+      } else {
+        this.doc.rect(this.margin + 5, this.currentY, 60, 20);
+        this.currentY += 22;
+      }
+
+      this.doc.line(this.margin + 5, this.currentY, this.margin + 65, this.currentY);
+      this.currentY += 4;
+      this.doc.setFontSize(8);
+      this.doc.text('Firma del Mecánico', this.margin + 20, this.currentY);
+    }
   }
 
   /**

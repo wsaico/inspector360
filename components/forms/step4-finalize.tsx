@@ -130,17 +130,31 @@ export default function Step4Finalize() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Nombre del Supervisor *</Label>
-            <Input
-              value={supervisorName}
-              onChange={(e) => setSupervisorName(e.target.value)}
-              placeholder="Nombre completo del supervisor"
-            />
-          </div>
-          <SignaturePad
-            label="Firma del Supervisor"
-            onSave={setSupervisorSignature}
-            required
+          <Input
+            value={supervisorName}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSupervisorName(value);
+              setSignatures({
+                ...formData.signatures,
+                supervisor_name: value,
+              });
+            }}
+            placeholder="Nombre completo del supervisor"
           />
+        </div>
+        <SignaturePad
+          label="Firma del Supervisor"
+          onSave={(sig) => {
+            setSupervisorSignature(sig);
+            setSignatures({
+              ...formData.signatures,
+              supervisor_signature: sig,
+              supervisor_name: supervisorName,
+            });
+          }}
+          required
+        />
         </CardContent>
       </Card>
 
@@ -151,17 +165,31 @@ export default function Step4Finalize() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Nombre del Mecánico *</Label>
-            <Input
-              value={mechanicName}
-              onChange={(e) => setMechanicName(e.target.value)}
-              placeholder="Nombre completo del mecánico"
-            />
-          </div>
-          <SignaturePad
-            label="Firma del Mecánico"
-            onSave={setMechanicSignature}
-            required
+          <Input
+            value={mechanicName}
+            onChange={(e) => {
+              const value = e.target.value;
+              setMechanicName(value);
+              setSignatures({
+                ...formData.signatures,
+                mechanic_name: value,
+              });
+            }}
+            placeholder="Nombre completo del mecánico"
           />
+        </div>
+        <SignaturePad
+          label="Firma del Mecánico"
+          onSave={(sig) => {
+            setMechanicSignature(sig);
+            setSignatures({
+              ...formData.signatures,
+              mechanic_signature: sig,
+              mechanic_name: mechanicName,
+            });
+          }}
+          required
+        />
         </CardContent>
       </Card>
 
