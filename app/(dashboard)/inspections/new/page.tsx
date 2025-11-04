@@ -13,6 +13,7 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Step1General from '@/components/forms/step1-general';
 import Step2Equipment from '@/components/forms/step2-equipment';
+import Step2_5Observations from '@/components/forms/step2_5-observations';
 import Step3Checklist from '@/components/forms/step3-checklist';
 import Step4Finalize from '@/components/forms/step4-finalize';
 
@@ -22,8 +23,9 @@ function InspectionWizardContent() {
   const steps = [
     { number: 1, title: 'Información General', description: 'Datos básicos de la inspección' },
     { number: 2, title: 'Equipos', description: 'Agregar equipos a inspeccionar' },
-    { number: 3, title: 'Checklist', description: 'Completar 15 items por equipo' },
-    { number: 4, title: 'Finalizar', description: 'Firmas y completar' },
+    { number: 3, title: 'Observaciones', description: 'Agregar observaciones de equipos' },
+    { number: 4, title: 'Checklist', description: 'Completar 15 items por equipo' },
+    { number: 5, title: 'Finalizar', description: 'Firmas y completar' },
   ];
 
   return (
@@ -88,8 +90,9 @@ function InspectionWizardContent() {
       <div className="min-h-[400px]">
         {currentStep === 1 && <Step1General />}
         {currentStep === 2 && <Step2Equipment />}
-        {currentStep === 3 && <Step3Checklist />}
-        {currentStep === 4 && <Step4Finalize />}
+        {currentStep === 3 && <Step2_5Observations />}
+        {currentStep === 4 && <Step3Checklist />}
+        {currentStep === 5 && <Step4Finalize />}
       </div>
 
       {/* Navigation Buttons */}
@@ -105,10 +108,10 @@ function InspectionWizardContent() {
           </Button>
 
           <div className="text-sm text-muted-foreground">
-            Paso {currentStep} de 4
+            Paso {currentStep} de 5
           </div>
 
-          {currentStep < 4 ? (
+          {currentStep < 5 ? (
             <Button onClick={nextStep} disabled={!canProceed()}>
               Siguiente
               <ArrowRight className="ml-2 h-4 w-4" />
