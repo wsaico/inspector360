@@ -26,9 +26,7 @@ export class InspectionService {
     equipmentList.forEach((eq) => {
       const entries = Object.entries(eq.checklist_data || {});
       entries.forEach(([code, item], index) => {
-        const hasText = (item?.observations || '').trim().length > 0;
-        const isNC = item?.status === 'no_conforme';
-        if (isNC || hasText) {
+        const isNC = item?.status === 'no_conforme'; if (isNC) {
           const key = `${eq.code}::${code}`;
           if (!existingKeys.has(key)) {
             derived.push({
@@ -36,7 +34,7 @@ export class InspectionService {
               inspection_id: eq.inspection_id,
               obs_id: code,
               equipment_code: eq.code,
-              obs_operator: item?.observations || (isNC ? 'Item no conforme' : ''),
+              obs_operator: '',
               obs_maintenance: null,
               order_index: index,
               created_at: undefined,
@@ -520,3 +518,4 @@ export class InspectionService {
     }
   }
 }
+

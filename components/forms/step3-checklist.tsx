@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/button';
 import { CHECKLIST_TEMPLATE, getChecklistGroupedByCategory } from '@/lib/checklist-template';
 import { CHECKLIST_CATEGORIES, ChecklistItem } from '@/types';
 import { CheckCircle2, XCircle, MinusCircle, Package, PenLine } from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
 import { toast } from 'sonner';
@@ -27,17 +25,11 @@ export default function Step3Checklist() {
   const handleStatusChange = (itemCode: string, status: ChecklistItem['status']) => {
     updateChecklist(currentEquipment.code, itemCode, {
       status,
-      observations: currentChecklist[itemCode]?.observations || '',
+      observations: '',
     });
   };
 
-  const handleObservationChange = (itemCode: string, text: string) => {
-    const prev = currentChecklist[itemCode];
-    updateChecklist(currentEquipment.code, itemCode, {
-      status: prev?.status || null,
-      observations: text,
-    });
-  };
+  
 
   const getProgress = () => {
     const total = CHECKLIST_TEMPLATE.length; // 15 items
@@ -144,22 +136,7 @@ export default function Step3Checklist() {
                       No Aplica
                     </Button>
                   </div>
-                  {/* Observación del Operador (obligatoria si No Conforme) */}
-                  <div className="space-y-2">
-                    <Label className={cn('text-sm', value?.status === 'no_conforme' ? 'font-medium' : '')}>
-                      Observación del Operador {value?.status === 'no_conforme' ? '(obligatoria si No Conforme)' : ''}
-                    </Label>
-                    <textarea
-                      className="w-full rounded-md border p-2 text-sm"
-                      rows={3}
-                      placeholder="Describe la condición o anomalía detectada"
-                      value={value?.observations || ''}
-                      onChange={(e) => handleObservationChange(item.code, e.target.value)}
-                    />
-                    {value?.status === 'no_conforme' && (!value?.observations || value.observations.trim().length === 0) && (
-                      <p className="text-xs text-red-600">Las observaciones son obligatorias para ítems No Conformes.</p>
-                    )}
-                  </div>
+                  {/* Observación por ítem removida según requerimiento */}
                 </div>
               );
             })}

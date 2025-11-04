@@ -48,17 +48,14 @@ function TemplateWithData() {
       equipmentList.forEach((eq) => {
         const entries = Object.entries(eq.checklist_data || {});
         entries.forEach(([code, item]: any, index) => {
-          const txt = (item?.observations || '').trim();
-          const hasText = txt.length > 0;
-          const isNC = item?.status === 'no_conforme';
-          if (isNC || hasText) {
+          const isNC = item?.status === 'no_conforme'; if (isNC) {
             const key = `${eq.code}::${code}`;
             if (!existingKeys.has(key)) {
               derived.push({
                 inspection_id: eq.inspection_id,
                 obs_id: code,
                 equipment_code: eq.code,
-                obs_operator: hasText ? txt : (isNC ? 'Item no conforme' : ''),
+                obs_operator: '',
                 obs_maintenance: null,
                 order_index: index,
               });
