@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
-import DashboardPage from '@/components/pages/dashboard-page';
-import { DashboardShell } from '@/components/layout/dashboard-shell';
+// Eliminamos el render directo del Dashboard para usar el layout del grupo
 
 export default function Home() {
   const router = useRouter();
@@ -57,13 +56,11 @@ export default function Home() {
     );
   }
 
-  if (!hasSession) {
-    return null;
+  // Si hay sesión, redirigimos al dashboard del grupo
+  if (hasSession) {
+    router.replace('/dashboard');
   }
 
-  return (
-    <DashboardShell>
-      <DashboardPage />
-    </DashboardShell>
-  );
+  // Sin sesión, el efecto ya redirige a /login
+  return null;
 }
