@@ -15,6 +15,10 @@ DROP POLICY IF EXISTS "Enable update for users based on id" ON user_profiles;
 DROP POLICY IF EXISTS "Enable insert for service role" ON user_profiles;
 DROP POLICY IF EXISTS "Allow authenticated users to read own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Allow users to update own profile" ON user_profiles;
+DROP POLICY IF EXISTS "Admins can insert profiles" ON user_profiles;
+DROP POLICY IF EXISTS "Admins can update profiles" ON user_profiles;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON user_profiles;
+DROP POLICY IF EXISTS "Supervisors can view station profiles" ON user_profiles;
 
 -- 2. Crear políticas RLS simples y sin recursión
 -- IMPORTANTE: Usamos auth.uid() en lugar de consultar user_profiles
@@ -56,3 +60,32 @@ SELECT
   with_check
 FROM pg_policies
 WHERE tablename = 'user_profiles';
+
+-- 5. (Opcional pero recomendado) Políticas adicionales seguras SIN recursión
+-- Estas políticas usan claims del JWT para otorgar permisos de admin/supervisor
+-- Asegúrate de que el token incluya 'role' y, para supervisor, 'station'
+
+DROP POLICY IF EXISTS "Admins JWT can view all profiles" ON user_profiles;
+CREATE POLICY "Admins JWT can view all profiles"
+ON user_profiles
+FOR SELECT
+TO authenticated
+USING ((auth.jwt() ->> 'role') = 'admin');
+
+DROP POLICY IF EXISTS "Admins JWT can update profiles" ON user_profiles;
+CREATE POLICY "Admins JWT can update profiles"
+ON user_profiles
+FOR UPDATE
+TO authenticated
+USING ((auth.jwt() ->> 'role') = 'admin')
+WITH CHECK ((auth.jwt() ->> 'role') = 'admin');
+
+DROP POLICY IF EXISTS "Supervisors JWT can view station profiles" ON user_profiles;
+CREATE POLICY "Supervisors JWT can view station profiles"
+ON user_profiles
+FOR SELECT
+TO authenticated
+USING (
+  (auth.jwt() ->> 'role') = 'supervisor'
+  AND (auth.jwt() ->> 'station') = user_profiles.station
+);

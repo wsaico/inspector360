@@ -31,6 +31,14 @@ export default function Step3Checklist() {
     });
   };
 
+  const handleObservationChange = (itemCode: string, text: string) => {
+    const prev = currentChecklist[itemCode];
+    updateChecklist(currentEquipment.code, itemCode, {
+      status: prev?.status || null,
+      observations: text,
+    });
+  };
+
   const getProgress = () => {
     const total = CHECKLIST_TEMPLATE.length; // 15 items
     const completed = Object.keys(currentChecklist).length;
@@ -99,7 +107,7 @@ export default function Step3Checklist() {
             {items.map((item) => {
               const value = currentChecklist[item.code];
               return (
-                <div key={item.code} className="space-y-2 rounded-lg border p-4">
+                <div key={item.code} className="space-y-3 rounded-lg border p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="text-sm font-semibold">{item.code}</p>
@@ -135,6 +143,22 @@ export default function Step3Checklist() {
                       <MinusCircle className="mr-2 h-4 w-4" />
                       No Aplica
                     </Button>
+                  </div>
+                  {/* Observación del Operador (obligatoria si No Conforme) */}
+                  <div className="space-y-2">
+                    <Label className={cn('text-sm', value?.status === 'no_conforme' ? 'font-medium' : '')}>
+                      Observación del Operador {value?.status === 'no_conforme' ? '(obligatoria si No Conforme)' : ''}
+                    </Label>
+                    <textarea
+                      className="w-full rounded-md border p-2 text-sm"
+                      rows={3}
+                      placeholder="Describe la condición o anomalía detectada"
+                      value={value?.observations || ''}
+                      onChange={(e) => handleObservationChange(item.code, e.target.value)}
+                    />
+                    {value?.status === 'no_conforme' && (!value?.observations || value.observations.trim().length === 0) && (
+                      <p className="text-xs text-red-600">Las observaciones son obligatorias para ítems No Conformes.</p>
+                    )}
                   </div>
                 </div>
               );

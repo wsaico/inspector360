@@ -30,37 +30,127 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Inspection } from '@/types';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Inspection, Observation } from '@/types';
+import { formatInspectionDate, hasPendingObservations } from '@/lib/utils';
 import { CHECKLIST_CATEGORIES } from '@/types';
 import Image from 'next/image';
 import { downloadInspectionPDF } from '@/lib/pdf/generator';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { usePermissions } from '@/hooks';
+import { withTimeout } from '@/lib/utils/async';
 
 export default function InspectionDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { canEditInspections } = usePermissions();
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedEquipment, setExpandedEquipment] = useState<string[]>([]);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [selectedObservation, setSelectedObservation] = useState<Observation | null>(null);
 
   useEffect(() => {
+    if (!params?.id) {
+      router.replace('/inspections');
+      return;
+    }
     loadInspection();
   }, [params.id]);
 
   const loadInspection = async () => {
     setLoading(true);
-    const { data, error } = await InspectionService.getInspectionById(params.id as string);
 
-    if (error) {
-      toast.error('Error al cargar la inspección');
-      console.error(error);
-      router.push('/inspections');
-    } else {
-      setInspection(data);
+    try {
+      const result = await withTimeout(
+        InspectionService.getInspectionById(params.id as string)
+      );
+
+      if (!result) {
+        toast.warning('La carga está tardando más de lo normal');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = result as any;
+      if (error) {
+        toast.error('Error al cargar la inspección');
+        console.error(error);
+        router.replace('/inspections');
+        return;
+      }
+
+      // Ordenar equipos y observaciones por order_index para evitar desorden
+      const sortedEquipment = Array.isArray(data?.equipment)
+        ? [...data.equipment].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+        : [];
+      const sortedObservations = Array.isArray(data?.observations)
+        ? [...data.observations].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+        : [];
+      setInspection({ ...data, equipment: sortedEquipment, observations: sortedObservations });
+    } catch (e) {
+      console.error('Fallo al cargar inspección:', e);
+      toast.error('No se pudo cargar la inspección');
+      router.replace('/inspections');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setLoading(false);
+  const openReply = (obs: Observation) => {
+    setSelectedObservation(obs);
+    setReplyText(obs.obs_maintenance || '');
+    setReplyOpen(true);
+  };
+
+  const saveReply = async () => {
+    if (!selectedObservation) return;
+    try {
+      const trimmed = replyText.trim();
+      // Si la observación es derivada del checklist (sin id), crearla primero
+      if (!selectedObservation.id && inspection?.id) {
+        const { data, error } = await InspectionService.createObservation({
+          inspection_id: inspection.id,
+          obs_id: selectedObservation.obs_id,
+          equipment_code: selectedObservation.equipment_code,
+          obs_operator: selectedObservation.obs_operator,
+          obs_maintenance: trimmed,
+          order_index: selectedObservation.order_index ?? 0,
+        });
+        if (error || !data) throw new Error(error || 'No se pudo crear la observación');
+
+        toast.success('Observación creada y actualizada');
+        // Reemplazar la observación derivada por la persistida con id
+        setInspection((prev) => {
+          if (!prev) return prev;
+          const updated = (prev.observations || []).map((o) => {
+            const isSame = !o.id && o.obs_id === selectedObservation.obs_id && o.equipment_code === selectedObservation.equipment_code;
+            return isSame ? { ...data } : o;
+          });
+          return { ...prev, observations: updated };
+        });
+      } else {
+        const { error } = await InspectionService.updateObservationMaintenance(
+          selectedObservation.id as string,
+          trimmed
+        );
+        if (error) throw new Error(error);
+        toast.success('Observación actualizada');
+        // Actualizar en memoria sin recargar todo
+        setInspection((prev) => {
+          if (!prev) return prev;
+          const updated = (prev.observations || []).map((o) =>
+            o.id === selectedObservation.id ? { ...o, obs_maintenance: trimmed } : o
+          );
+          return { ...prev, observations: updated };
+        });
+      }
+      setReplyOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error('No se pudo actualizar la observación');
+    }
   };
 
   const toggleEquipment = (equipmentCode: string) => {
@@ -69,6 +159,21 @@ export default function InspectionDetailPage() {
         ? prev.filter((code) => code !== equipmentCode)
         : [...prev, equipmentCode]
     );
+  };
+
+  const goToChecklist = (obs: Observation) => {
+    // Expand corresponding equipment and scroll to the checklist item
+    const code = obs.equipment_code;
+    if (!expandedEquipment.includes(code)) {
+      setExpandedEquipment((prev) => [...prev, code]);
+    }
+    // Espera al render para hacer scroll
+    setTimeout(() => {
+      const el = document.getElementById(`row-${code}-${obs.obs_id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
   };
 
   const getStatusBadge = (status: string) => {
@@ -117,12 +222,13 @@ export default function InspectionDetailPage() {
     if (!inspection) return;
 
     try {
-      toast.loading('Generando PDF...');
-      await downloadInspectionPDF(inspection);
-      toast.success('PDF descargado exitosamente');
+      toast.loading('Abriendo plantilla FOR-ATA-057...');
+      const url = `/templates/forata057?id=${inspection.id}&print=true`;
+      window.open(url, '_blank');
+      toast.success('Plantilla abierta, imprimiendo a PDF');
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Error al generar el PDF');
+      console.error('Error abriendo plantilla:', error);
+      toast.error('Error al abrir la plantilla FOR-ATA-057');
     }
   };
 
@@ -153,10 +259,14 @@ export default function InspectionDetailPage() {
             Volver
           </Button>
           <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold">{inspection.form_code || 'Sin código'}</h2>
-              {getStatusBadge(inspection.status)}
-            </div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold">{inspection.form_code || 'Sin código'}</h2>
+                {hasPendingObservations(inspection) ? (
+                  <Badge variant="warning">Pendiente</Badge>
+                ) : (
+                  getStatusBadge(inspection.status)
+                )}
+              </div>
             <p className="text-sm text-muted-foreground">
               Detalles de la inspección técnica
             </p>
@@ -174,17 +284,18 @@ export default function InspectionDetailPage() {
           <CardTitle>Información General</CardTitle>
         </CardHeader>
         <CardContent>
+          {hasPendingObservations(inspection) && (
+            <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm">
+              Hay observaciones del operador sin respuesta del mecánico. La inspección no está al 100%.
+            </div>
+          )}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="flex items-center text-sm text-muted-foreground mb-1">
                 <Calendar className="mr-2 h-4 w-4" />
                 Fecha de Inspección
               </div>
-              <p className="font-semibold">
-                {typeof inspection.inspection_date === 'string'
-                  ? format(new Date(inspection.inspection_date), 'dd/MM/yyyy', { locale: es })
-                  : format(inspection.inspection_date, 'dd/MM/yyyy', { locale: es })}
-              </p>
+              <p className="font-semibold">{formatInspectionDate(inspection.inspection_date)}</p>
             </div>
             <div>
               <div className="flex items-center text-sm text-muted-foreground mb-1">
@@ -298,7 +409,7 @@ export default function InspectionDetailPage() {
                           </TableHeader>
                           <TableBody>
                             {checklistItems.map(([code, item]) => (
-                              <TableRow key={code}>
+                              <TableRow key={code} id={`row-${equipment.code}-${code}`}>
                                 <TableCell className="font-medium">{code}</TableCell>
                                 <TableCell>{item.description || '-'}</TableCell>
                                 <TableCell>
@@ -330,6 +441,75 @@ export default function InspectionDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Observaciones (Operador/Mecánico) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Observaciones ({inspection.observations?.length || 0})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {inspection.observations && inspection.observations.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Equipo</TableHead>
+                  <TableHead>Operador</TableHead>
+                  <TableHead>Mecánico</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {inspection.observations.map((obs) => (
+                  <TableRow key={obs.id || `${obs.obs_id}-${obs.equipment_code}`}> 
+                    <TableCell className="font-medium">{obs.obs_id}</TableCell>
+                    <TableCell>{obs.equipment_code}</TableCell>
+                    <TableCell className="max-w-sm">
+                      <span className="text-sm text-muted-foreground">{obs.obs_operator || '-'}</span>
+                    </TableCell>
+                    <TableCell className="max-w-sm">
+                      <span className="text-sm">{obs.obs_maintenance || '-'}</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => goToChecklist(obs)}>Ir al checklist</Button>
+                        {canEditInspections && (!obs.obs_maintenance || obs.obs_maintenance.trim().length === 0) && (
+                          <Button variant="outline" size="sm" onClick={() => openReply(obs)}>Responder</Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-muted-foreground">No hay observaciones registradas.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={replyOpen} onOpenChange={setReplyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Respuesta del Mecánico</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Código {selectedObservation?.obs_id} · Equipo {selectedObservation?.equipment_code}
+            </p>
+            <Textarea
+              placeholder="Ingresa tu observación de mantenimiento"
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReplyOpen(false)}>Cancelar</Button>
+            <Button onClick={saveReply}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Firma del Supervisor */}
       {inspection.status === 'completed' && inspection.supervisor_signature_url && (
         <Card>
@@ -350,7 +530,7 @@ export default function InspectionDetailPage() {
                     alt="Firma del supervisor"
                     width={400}
                     height={150}
-                    className="max-w-full h-auto"
+                    className="max-w-full w-auto h-auto"
                   />
                 </div>
               </div>
@@ -379,7 +559,7 @@ export default function InspectionDetailPage() {
                     alt="Firma del mecánico"
                     width={400}
                     height={150}
-                    className="max-w-full h-auto"
+                    className="max-w-full w-auto h-auto"
                   />
                 </div>
               </div>

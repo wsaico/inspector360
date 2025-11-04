@@ -84,6 +84,7 @@ export interface Inspection {
   created_at?: string;
   updated_at?: string;
   equipment?: Equipment[];
+  observations?: Observation[];
 }
 
 export interface InspectionFormData {

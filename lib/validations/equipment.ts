@@ -19,7 +19,9 @@ export const equipmentSchema = z.object({
 
 export const observationSchema = z.object({
   equipment_code: z.string().min(1, 'Código de equipo requerido'),
-  obs_operator: z.string().min(1, 'Observación del operador requerida'),
+  // La observación del operador será opcional aquí;
+  // Se hará obligatoria dinámicamente si el checklist del equipo tiene No Conformes
+  obs_operator: z.string().optional(),
   // La respuesta de mantenimiento puede ser posterior; permitir vacío inicialmente
   obs_maintenance: z.string().optional(),
 });

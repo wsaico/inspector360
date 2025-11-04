@@ -7,7 +7,13 @@ export const supabase = typeof window !== 'undefined'
       const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
       if (url && key) {
-        return createBrowserClient(url, key);
+        return createBrowserClient(url, key, {
+          auth: {
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: true,
+          },
+        });
       }
 
       // Fallback mínimo para no romper la UI en build/desarrollo sin ENV

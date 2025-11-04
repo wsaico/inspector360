@@ -5,7 +5,7 @@
  * Permite agregar múltiples observaciones relacionadas con los equipos
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useInspectionForm } from '@/context/inspection-context';
@@ -33,13 +33,29 @@ export default function Step2_5Observations() {
     resolver: zodResolver(observationSchema),
   });
 
+  // Detectar si para el equipo seleccionado es obligatorio el campo de obs del operador
+  const selectedEquipmentCode = watch('equipment_code');
+  const operatorObsRequired = useMemo(() => {
+    if (!selectedEquipmentCode) return false;
+    const checklist = formData.checklists[selectedEquipmentCode] || {};
+    return Object.values(checklist).some((item) => item?.status === 'no_conforme');
+  }, [selectedEquipmentCode, formData.checklists]);
+
   const onSubmit = (data: ObservationFormData) => {
+    // Regla: si hay uno o más items del checklist No Conformes para ese equipo,
+    // la observación del operador es obligatoria.
+    if (operatorObsRequired && (!data.obs_operator || data.obs_operator.trim().length === 0)) {
+      toast.error('La observación del operador es obligatoria porque el checklist tiene ítems No Conformes.');
+      return;
+    }
     // Generar ID automático OBS-001, OBS-002, etc.
     const nextNumber = editingIndex !== null ? editingIndex + 1 : formData.observations.length + 1;
     const obs_id = `OBS-${String(nextNumber).padStart(3, '0')}`;
 
     const observation: Observation = {
       ...data,
+      obs_operator: data.obs_operator ?? '',
+      obs_maintenance: data.obs_maintenance ?? null,
       obs_id,
       order_index: editingIndex !== null ? editingIndex : formData.observations.length,
     };
@@ -113,13 +129,17 @@ export default function Step2_5Observations() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Observación - Operador *</Label>
+                <Label>
+                  Observación - Operador {operatorObsRequired ? '*' : '(opcional si todo es Conforme)'}
+                </Label>
                 <Textarea
                   {...register('obs_operator')}
                   placeholder="Observaciones del operador del equipo"
                   rows={4}
                 />
-                {errors.obs_operator && <p className="text-sm text-red-500">{errors.obs_operator.message}</p>}
+                {operatorObsRequired && (!watch('obs_operator') || watch('obs_operator')?.trim().length === 0) && (
+                  <p className="text-sm text-red-500">Requerido: hay ítems No Conformes en el checklist.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Observación - Mantenimiento (responde mecánico)</Label>

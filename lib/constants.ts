@@ -61,3 +61,9 @@ export const SUCCESS_MESSAGES = {
   USER_UPDATED: 'Usuario actualizado exitosamente',
   PDF_GENERATED: 'PDF generado exitosamente',
 } as const;
+
+// Texto de nota para el footer del FOR-ATA-057
+export const FOR_ATA_057_FOOTER_NOTE = `**NOTA:**
+**Para registros fisicos:** No debe borrarse, bajo ninguna circunstancia, la información registrada originalmente en un registro; las correcciones o anulación de una parte de la información plasmada en los registros físicos, deben realizarse trazando una línea diagonal sobre la información a corregir o anular, garantizando que ésta quede legible, para luego consignar la nueva información al margen de la información original. La justificación de la corrección o anulación efectuada debe realizarse en la parte posterior del registro indicando la fecha, nombre y/o firma de quien lo ejecutó para que quede constancia.
+
+**Para registros electrónicos:** Colocar un comentario sobre la información modificada. La justificación de la corrección o anulación efectuada debe realizarse en el comentario añadido indicando la fecha, nombre y/o firma de quien lo ejecutó para que quede constancia.`;

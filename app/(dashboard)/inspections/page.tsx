@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePermissions } from '@/hooks';
 import { InspectionService } from '@/lib/services';
+import { withTimeout } from '@/lib/utils/async';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,8 +27,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Inspection } from '@/types';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { formatInspectionDate, hasPendingObservations } from '@/lib/utils';
 
 export default function InspectionsPage() {
   const { canCreateInspections } = usePermissions();
@@ -40,7 +40,17 @@ export default function InspectionsPage() {
 
   const loadInspections = async () => {
     setLoading(true);
-    const { data, error } = await InspectionService.getInspections();
+    // Evitar spinner infinito: aplicar timeout suave
+    const result = await withTimeout(InspectionService.getInspections(), 8000);
+
+    if (!result) {
+      // Corte de espera: mostramos tabla vacía y aviso
+      setInspections([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = result;
 
     if (error) {
       toast.error('Error al cargar inspecciones');
@@ -52,8 +62,11 @@ export default function InspectionsPage() {
     setLoading(false);
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'completed') {
+  const getStatusBadge = (inspection: Inspection) => {
+    if (hasPendingObservations(inspection)) {
+      return <Badge variant="warning">Pendiente</Badge>;
+    }
+    if (inspection.status === 'completed') {
       return <Badge variant="success">Completada</Badge>;
     }
     return <Badge variant="warning">Borrador</Badge>;
@@ -143,15 +156,7 @@ export default function InspectionsPage() {
                     <TableCell>
                       <div className="flex items-center text-sm">
                         <Calendar className="mr-2 h-4 w-4 text-gray-400" />
-                        {typeof inspection.inspection_date === 'string'
-                          ? format(
-                              new Date(inspection.inspection_date),
-                              'dd/MM/yyyy',
-                              { locale: es }
-                            )
-                          : format(inspection.inspection_date, 'dd/MM/yyyy', {
-                              locale: es,
-                            })}
+                        {formatInspectionDate(inspection.inspection_date)}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -166,7 +171,7 @@ export default function InspectionsPage() {
                         {inspection.station}
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(inspection.status)}</TableCell>
+                    <TableCell>{getStatusBadge(inspection)}</TableCell>
                     <TableCell className="text-right">
                       <Link href={`/inspections/${inspection.id}`}>
                         <Button variant="ghost" size="sm">

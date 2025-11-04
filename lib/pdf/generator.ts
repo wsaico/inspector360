@@ -29,7 +29,7 @@ export class PDFGenerator {
 
   constructor() {
     this.doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4',
     });
@@ -41,31 +41,21 @@ export class PDFGenerator {
    * Genera el PDF completo de la inspección
    */
   async generateInspectionPDF(inspection: Inspection): Promise<Blob> {
-    // Página 1: Información general y equipos
-    this.addHeader(inspection);
-    this.addGeneralInfo(inspection);
+    // Página principal horizontal: encabezado + matriz checklist + observaciones + firmas
+    await this.addHeader(inspection);
+    this.addTopMeta(inspection);
+    this.addLegend();
+    this.addChecklistMatrix(inspection);
+    this.addNoteParagraph();
+    this.addObservationsTable(inspection);
 
-    // Por cada equipo, agregar su checklist
-    if (inspection.equipment && inspection.equipment.length > 0) {
-      for (let i = 0; i < inspection.equipment.length; i++) {
-        const equipment = inspection.equipment[i];
-
-        // Si no es el primer equipo, agregar nueva página
-        if (i > 0) {
-          this.doc.addPage();
-          this.currentY = this.margin;
-          this.addHeader(inspection);
-        }
-
-        this.addEquipmentSection(equipment, i + 1);
-        this.addChecklistTable(equipment);
-      }
+    // Firmas al pie; si no hay espacio, nueva página
+    const remainingSpace = this.pageHeight - this.currentY - 40;
+    if (remainingSpace < 60) {
+      this.doc.addPage();
+      this.currentY = this.margin;
+      await this.addHeader(inspection);
     }
-
-    // Última página: Firmas
-    this.doc.addPage();
-    this.currentY = this.margin;
-    this.addHeader(inspection);
     await this.addSignaturesSection(inspection);
     this.addFooter();
 
@@ -75,41 +65,89 @@ export class PDFGenerator {
   /**
    * Agrega el encabezado de cada página
    */
-  private addHeader(inspection: Inspection) {
-    // Logo y título (simulado con texto por ahora)
-    this.doc.setFillColor(COLORS.primary);
-    this.doc.rect(0, 0, this.pageWidth, 30, 'F');
+  private async addHeader(inspection: Inspection) {
+    // Banda superior con logo y caja de metadatos a la derecha
+    const bandHeight = 22;
+    this.doc.setFillColor(COLORS.white);
+    this.doc.rect(0, 0, this.pageWidth, bandHeight, 'F');
 
-    this.doc.setTextColor(COLORS.white);
-    this.doc.setFontSize(18);
+    // Logo (si no existe, texto TALMA)
+    const logoX = this.margin;
+    const logoY = 4;
+    const logoW = 35;
+    const logoH = 14;
+    try {
+      const logoPath = '/assets/logo.png';
+      const dataUrl = await this.loadImage(logoPath);
+      this.doc.addImage(dataUrl, 'PNG', logoX, logoY, logoW, logoH);
+    } catch {
+      this.doc.setTextColor(COLORS.primary);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setFontSize(18);
+      this.doc.text('Talma', logoX, logoY + 12);
+    }
+
+    // Título centrado
+    const title = 'CONTROL DE INSPECCIÓN DE REVISIÓN 360° DE EQUIPOS GSE MOTORIZADOS- ESTACIONES';
+    this.doc.setTextColor(COLORS.black);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('INSPECCIÓN 360°', this.margin, 12);
+    this.doc.setFontSize(11);
+    const titleWidth = this.doc.getTextWidth(title);
+    this.doc.text(title, (this.pageWidth - titleWidth) / 2, 9);
 
-    this.doc.setFontSize(10);
+    // Caja derecha estática: Código, Versión, Fecha de emisión
+    const boxW = 80;
+    const boxH = bandHeight - 4;
+    const boxX = this.pageWidth - this.margin - boxW;
+    const boxY = 2;
+    const labelW = 42; // ancho col de etiqueta
+    const valueW = boxW - labelW;
+    const rowH = 6;
+
+    this.doc.setDrawColor(COLORS.gray);
+    this.doc.rect(boxX, boxY, boxW, boxH);
+    // Divisor vertical entre etiqueta/valor
+    this.doc.line(boxX + labelW, boxY, boxX + labelW, boxY + boxH);
+    // Filas
+    this.doc.line(boxX, boxY + rowH, boxX + boxW, boxY + rowH);
+    this.doc.line(boxX, boxY + rowH * 2, boxX + boxW, boxY + rowH * 2);
+
+    // Etiquetas (izquierda)
+    this.doc.setFontSize(9);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('Código:', boxX + 3, boxY + 4.3);
+    this.doc.text('Versión:', boxX + 3, boxY + rowH + 4.3);
+    this.doc.text('Fecha de emisión:', boxX + 3, boxY + rowH * 2 + 4.3);
+
+    // Valores (derecha) estáticos
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text('Sistema Integrado de Gestión', this.margin, 18);
+    const valX = boxX + labelW + 3;
+    this.doc.text('FOR-ATA-057', valX, boxY + 4.3);
+    this.doc.text('3', valX, boxY + rowH + 4.3);
+    this.doc.text('17/09/2025', valX, boxY + rowH * 2 + 4.3);
 
-    // Código del formulario
-    this.doc.setFontSize(12);
-    this.doc.setFont('helvetica', 'bold');
-    const formCode = inspection.form_code || 'FOR-ATA-057';
-    const codeWidth = this.doc.getTextWidth(formCode);
-    this.doc.text(formCode, this.pageWidth - this.margin - codeWidth, 12);
+    this.currentY = bandHeight + 4;
+  }
 
-    // Fecha
+  // Meta superior: fecha y operador
+  private addTopMeta(inspection: Inspection) {
     this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
-    const dateStr = format(
-      typeof inspection.inspection_date === 'string'
-        ? new Date(inspection.inspection_date)
-        : inspection.inspection_date,
-      'dd/MM/yyyy',
-      { locale: es }
-    );
-    const dateWidth = this.doc.getTextWidth(dateStr);
-    this.doc.text(dateStr, this.pageWidth - this.margin - dateWidth, 18);
+    const dateStr = this.formatDateLocal(inspection.inspection_date);
+    this.doc.text(`Fecha: ${dateStr}`, this.margin, this.currentY);
+    const opText = `Operador a cargo de la inspección: ${inspection.inspector_name}`;
+    const opWidth = this.doc.getTextWidth(opText);
+    this.doc.text(opText, this.pageWidth - this.margin - opWidth, this.currentY);
+    this.currentY += 8;
+  }
 
-    this.currentY = 35;
+  // Leyenda ✓ / X / N/A como en el formato HTML
+  private addLegend() {
+    const legend = '✓ (Check) si el ítem cumple o está conforme.  X si el ítem no cumple o presenta una observación.  N/A si el ítem no aplica para el equipo o actividad inspeccionada.';
+    this.doc.setFontSize(8);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.text(legend, this.margin, this.currentY);
+    this.currentY += 6;
   }
 
   /**
@@ -264,6 +302,108 @@ export class PDFGenerator {
     this.currentY = (this.doc as any).lastAutoTable.finalY + 10;
   }
 
+  // Matriz de checklist (filas: equipos, columnas: ítems) en horizontal
+  private addChecklistMatrix(inspection: Inspection) {
+    // Encabezados exactos del HTML (12 ítems)
+    const headerItems = [
+      'Extintor vigente: verificar presencia, fecha de vencimiento y de ultima inspección. El manómetro en zona verde.',
+      'Pin de seguridad: comprobar que esté colocado correctamente y sin deformaciones.',
+      'Calzas: deben estar disponibles, sin fisuras ni desgaste excesivo.',
+      'Placards, stickers y micas: deben estar legibles, adheridos y sin daños.',
+      'Nivel de combustible: debe ser suficiente para la operación prevista.',
+      'Asiento y cinturón de seguridad: revisar estado, anclaje y funcionamiento.',
+      'Circulina operativa: encender y comprobar visibilidad (Aplica a todos los equipos). \nAlarma de retroceso operativo (Aplica a FT-PM-TR)',
+      'Luces operativas: verificar luces delanteras, traseras y de freno.',
+      'Cintas reflectivas: deben estar adheridas y visibles.',
+      'Pintura: sin deterioro que afecte señalización o visibilidad del equipo.',
+      'Neumáticos sin desgaste: revisar la ausencia de grietas o desgaste de las llantas.',
+      'Frenos operativos (Freno de pedal y parqueo o mano): probar funcionamiento antes de iniciar el desplazamiento.',
+    ];
+
+    const items = [...CHECKLIST_TEMPLATE]
+      .sort((a, b) => a.order_index - b.order_index)
+      .slice(0, 12);
+
+    const head = ['CÓDIGO', 'HORA', ...headerItems, 'FIRMA'];
+    const hourStr = this.formatTimeLocal(inspection.inspection_date);
+    const rows = (inspection.equipment || []).map((eq) => {
+      const checklist = eq.checklist_data || {};
+      const values = items.map((i) => {
+        const st = checklist[i.code]?.status || null;
+        if (st === 'conforme') return '✓';
+        if (st === 'no_conforme') return 'X';
+        if (st === 'no_aplica') return 'N/A';
+        return '';
+      });
+      return [eq.code || '-', hourStr, ...values, eq.inspector_signature_url ? 'Firmado' : ''];
+    });
+
+    const usableW = this.pageWidth - this.margin * 2;
+    const fixedLeft = 22 + 18;
+    const fixedRight = 22;
+    const remaining = usableW - fixedLeft - fixedRight;
+    const perItem = remaining / items.length;
+
+    const columnStyles: Record<number, any> = { 0: { cellWidth: 22 }, 1: { cellWidth: 18 } };
+    for (let i = 2; i < 2 + items.length; i++) columnStyles[i] = { cellWidth: perItem };
+    columnStyles[2 + items.length] = { cellWidth: 22 };
+
+    autoTable(this.doc, {
+      startY: this.currentY,
+      head: [head],
+      body: rows,
+      styles: { fontSize: 8, halign: 'center', valign: 'middle', overflow: 'linebreak' },
+      headStyles: { fillColor: [9, 48, 113], textColor: 255, fontStyle: 'bold' },
+      columnStyles,
+      margin: { left: this.margin, right: this.margin },
+    });
+
+    // @ts-ignore
+    this.currentY = (this.doc as any).lastAutoTable.finalY + 8;
+  }
+
+  // Párrafo informativo previo a las observaciones
+  private addNoteParagraph() {
+    const text = 'Para hacer la revisión inicial 360 de los vehículos motorizados el operador asignado a la operación de su equipo tiene la responsabilidad y obligación de verificar lo siguiente antes de operar la unidad siguiendo los puntos que se encuentran en los stickers de color amarillo en cada equipo, de encontrar alguna falla o algún problema en el equipo deberá ser reportado inmediatamente a su supervisor y al equipo de mantenimiento.';
+    this.doc.setFontSize(8);
+    this.doc.setFont('helvetica', 'normal');
+    const maxWidth = this.pageWidth - this.margin * 2;
+    const lines = this.doc.splitTextToSize(text, maxWidth);
+    this.doc.text(lines, this.margin, this.currentY);
+    this.currentY += 6 + lines.length * 3.2;
+  }
+
+  // Tabla de observaciones
+  private addObservationsTable(inspection: Inspection) {
+    const obs = inspection.observations || [];
+    if (obs.length === 0) return;
+
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('OBSERVACIONES', this.margin, this.currentY);
+    this.currentY += 6;
+
+    const head = ['CÓDIGO', 'OBSERVACIONES OPERADOR', 'OBSERVACIONES MANTENIMIENTO'];
+    const rows = obs.map((o) => [o.equipment_code || o.obs_id || '-', o.obs_operator || '', o.obs_maintenance || '']);
+
+    autoTable(this.doc, {
+      startY: this.currentY,
+      head: [head],
+      body: rows,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [9, 48, 113], textColor: 255, fontStyle: 'bold' },
+      margin: { left: this.margin, right: this.margin },
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: (this.pageWidth - this.margin * 2 - 22) * 0.5 },
+        2: { cellWidth: (this.pageWidth - this.margin * 2 - 22) * 0.5 },
+      },
+    });
+
+    // @ts-ignore
+    this.currentY = (this.doc as any).lastAutoTable.finalY + 8;
+  }
+
   /**
    * Agrega la sección de firmas
    */
@@ -363,6 +503,16 @@ export class PDFGenerator {
       this.doc.setFontSize(8);
       this.doc.text('Firma del Mecánico', this.margin + 20, this.currentY);
     }
+
+    // Nota justo debajo de las firmas (letra muy pequeña)
+    const note = `NOTA:\nPara registros fisicos: No debe borrarse, bajo ninguna circunstancia, la información registrada originalmente en un registro; las correcciones o anulación de una parte de la información plasmada en los registros físicos, deben realizarse trazando una línea diagonal sobre la información a corregir o anular, garantizando que ésta quede legible, para luego consignar la nueva información al margen de la información original. La justificación de la corrección o anulación efectuada debe realizarse en la parte posterior del registro indicando la fecha, nombre y/o firma de quien lo ejecutó para que quede constancia.\n\nPara registros electrónicos: Colocar un comentario sobre la información modificada. La justificación de la corrección o anulación efectuada debe realizarse en el comentario añadido indicando la fecha, nombre y/o firma de quien lo ejecutó para que quede constancia.`;
+    this.currentY += 8;
+    this.doc.setTextColor(COLORS.black);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setFontSize(8);
+    const lines = this.doc.splitTextToSize(note, this.pageWidth - this.margin * 2);
+    this.doc.text(lines, this.margin, this.currentY);
+    this.currentY += lines.length * 4.2;
   }
 
   /**
@@ -377,10 +527,7 @@ export class PDFGenerator {
     this.doc.setTextColor(COLORS.gray);
     this.doc.setFontSize(8);
     this.doc.setFont('helvetica', 'normal');
-
-    const footerText = 'Inspector 360° - Sistema Integrado de Gestión';
-    const textWidth = this.doc.getTextWidth(footerText);
-    this.doc.text(footerText, (this.pageWidth - textWidth) / 2, footerY);
+    // El pie solo muestra número de página; texto informativo ya va bajo firmas
 
     // Número de página
     const pageText = `Página ${this.doc.getCurrentPageInfo().pageNumber}`;
@@ -408,6 +555,24 @@ export class PDFGenerator {
     });
   }
 
+  // Formatea fecha preservando día cuando llega como string
+  private formatDateLocal(input: Date | string): string {
+    if (typeof input === 'string') {
+      const m = input.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
+      if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    }
+    return format(typeof input === 'string' ? new Date(input) : input, 'dd/MM/yyyy', { locale: es });
+  }
+
+  private formatTimeLocal(input: Date | string): string {
+    if (typeof input === 'string') {
+      const m = input.match(/T(\d{2}):(\d{2})/);
+      if (m) return `${m[1]}:${m[2]}`;
+      return '';
+    }
+    return format(input, 'HH:mm', { locale: es });
+  }
+
   /**
    * Obtiene el nombre del tipo de inspección
    */
@@ -418,6 +583,14 @@ export class PDFGenerator {
       post_mantenimiento: 'Post Mantenimiento',
     };
     return types[type] || type;
+  }
+
+  // Acorta descripciones largas para cabeceras de columna
+  private shorten(text: string): string {
+    const max = 26;
+    if (!text) return '';
+    if (text.length <= max) return text;
+    return text.slice(0, max - 1) + '…';
   }
 
   /**

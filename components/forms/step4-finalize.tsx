@@ -73,6 +73,21 @@ export default function Step4Finalize() {
         }
       }
 
+      // 2.5 Guardar observaciones agregadas en el formulario (si existen)
+      if (formData.observations && formData.observations.length > 0) {
+        for (let i = 0; i < formData.observations.length; i++) {
+          const o = formData.observations[i];
+          await InspectionService.createObservation({
+            inspection_id: inspection.id!,
+            obs_id: o.obs_id,
+            equipment_code: o.equipment_code,
+            obs_operator: o.obs_operator,
+            obs_maintenance: o.obs_maintenance ?? null,
+            order_index: i,
+          });
+        }
+      }
+
       // 3. Completar con firmas
       await InspectionService.completeInspection(inspection.id!, {
         supervisorName,

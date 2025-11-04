@@ -8,12 +8,55 @@ import { Inspection, Equipment } from '@/types';
 
 export class InspectionService {
   /**
+   * Deriva observaciones a partir del checklist de equipos
+   * Si un ítem está en "no_conforme" o tiene texto en observations, se genera una observación del operador.
+   * Se evita duplicar si ya existe una observación explícita con el mismo (equipment_code, obs_id).
+   */
+  private static deriveObservationsFromEquipment(
+    equipmentList: Equipment[] | undefined,
+    existing: any[] = []
+  ) {
+    if (!equipmentList || equipmentList.length === 0) return [];
+
+    const existingKeys = new Set(
+      (existing || []).map((o) => `${o.equipment_code}::${o.obs_id}`)
+    );
+
+    const derived: any[] = [];
+    equipmentList.forEach((eq) => {
+      const entries = Object.entries(eq.checklist_data || {});
+      entries.forEach(([code, item], index) => {
+        const hasText = (item?.observations || '').trim().length > 0;
+        const isNC = item?.status === 'no_conforme';
+        if (isNC || hasText) {
+          const key = `${eq.code}::${code}`;
+          if (!existingKeys.has(key)) {
+            derived.push({
+              // sin id (proviene del checklist), sirve para visualización
+              inspection_id: eq.inspection_id,
+              obs_id: code,
+              equipment_code: eq.code,
+              obs_operator: item?.observations || (isNC ? 'Item no conforme' : ''),
+              obs_maintenance: null,
+              order_index: index,
+              created_at: undefined,
+              updated_at: undefined,
+            });
+          }
+        }
+      });
+    });
+
+    return derived;
+  }
+  /**
    * Obtiene todas las inspecciones según los permisos del usuario
    * El RLS de Supabase maneja automáticamente el filtrado por rol
    */
   static async getInspections() {
     try {
-      const { data, error } = await supabase
+      // Obtener inspecciones con equipos
+      const { data: inspections, error: inspectionsError } = await supabase
         .from('inspections')
         .select(`
           *,
@@ -21,12 +64,44 @@ export class InspectionService {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching inspections:', error);
-        throw error;
+      if (inspectionsError) {
+        console.error('Error fetching inspections:', inspectionsError);
+        throw inspectionsError;
       }
 
-      return { data, error: null };
+      const ids = (inspections || []).map((i) => i.id).filter(Boolean);
+      if (!ids || ids.length === 0) {
+        return { data: inspections || [], error: null };
+      }
+
+      // Obtener observaciones asociadas en un solo query y adjuntar
+      const { data: obs, error: obsError } = await supabase
+        .from('observations')
+        .select('id, inspection_id, obs_id, equipment_code, obs_operator, obs_maintenance, order_index, created_at, updated_at')
+        .in('inspection_id', ids);
+
+      if (obsError) {
+        console.warn('Observations fetch failed, continuing without them:', obsError);
+        return { data: inspections || [], error: null };
+      }
+
+      const byInspection: Record<string, any[]> = {};
+      (obs || []).forEach((o) => {
+        const key = o.inspection_id;
+        if (!byInspection[key]) byInspection[key] = [];
+        byInspection[key].push(o);
+      });
+
+      const withObs = (inspections || []).map((i) => {
+        const attached = byInspection[i.id!] || [];
+        const derived = InspectionService.deriveObservationsFromEquipment(i.equipment as Equipment[] | undefined, attached);
+        return {
+          ...i,
+          observations: attached.length > 0 ? attached : derived,
+        };
+      });
+
+      return { data: withObs, error: null };
     } catch (error: any) {
       console.error('Error fetching inspections:', error);
       return { data: null, error: error.message };
@@ -38,7 +113,8 @@ export class InspectionService {
    */
   static async getInspectionById(id: string) {
     try {
-      const { data, error } = await supabase
+      // Obtener inspección con equipos
+      const { data: inspection, error: inspectionError } = await supabase
         .from('inspections')
         .select(`
           *,
@@ -47,8 +123,21 @@ export class InspectionService {
         .eq('id', id)
         .single();
 
-      if (error) throw error;
-      return { data, error: null };
+      if (inspectionError) throw inspectionError;
+
+      // Obtener observaciones asociadas explícitamente
+      const { data: observations, error: obsError } = await supabase
+        .from('observations')
+        .select('id, inspection_id, obs_id, equipment_code, obs_operator, obs_maintenance, order_index, created_at, updated_at')
+        .eq('inspection_id', id);
+
+      if (obsError) {
+        console.warn('Observations fetch failed for inspection:', id, obsError);
+      }
+
+      const derived = InspectionService.deriveObservationsFromEquipment(inspection?.equipment as Equipment[] | undefined, observations || []);
+      const finalObs = (observations && observations.length > 0) ? observations : derived;
+      return { data: { ...inspection, observations: finalObs }, error: null };
     } catch (error: any) {
       console.error('Error fetching inspection:', error);
       return { data: null, error: error.message };
@@ -367,6 +456,67 @@ export class InspectionService {
     } catch (error: any) {
       console.error('Error fetching unique equipment:', error);
       return { data: [], error: error.message };
+    }
+  }
+
+  /**
+   * Actualiza la respuesta del mecánico para una observación
+   */
+  static async updateObservationMaintenance(
+    observationId: string,
+    obsMaintenance: string
+  ) {
+    try {
+      const { data, error } = await supabase
+        .from('observations')
+        .update({
+          obs_maintenance: obsMaintenance,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', observationId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error updating observation maintenance:', error);
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Crea una observación cuando proviene del checklist (sin id)
+   */
+  static async createObservation(
+    payload: {
+      inspection_id: string;
+      obs_id: string;
+      equipment_code: string;
+      obs_operator: string;
+      obs_maintenance: string | null;
+      order_index?: number;
+    }
+  ) {
+    try {
+      const { data, error } = await supabase
+        .from('observations')
+        .insert({
+          inspection_id: payload.inspection_id,
+          obs_id: payload.obs_id,
+          equipment_code: payload.equipment_code,
+          obs_operator: payload.obs_operator,
+          obs_maintenance: payload.obs_maintenance,
+          order_index: payload.order_index ?? 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error creating observation:', error);
+      return { data: null, error: error.message };
     }
   }
 }

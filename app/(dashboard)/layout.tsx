@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks';
 
 export default function DashboardGroupLayout({
   children,
@@ -12,47 +12,32 @@ export default function DashboardGroupLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
+  const { user, loading } = useAuth();
+  const [authTimeout, setAuthTimeout] = useState(false);
+  // Modo desarrollo sin Supabase: permitir acceso al dashboard sin bloquear
+  const devNoAuth = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  // Redirección basada en estado de autenticación centralizado
   useEffect(() => {
-    const verifySession = async () => {
-      try {
-        // Si el cliente de Supabase no está disponible, redirige al login y evita spinner infinito
-        if (!supabase || !('auth' in supabase)) {
-          setAuthorized(false);
-          router.replace('/login');
-          setLoading(false);
-          return;
-        }
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
 
-        const { data: { session }, error } = await supabase.auth.getSession();
+  // Guardia: si la autenticación tarda demasiado, cortamos el spinner
+  useEffect(() => {
+    if (loading && !authTimeout) {
+      const t = setTimeout(() => setAuthTimeout(true), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [loading, authTimeout]);
 
-        if (error) {
-          // Ante cualquier error, enviamos al login y liberamos el loader
-          setAuthorized(false);
-          router.replace('/login');
-        } else {
-          if (session) {
-            setAuthorized(true);
-          } else {
-            setAuthorized(false);
-            router.replace('/login');
-          }
-        }
-      } catch (err) {
-        // Cualquier error: no autorizado y redirigir a login
-        setAuthorized(false);
-        router.replace('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
+  if (devNoAuth) {
+    // Entorno sin Supabase configurado: no bloquear navegación
+    return <DashboardShell>{children}</DashboardShell>;
+  }
 
-    verifySession();
-  }, [router]);
-
-  if (loading) {
+  if (loading && !authTimeout) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -60,7 +45,34 @@ export default function DashboardGroupLayout({
     );
   }
 
-  if (!authorized) {
+  if (loading && authTimeout) {
+    // Fallback limpio: mensaje y acceso a login sin spinner infinito
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="rounded-lg border bg-white p-6 shadow">
+          <p className="text-sm text-muted-foreground">
+            La validación de sesión está tardando demasiado.
+          </p>
+          <div className="mt-4 flex gap-3">
+            <button
+              className="inline-flex items-center rounded-md border px-3 py-2 text-sm"
+              onClick={() => router.replace('/login')}
+            >
+              Ir a login
+            </button>
+            <button
+              className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm text-white"
+              onClick={() => location.reload()}
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
     return null;
   }
 

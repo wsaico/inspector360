@@ -192,9 +192,18 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
         return true;
       case 4:
         // Verificar que todos los equipos tengan checklist completo (según template)
+        // y aplicar regla: si un equipo tiene uno o más ítems No Conformes,
+        // debe existir al menos una observación del operador para ese equipo.
         return formData.equipment.every(eq => {
           const checklist = formData.checklists[eq.code];
-          return checklist && Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
+          const checklistCompleto = checklist && Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
+          if (!checklistCompleto) return false;
+          const tieneNoConformes = Object.values(checklist || {}).some((item) => item?.status === 'no_conforme');
+          if (!tieneNoConformes) return true; // si todo es conforme, no exigir observación
+          const tieneObsOperador = formData.observations.some(
+            (obs) => obs.equipment_code === eq.code && !!obs.obs_operator && obs.obs_operator.trim().length > 0
+          );
+          return tieneObsOperador;
         });
       case 5:
         return (
