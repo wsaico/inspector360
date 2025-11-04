@@ -14,15 +14,36 @@ export default function Home() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        // Si el cliente de Supabase no está disponible, redirige al login
+        if (!supabase || !('auth' in supabase)) {
+          setHasSession(false);
+          router.replace('/login');
+          setLoading(false);
+          return;
+        }
 
-      if (session) {
-        setHasSession(true);
-      } else {
-        router.push('/login');
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          // En caso de error, enviamos al login y liberamos el loader
+          console.error('Error obteniendo sesión:', error);
+          setHasSession(false);
+          router.replace('/login');
+        } else if (session) {
+          setHasSession(true);
+        } else {
+          router.replace('/login');
+        }
+
+        setLoading(false);
+      } catch (err) {
+        // Cualquier excepción (p.ej. variables de entorno faltan) no debe dejar el spinner infinito
+        console.error('Excepción en checkSession:', err);
+        setHasSession(false);
+        router.replace('/login');
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     checkSession();
