@@ -76,7 +76,11 @@ export default function Step2_5Observations() {
 
   const handleEdit = (index: number) => {
     const obs = formData.observations[index];
-    reset(obs);
+    reset({
+      equipment_code: obs.equipment_code,
+      obs_operator: obs.obs_operator ?? '',
+      obs_maintenance: obs.obs_maintenance ?? undefined,
+    });
     setEditingIndex(index);
   };
 

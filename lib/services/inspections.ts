@@ -69,7 +69,7 @@ export class InspectionService {
         throw inspectionsError;
       }
 
-      const ids = (inspections || []).map((i) => i.id).filter(Boolean);
+      const ids = (inspections || []).map((i: { id?: string }) => i.id).filter(Boolean);
       if (!ids || ids.length === 0) {
         return { data: inspections || [], error: null };
       }
@@ -86,13 +86,13 @@ export class InspectionService {
       }
 
       const byInspection: Record<string, any[]> = {};
-      (obs || []).forEach((o) => {
+      (obs || []).forEach((o: any) => {
         const key = o.inspection_id;
         if (!byInspection[key]) byInspection[key] = [];
         byInspection[key].push(o);
       });
 
-      const withObs = (inspections || []).map((i) => {
+      const withObs = (inspections || []).map((i: Inspection) => {
         const attached = byInspection[i.id!] || [];
         const derived = InspectionService.deriveObservationsFromEquipment(i.equipment as Equipment[] | undefined, attached);
         return {

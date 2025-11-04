@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import FORATA057Template from '../../../components/pages/forata057-template';
 import { FOR_ATA_057_FOOTER_NOTE } from '@/lib/constants';
 import { InspectionProvider, useInspectionForm } from '@/context/inspection-context';
@@ -210,7 +210,7 @@ function TemplateWithData() {
 export default function Page() {
   return (
     <InspectionProvider>
-      <TemplateWithData />
+      <Suspense fallback={<div />}>\n      <TemplateWithData />\n      </Suspense>
     </InspectionProvider>
   );
 }
