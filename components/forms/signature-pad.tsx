@@ -8,6 +8,7 @@
 import { useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eraser, Check, X } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export default function SignaturePad({
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       const dataURL = sigCanvas.current.toDataURL('image/png');
       onSave(dataURL);
+      toast.success('Firma guardada');
     }
   };
 
@@ -78,19 +80,19 @@ export default function SignaturePad({
         </div>
 
         {/* Botones de acción */}
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={handleClear}
             disabled={isEmpty}
+            className="w-full sm:w-auto"
           >
             <Eraser className="mr-2 h-4 w-4" />
             Limpiar
           </Button>
-          <div className="flex-1" />
           {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
               <X className="mr-2 h-4 w-4" />
               Cancelar
             </Button>
@@ -99,7 +101,7 @@ export default function SignaturePad({
             type="button"
             onClick={handleSave}
             disabled={isEmpty}
-            className="bg-primary"
+            className="bg-primary w-full sm:w-auto"
           >
             <Check className="mr-2 h-4 w-4" />
             Guardar Firma

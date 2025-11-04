@@ -44,7 +44,12 @@ export default function Step3Checklist() {
   };
 
   const isChecklistComplete = () => {
-    return Object.keys(currentChecklist).length === CHECKLIST_TEMPLATE.length;
+    const baseComplete = Object.keys(currentChecklist).length === CHECKLIST_TEMPLATE.length;
+    // Si hay observaciones del inspector sin respuesta de mecánico para este equipo, queda pendiente
+    const hasPendingObservation = formData.observations.some(
+      (obs) => obs.equipment_code === currentEquipment.code && !!obs.obs_operator && !obs.obs_maintenance
+    );
+    return baseComplete && !hasPendingObservation;
   };
 
   return (
@@ -179,13 +184,23 @@ export default function Step3Checklist() {
               />
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  El checklist de este equipo está completo. Firme para confirmar la inspección.
-                </p>
-                <Button onClick={() => setShowSignaturePad(true)}>
-                  <PenLine className="mr-2 h-4 w-4" />
-                  Firmar Checklist
-                </Button>
+                {formData.observations.some((obs) => obs.equipment_code === currentEquipment.code && !!obs.obs_operator && !obs.obs_maintenance) ? (
+                  <>
+                    <p className="text-muted-foreground mb-4">
+                      Checklist completo pero con observaciones del inspector. Pendiente respuesta del mecánico.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground mb-4">
+                      El checklist de este equipo está completo. Firme para confirmar la inspección.
+                    </p>
+                    <Button onClick={() => setShowSignaturePad(true)}>
+                      <PenLine className="mr-2 h-4 w-4" />
+                      Firmar Checklist
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </CardContent>

@@ -146,7 +146,7 @@ export default function InspectionDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/inspections')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -162,7 +162,7 @@ export default function InspectionDetailPage() {
             </p>
           </div>
         </div>
-        <Button onClick={handleDownloadPDF}>
+        <Button onClick={handleDownloadPDF} className="w-full md:w-auto">
           <Download className="mr-2 h-4 w-4" />
           Descargar PDF
         </Button>

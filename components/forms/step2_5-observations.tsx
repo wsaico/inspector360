@@ -51,6 +51,9 @@ export default function Step2_5Observations() {
     } else {
       addObservation(observation);
       toast.success('Observación agregada');
+      if (observation.obs_operator && !observation.obs_maintenance) {
+        toast.info(`Pendiente respuesta de mecánico para ${observation.obs_id}`);
+      }
     }
     reset();
   };
@@ -119,7 +122,7 @@ export default function Step2_5Observations() {
                 {errors.obs_operator && <p className="text-sm text-red-500">{errors.obs_operator.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label>Observación - Mantenimiento *</Label>
+                <Label>Observación - Mantenimiento (responde mecánico)</Label>
                 <Textarea
                   {...register('obs_maintenance')}
                   placeholder="Observaciones de mantenimiento"

@@ -20,7 +20,8 @@ export const equipmentSchema = z.object({
 export const observationSchema = z.object({
   equipment_code: z.string().min(1, 'Código de equipo requerido'),
   obs_operator: z.string().min(1, 'Observación del operador requerida'),
-  obs_maintenance: z.string().min(1, 'Observación de mantenimiento requerida'),
+  // La respuesta de mantenimiento puede ser posterior; permitir vacío inicialmente
+  obs_maintenance: z.string().optional(),
 });
 
 export type EquipmentFormData = z.infer<typeof equipmentSchema>;
