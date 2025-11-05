@@ -46,7 +46,9 @@ export default function InspectionsPage() {
   const loadInspections = async () => {
     setLoading(true);
     // Evitar spinner infinito: aplicar timeout suave
-    const result = await withTimeout(InspectionService.getInspections({ page, pageSize }), 8000);
+    // Si no puede ver todas, pedimos al backend filtrar por su estación
+    const stationFilter = canViewAllStations ? undefined : (profile?.station || undefined);
+    const result = await withTimeout(InspectionService.getInspections({ page, pageSize, station: stationFilter }), 8000);
 
     if (!result) {
       // Corte de espera: mostramos tabla vacía y aviso
@@ -62,6 +64,7 @@ export default function InspectionsPage() {
       console.error(error);
     } else {
       setInspections(data || []);
+      // El total proporcionado por el backend ya respeta la estación si se aplicó filtro.
       setTotal(typeof t === 'number' ? t : (data?.length || 0));
     }
 

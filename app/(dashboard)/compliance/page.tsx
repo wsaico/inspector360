@@ -34,7 +34,7 @@ import { STATIONS } from '@/types/roles';
 import { StationsService } from '@/lib/services/stations';
 
 export default function CompliancePage() {
-  const { profile, loading: profileLoading } = useAuth();
+  const { profile, loading: profileLoading, user, error, status } = useAuth();
   const { canViewAllStations } = usePermissions();
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
@@ -79,6 +79,10 @@ export default function CompliancePage() {
 
   useEffect(() => {
     if (profileLoading) return;
+    // Evitar cargar si la sesión no está activa
+    if (!user) return;
+    // Evitar cargar datos globales por un primer render sin estación cuando no tiene permiso.
+    if (!showAllStations && !station) return;
 
     const fetchData = async () => {
       setLoading(true);
@@ -128,6 +132,9 @@ export default function CompliancePage() {
         <p className="text-sm text-muted-foreground">
           Métricas y estadísticas de inspecciones
         </p>
+        {status === 'unauthenticated' && !profileLoading && (
+          <p className="mt-2 text-xs text-red-600">Sesión expirada o perfil no disponible. Inicia sesión para ver tus datos de estación.</p>
+        )}
       </div>
 
       {/* Filtros */}
@@ -176,7 +183,11 @@ export default function CompliancePage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalInspections}</div>
             <p className="text-xs text-muted-foreground">
-              Todas las inspecciones registradas
+              {showAllStations && !station
+                ? 'Todas las estaciones'
+                : station
+                  ? `Inspecciones de la estación ${station}`
+                  : 'Inspecciones'}
             </p>
           </CardContent>
         </Card>

@@ -243,13 +243,30 @@ export default function InspectionDetailPage() {
     if (!inspection) return;
 
     try {
-      toast.loading('Abriendo plantilla FOR-ATA-057...');
-      const url = `/templates/forata057?id=${inspection.id}&print=true`;
-      window.open(url, '_blank');
-      toast.success('Plantilla abierta, imprimiendo a PDF');
+      const toastId = toast.loading('Generando PDF (FOR-ATA-057) ...');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+      const res = await fetch(`/api/inspections/${inspection.id}/pdf`, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        throw new Error(`Error ${res.status}: no se pudo generar el PDF`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `FOR-ATA-057-${inspection.form_code || inspection.id}.pdf`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.dismiss(toastId);
+      toast.success('PDF descargado correctamente');
     } catch (error) {
-      console.error('Error abriendo plantilla:', error);
-      toast.error('Error al abrir la plantilla FOR-ATA-057');
+      console.error('Error generando/descargando PDF:', error);
+      try { toast.dismiss(); } catch {}
+      toast.error('No se pudo generar el PDF');
     }
   };
 

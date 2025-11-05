@@ -21,7 +21,7 @@ import { StationsService } from '@/lib/services/stations';
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
-  const { profile, error } = useAuth();
+  const { profile, error, user, status, loading: authLoading } = useAuth();
   const { canCreateInspections, canViewAllStations } = usePermissions();
 
   const [loading, setLoading] = useState(false);
@@ -37,7 +37,8 @@ export default function DashboardPage() {
     complianceRate: 0,
   });
 
-  const showAllStations = canViewAllStations || (!profile?.station) || String(profile?.station).toLowerCase() === 'todas';
+  // No elevar a global por "estación vacía"; solo admin/SIG o estación explícita "todas"
+  const showAllStations = canViewAllStations || String(profile?.station || '').toLowerCase() === 'todas';
 
   useEffect(() => {
     if (!showAllStations && profile?.station) {
@@ -49,6 +50,15 @@ export default function DashboardPage() {
     const load = async () => {
       setLoading(true);
       try {
+        // Evitar cargar si la sesión no está activa
+        if (!user) {
+          return;
+        }
+        // Evitar cargar datos globales si el usuario no puede ver todas
+        // y aún no se ha establecido su estación.
+        if (!showAllStations && !station) {
+          return;
+        }
         const overall = await ComplianceService.getOverallStats({ station, month });
         const daily = await ComplianceService.getDailyCompliance({ station, month, aggregateAll: showAllStations && !station });
 
@@ -96,13 +106,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Error message if profile failed to load */}
-      {error && !profile && (
+      {status === 'unauthenticated' && !authLoading && !profile && (
         <Card className="border-destructive">
           <CardHeader>
-            <CardTitle className="text-destructive">Error al cargar perfil</CardTitle>
+            <CardTitle className="text-destructive">Sesión expirada o perfil no disponible</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">{error}</p>
+            <p className="text-sm text-muted-foreground">{error || 'Tu sesión puede haber expirado. Inicia sesión nuevamente para ver datos de tu estación.'}</p>
             <p className="text-sm text-muted-foreground mt-2">
               Por favor contacta al administrador del sistema.
             </p>
@@ -219,7 +229,11 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalInspections}</div>
             <p className="text-xs text-muted-foreground">
-              Todas las inspecciones
+              {showAllStations && !station
+                ? 'Todas las estaciones'
+                : station
+                  ? `Inspecciones de la estación ${station}`
+                  : 'Inspecciones'}
             </p>
           </CardContent>
         </Card>

@@ -165,7 +165,12 @@ const sampleData: Inspection = {
   mechanic_signature_date: new Date('2025-11-04T16:00:00'),
 };
 
-const FORATA057Template: React.FC<{ data?: Inspection; headerMode?: 'codes' | 'text' }> = ({ data = sampleData, headerMode = 'text' }) => {
+const FORATA057Template: React.FC<{
+  data?: Inspection;
+  headerMode?: 'codes' | 'text';
+  compact?: boolean;
+  padRows?: boolean;
+}> = ({ data = sampleData, headerMode = 'text', compact = false, padRows = true }) => {
   // Encabezados de checklist: modo 'text' (descripción exacta) o 'codes' (CHK-01..12)
   const checkHeaders = headerMode === 'codes'
     ? CHK_CODES
@@ -184,23 +189,40 @@ const FORATA057Template: React.FC<{ data?: Inspection; headerMode?: 'codes' | 't
         'Frenos operativos (Freno de pedal y parqueo o mano): probar funcionamiento antes de iniciar el desplazamiento.'
       ];
 
-  // Asegurar mínimo 17 filas de equipos
-  const equipmentRows = [...(data.equipment || [])];
-  while (equipmentRows.length < 17) {
-    equipmentRows.push({ code: 'TLM-XX-XXX' });
+  // Filtrado de equipos sin datos cuando no se desea rellenar
+  const hasEqData = (eq: Equipment) => {
+    const hasStatus = !!eq.checklist_data && Object.values(eq.checklist_data).some((v) => !!v?.status);
+    const hasSig = !!eq.inspector_signature_url;
+    const hasHour = !!eq.hour;
+    const hasCode = !!eq.code && eq.code.trim().length > 0;
+    return hasCode && (hasStatus || hasSig || hasHour);
+  };
+  let equipmentRows = [...(data.equipment || [])];
+  if (!padRows) {
+    equipmentRows = equipmentRows.filter(hasEqData);
+  } else {
+    while (equipmentRows.length < 17) {
+      equipmentRows.push({ code: 'TLM-XX-XXX' });
+    }
   }
 
-  // Asegurar mínimo 7 filas de observaciones
-  const observationRows = [...(data.observations || [])];
-  while (observationRows.length < 7) {
-    observationRows.push({ obs_id: 'TLM-' });
+  // Observaciones: filtrar vacías si no se desea rellenar
+  let observationRows = [...(data.observations || [])];
+  if (!padRows) {
+    observationRows = observationRows.filter((o) => (o.obs_operator && o.obs_operator.trim().length > 0) || (o.obs_maintenance && o.obs_maintenance.trim().length > 0));
+  } else {
+    while (observationRows.length < 7) {
+      observationRows.push({ obs_id: 'TLM-' });
+    }
   }
 
+  const fs = (pt: number) => (compact ? `${Math.max(pt - 3, 7)}pt` : `${pt}pt`);
+  const rowHeight = (px: number) => (compact ? `${Math.max(px - 10, 14)}px` : `${px}px`);
   return (
-    <div className="w-full bg-white p-4" style={{ fontFamily: 'Calibri, Arial, sans-serif', fontSize: '11pt' }}>
+    <div className="w-full bg-white p-4" style={{ fontFamily: 'Calibri, Arial, sans-serif', fontSize: compact ? '10pt' : '11pt' }}>
       <style>{`
         @media print {
-          @page { margin: 0.25in; }
+          @page { margin: ${compact ? '0.2in' : '0.25in'}; }
           body { margin: 0; }
         }
         .forata-table { border-collapse: collapse; width: 100%; }
@@ -212,48 +234,48 @@ const FORATA057Template: React.FC<{ data?: Inspection; headerMode?: 'codes' | 't
 
       <table className="forata-table">
         <tbody>
-          {/* Header Row 1 */}
-          <tr style={{ height: '66px' }}>
+          {/* Header Row 1 (compactado) */}
+          <tr style={{ height: rowHeight(48) }}>
             <td rowSpan={3} colSpan={2} className="text-center" style={{ width: '140px' }}>
               {data.logo_url ? (
-                <img src={data.logo_url} alt="Logo" style={{ maxWidth: '130px', maxHeight: '56px' }} />
+                <img src={data.logo_url} alt="Logo" style={{ maxWidth: '130px', maxHeight: compact ? '44px' : '56px' }} />
               ) : (
                 <div className="text-gray-400 text-xs">LOGO</div>
               )}
             </td>
-            <td rowSpan={3} colSpan={10} className="text-center font-bold" style={{ fontSize: '16pt' }}>
+            <td rowSpan={3} colSpan={10} className="text-center font-bold" style={{ fontSize: fs(14), lineHeight: 1.15 }}>
               CONTROL DE INSPECCIÓN DE REVISIÓN 360° DE EQUIPOS GSE MOTORIZADOS- ESTACIONES
             </td>
-            <td colSpan={2} className="text-center font-bold bg-gray-200" style={{ fontSize: '11pt' }}>Código:</td>
+            <td colSpan={2} className="text-center font-bold bg-gray-200" style={{ fontSize: fs(11) }}>Código:</td>
             <td className="text-center">{data.form_code || 'FOR-ATA-057'}</td>
           </tr>
 
           {/* Header Row 2 */}
-          <tr style={{ height: '22px' }}>
-            <td colSpan={2} className="text-center font-bold bg-gray-200">Versión:</td>
+          <tr style={{ height: rowHeight(18) }}>
+            <td colSpan={2} className="text-center font-bold bg-gray-200" style={{ fontSize: fs(11) }}>Versión:</td>
             <td className="text-center">{data.form_version || '3'}</td>
           </tr>
 
           {/* Header Row 3 */}
-          <tr style={{ height: '22px' }}>
-            <td colSpan={2} className="text-center font-bold bg-gray-200">Fecha de emisión:</td>
+          <tr style={{ height: rowHeight(18) }}>
+            <td colSpan={2} className="text-center font-bold bg-gray-200" style={{ fontSize: fs(11) }}>Fecha de emisión:</td>
             <td className="text-center">{data.form_issue_date || '17/09/2025'}</td>
           </tr>
 
-          {/* Date and Operator Row */}
-          <tr style={{ height: '30px' }}>
-            <td colSpan={2} className="text-right font-bold" style={{ fontSize: '14pt' }}>Fecha:</td>
-            <td colSpan={2} className="text-center font-bold" style={{ fontSize: '14pt' }}>
+          {/* Date and Operator Row (compactado) */}
+          <tr style={{ height: rowHeight(24) }}>
+            <td colSpan={2} className="text-right font-bold" style={{ fontSize: fs(12) }}>Fecha:</td>
+            <td colSpan={2} className="text-center font-bold" style={{ fontSize: fs(12) }}>
               {formatDate(data.inspection_date)}
             </td>
-            <td colSpan={3} className="text-center font-bold" style={{ fontSize: '14pt' }}>
+            <td colSpan={3} className="text-center font-bold" style={{ fontSize: fs(12) }}>
               Operador a cargo de la inspección:
             </td>
-            <td colSpan={3} className="text-center font-bold" style={{ fontSize: '14pt' }}>
+            <td colSpan={3} className="text-center font-bold" style={{ fontSize: fs(12) }}>
               {data.inspector_name || ''}
             </td>
             <td className="no-border"></td>
-            <td rowSpan={2} colSpan={4} className="text-left" style={{ fontSize: '12pt', verticalAlign: 'top', padding: '8px' }}>
+            <td rowSpan={2} colSpan={4} className="text-left" style={{ fontSize: fs(9), verticalAlign: 'top', padding: compact ? '4px' : '8px', lineHeight: 1.2 }}>
               <strong>✓</strong> (Check) si el ítem cumple o está conforme.<br/>
               <strong>X</strong> si el ítem no cumple o presenta una observación.<br/>
               <strong>N/A</strong> si el ítem no aplica para el equipo o actividad inspeccionada.
@@ -261,35 +283,38 @@ const FORATA057Template: React.FC<{ data?: Inspection; headerMode?: 'codes' | 't
           </tr>
 
           {/* Separator Row */}
-          <tr style={{ height: '12px' }}>
+          <tr style={{ height: rowHeight(8) }}>
             <td colSpan={11} className="border-bottom no-border" style={{ borderTop: 'none' }}></td>
           </tr>
 
           
 
           {/* Checklist Headers */}
-          <tr style={{ height: '126px', backgroundColor: '#002060', color: 'white' }}>
-            <td className="text-center font-bold" style={{ fontSize: '11pt', width: '80px' }}>CÓDIGO</td>
-            <td className="text-center font-bold" style={{ fontSize: '11pt', width: '55px' }}>HORA</td>
+          <tr style={{ height: rowHeight(126), backgroundColor: '#002060', color: 'white' }}>
+            <td className="text-center font-bold" style={{ fontSize: fs(11), width: '80px' }}>CÓDIGO</td>
+            <td className="text-center font-bold" style={{ fontSize: fs(11), width: '55px' }}>HORA</td>
             {checkHeaders.map((header, idx) => (
               <td
                 key={idx}
                 className="text-center font-bold"
                 style={{
-                  fontSize: headerMode === 'text' ? (idx === 6 ? '11pt' : '12pt') : '12pt',
+                  fontSize: headerMode === 'text' ? (compact ? '8px' : (idx === 6 ? fs(11) : fs(12))) : fs(12),
                   width: '90px',
-                  verticalAlign: 'middle'
+                  verticalAlign: 'middle',
+                  whiteSpace: 'normal',
+                  wordWrap: 'break-word',
+                  lineHeight: compact ? 1.2 : 1.3
                 }}
               >
                 {header}
               </td>
             ))}
-            <td className="text-center font-bold" style={{ fontSize: '11pt', width: '90px' }}>FIRMA</td>
+            <td className="text-center font-bold" style={{ fontSize: fs(11), width: '90px' }}>FIRMA</td>
           </tr>
 
           {/* Equipment Rows */}
           {equipmentRows.map((eq, idx) => (
-            <tr key={idx} style={{ height: '21px' }}>
+            <tr key={idx} style={{ height: rowHeight(21) }}>
               <td className="text-center">{eq.code || 'TLM-XX-XXX'}</td>
               <td className="text-center">{eq.hour || ''}</td>
               {CHK_CODES.map((code) => (
@@ -299,73 +324,123 @@ const FORATA057Template: React.FC<{ data?: Inspection; headerMode?: 'codes' | 't
               ))}
               <td className="text-center">
                 {eq.inspector_signature_url && (
-                  <img src={eq.inspector_signature_url} alt="Firma" style={{ maxHeight: '18px' }} />
+                  <img
+                    src={eq.inspector_signature_url}
+                    alt="Firma"
+                    style={{
+                      height: compact ? '28px' : '34px',
+                      maxWidth: '100%',
+                      width: 'auto',
+                      objectFit: 'contain',
+                      display: 'block',
+                      margin: '0 auto'
+                    }}
+                  />
                 )}
               </td>
             </tr>
           ))}
 
+          {/* Separación: dos líneas vacías antes del texto de leyenda poschecklist */}
+          <tr>
+            <td colSpan={15} className="no-border" style={{ border: 'none' }}>
+              <div style={{ height: rowHeight(13) }}>&nbsp;</div>
+            </td>
+          </tr>
+          <tr>
+            <td colSpan={15} className="no-border" style={{ border: 'none' }}>
+              <div style={{ height: rowHeight(13) }}>&nbsp;</div>
+            </td>
+          </tr>
+
           {/* Legend Row */}
           <tr>
-            <td colSpan={15} className="text-center" style={{ height: '48px', fontSize: '13pt', padding: '8px' }}>
+            <td colSpan={15} className="text-center" style={{ height: rowHeight(48), fontSize: fs(11), padding: '6px' }}>
               {data.legend_text}
             </td>
           </tr>
 
           {/* Observations Header */}
-          <tr style={{ height: '25px', backgroundColor: '#E7E6E6' }}>
-            <td className="text-center font-bold" style={{ fontSize: '14pt' }}>CÓDIGO</td>
-            <td colSpan={7} className="text-center font-bold" style={{ fontSize: '14pt' }}>OBSERVACIONES OPERADOR</td>
-            <td colSpan={7} className="text-center font-bold" style={{ fontSize: '14pt' }}>OBSERVACIONES MANTENIMIENTO</td>
+          <tr style={{ height: rowHeight(25), backgroundColor: '#E7E6E6' }}>
+            <td className="text-center font-bold" style={{ fontSize: fs(12) }}>CÓDIGO</td>
+            <td colSpan={7} className="text-center font-bold" style={{ fontSize: fs(12) }}>OBSERVACIONES OPERADOR</td>
+            <td colSpan={7} className="text-center font-bold" style={{ fontSize: fs(12) }}>OBSERVACIONES MANTENIMIENTO</td>
           </tr>
 
           {/* Observation Rows */}
           {observationRows.map((obs, idx) => (
-            <tr key={idx} style={{ height: '28px' }}>
+            <tr key={idx} style={{ height: rowHeight(28) }}>
               <td className="text-left" style={{ paddingLeft: '4px' }}>{obs.equipment_code || obs.obs_id || 'TLM-'}</td>
               <td colSpan={7} className="text-center">{obs.obs_operator || ''}</td>
               <td colSpan={7} className="text-center">{obs.obs_maintenance || ''}</td>
             </tr>
           ))}
 
-          {/* Signature Images and Details Row (above line and text) */}
-          <tr style={{ height: '60px' }}>
+          {/* Signature Images Row (sin marcos, sin fecha/hora, sin nombres) */}
+          <tr style={{ height: rowHeight(100) }}>
             <td colSpan={2} className="no-border"></td>
-            <td colSpan={3} className="text-center" style={{ verticalAlign: 'top' }}>
+            <td colSpan={3} className="text-center no-border" style={{ verticalAlign: 'top' }}>
               {data.supervisor_signature_url && (
-                <img src={data.supervisor_signature_url} alt="Firma Supervisor" style={{ maxHeight: '40px', marginBottom: '4px' }} />
+                <img
+                  src={data.supervisor_signature_url}
+                  alt="Firma Supervisor"
+                  style={{
+                    height: compact ? '80px' : '96px',
+                    maxWidth: '100%',
+                    width: 'auto',
+                    marginBottom: '0px',
+                    objectFit: 'contain',
+                    display: 'block',
+                    marginLeft: 'auto',
+                    marginRight: 'auto'
+                  }}
+                />
               )}
-              <div className="text-sm">{data.supervisor_name || ''}</div>
-              <div className="text-xs">{formatDateTime(data.supervisor_signature_date)}</div>
             </td>
             <td colSpan={5} className="no-border"></td>
-            <td colSpan={3} className="text-center" style={{ verticalAlign: 'top' }}>
+            <td colSpan={3} className="text-center no-border" style={{ verticalAlign: 'top' }}>
               {data.mechanic_signature_url && (
-                <img src={data.mechanic_signature_url} alt="Firma Mecánico" style={{ maxHeight: '40px', marginBottom: '4px' }} />
+                <img
+                  src={data.mechanic_signature_url}
+                  alt="Firma Mecánico"
+                  style={{
+                    height: compact ? '80px' : '96px',
+                    maxWidth: '100%',
+                    width: 'auto',
+                    marginBottom: '0px',
+                    objectFit: 'contain',
+                    display: 'block',
+                    marginLeft: 'auto',
+                    marginRight: 'auto'
+                  }}
+                />
               )}
-              <div className="text-sm">{data.mechanic_name || ''}</div>
-              <div className="text-xs">{formatDateTime(data.mechanic_signature_date)}</div>
             </td>
             <td colSpan={2} className="no-border"></td>
           </tr>
 
-          {/* Signature Label Row (with line below images) */}
-          <tr style={{ height: '50px' }}>
+          {/* Signature Label Row (solo borde superior, con nombre encima del texto) */}
+          <tr style={{ height: rowHeight(48) }}>
             <td colSpan={2} className="no-border"></td>
-            <td colSpan={3} className="text-center font-bold border-top" style={{ verticalAlign: 'bottom', paddingTop: '20px' }}>
+            <td colSpan={3} className="text-center font-bold no-border border-top" style={{ verticalAlign: 'bottom', paddingTop: compact ? '6px' : '8px', fontSize: fs(10) }}>
+              <div style={{ fontSize: fs(10), marginBottom: '4px', fontWeight: 'normal' }}>{data.supervisor_name || ''}</div>
               FIRMA<br/>SUPERVISOR O ENCARGADO DE ESTACIÓN
             </td>
             <td colSpan={5} className="no-border"></td>
-            <td colSpan={3} className="text-center font-bold border-top" style={{ verticalAlign: 'bottom', paddingTop: '20px' }}>
+            <td colSpan={3} className="text-center font-bold no-border border-top" style={{ verticalAlign: 'bottom', paddingTop: compact ? '6px' : '8px', fontSize: fs(10) }}>
+              <div style={{ fontSize: fs(10), marginBottom: '4px', fontWeight: 'normal' }}>{data.mechanic_name || ''}</div>
               FIRMA<br/>MECÁNICO DE ESTACIÓN
             </td>
             <td colSpan={2} className="no-border"></td>
           </tr>
+          
 
 
+          {/* (Sin espacio adicional aquí) */}
+          
           {/* Footer / Note Row (letra muy pequeña, soporta **negrita**) */}
           <tr>
-            <td colSpan={15} className="text-left border-top" style={{ fontSize: '8pt', padding: '8px' }}>
+            <td colSpan={15} className="text-left border-top" style={{ fontSize: compact ? '7pt' : '8pt', padding: compact ? '6px' : '8px' }}>
               {data.footer_text
                 ? renderBoldWithBreaks(data.footer_text)
                 : (

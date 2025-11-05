@@ -139,22 +139,40 @@ export function useAuth() {
 
   // Refresco proactivo de sesión para evitar expiraciones prematuras
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const refreshNow = async () => {
       try {
-        // Intentar refrescar si hay usuario
-        if (authState.user) {
-          // Algunos entornos requieren refresh explícito
-          if ((supabase as any)?.auth?.refreshSession) {
-            await withTimeout((supabase as any).auth.refreshSession(), 8000);
-          } else {
-            await withTimeout(supabase.auth.getSession(), 8000);
-          }
+        const res = await withTimeout(supabase.auth.getSession(), 8000);
+        const { data: { session } } = res as { data: { session: Session | null } };
+        if (session?.user) {
+          // Asegurar perfil actualizado tras refresh
+          const loadedProfile = await loadUserProfile(session.user);
+          writePersisted(session.user, loadedProfile);
         }
-      } catch (e) {
-        // No romper la sesión por errores intermitentes
+      } catch {
+        // Ignorar errores esporádicos de red
       }
-    }, 10 * 60 * 1000); // cada 10 minutos
-    return () => clearInterval(interval);
+    };
+
+    const interval = setInterval(refreshNow, 5 * 60 * 1000); // cada 5 minutos
+
+    const onVisibleOrOnline = () => {
+      // Al volver al foco o conexión, intentar refrescar inmediatamente
+      refreshNow();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') onVisibleOrOnline();
+      });
+      window.addEventListener('online', onVisibleOrOnline);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', onVisibleOrOnline);
+      }
+    };
   }, [authState.user]);
 
   const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<UserProfile | null> => {
@@ -255,8 +273,16 @@ export function useAuth() {
       if (error) throw error;
 
       if (data.user) {
-        const loadedProfile = await loadUserProfile(data.user);
-        writePersisted(data.user, loadedProfile);
+        // Fast-path: no bloquear inicio por carga de perfil
+        setAuthState(prev => ({ ...prev, user: data.user, loading: false }));
+        // Carga y persistencia del perfil en background
+        loadUserProfile(data.user)
+          .then((loadedProfile) => {
+            writePersisted(data.user!, loadedProfile);
+          })
+          .catch(() => {
+            // Ignorar fallos puntuales de perfil; usuario ya quedó autenticado
+          });
       }
 
       return { success: true, error: null };
@@ -285,6 +311,10 @@ export function useAuth() {
     profile: authState.profile,
     loading: authState.loading,
     error: authState.error,
+    // Estado explícito para evitar avisos falsos durante la carga
+    status: (authState.loading
+      ? 'loading'
+      : (authState.user ? 'authenticated' : 'unauthenticated')) as 'loading' | 'authenticated' | 'unauthenticated',
     signIn,
     signOut,
   };

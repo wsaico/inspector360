@@ -10,6 +10,12 @@ function TemplateWithData() {
   const { formData } = useInspectionForm();
   const searchParams = useSearchParams();
   const inspectionId = searchParams.get('id');
+  const isPdfMode = searchParams.get('pdf') === '1';
+  const defaultLogo = useMemo(() => {
+    const p = searchParams.get('logo');
+    // Usa tu logo por defecto si no se especifica parámetro
+    return p && p.trim().length > 0 ? p : '/logo.png';
+  }, [searchParams]);
   const [remote, setRemote] = useState<any | null>(null);
 
   useEffect(() => {
@@ -20,6 +26,27 @@ function TemplateWithData() {
     };
     load();
   }, [inspectionId]);
+
+  // Flag global para que el endpoint sepa que el render está listo
+  useEffect(() => {
+    try {
+      (window as any).__forata057_ready = false;
+    } catch {}
+    return () => {
+      try { delete (window as any).__forata057_ready; } catch {}
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (inspectionId) {
+        (window as any).__forata057_ready = !!remote;
+      } else {
+        // Cuando no hay id (preview desde formulario), lo damos por listo
+        (window as any).__forata057_ready = true;
+      }
+    } catch {}
+  }, [inspectionId, remote]);
 
   // Auto print si viene ?print=true y los datos están listos
   useEffect(() => {
@@ -83,10 +110,10 @@ function TemplateWithData() {
     };
     // Si viene id, usar datos remotos (inspección persistida)
     if (remote) {
-      const hour = getHour(remote.inspection_date);
       const equipment = (remote.equipment || []).map((eq: any) => ({
         code: eq.code,
-        hour,
+        // Hora por equipo: prioriza updated_at, luego created_at, y finalmente la fecha global
+        hour: getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
         checklist_data: (Object.fromEntries(
           Array.from({ length: 12 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
@@ -108,6 +135,7 @@ function TemplateWithData() {
         : deriveObservationsFromEquipmentLocal(remote.equipment as any[] | undefined);
 
       return {
+        logo_url: (remote as any)?.logo_url ?? defaultLogo,
         form_code: remote.form_code ?? 'FOR-ATA-057',
         form_version: '3',
         form_issue_date: '17/09/2025',
@@ -162,6 +190,7 @@ function TemplateWithData() {
       : deriveObservationsFromEquipmentLocal(equipmentForDerive);
 
     return {
+      logo_url: defaultLogo,
       form_code: 'FOR-ATA-057',
       form_version: '3',
       form_issue_date: '17/09/2025',
@@ -182,24 +211,31 @@ function TemplateWithData() {
   }, [formData, remote]);
 
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>Vista FOR-ATA-057</h2>
-        <button
-          onClick={() => window.print()}
-          style={{
-            padding: '8px 12px',
-            borderRadius: 6,
-            border: '1px solid #C1C7D0',
-            background: '#1f2937',
-            color: '#fff',
-            cursor: 'pointer'
-          }}
-        >
-          Descargar PDF
-        </button>
-      </div>
-      <FORATA057Template data={data} headerMode="text" />
+    <div style={{ padding: isPdfMode ? 0 : 16 }}>
+      {!isPdfMode && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 16 }}>Vista FOR-ATA-057</h2>
+          <button
+            onClick={() => window.print()}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #C1C7D0',
+              background: '#1f2937',
+              color: '#fff',
+              cursor: 'pointer'
+            }}
+          >
+            Descargar PDF
+          </button>
+        </div>
+      )}
+      <FORATA057Template
+        data={data}
+        headerMode={'text'}
+        compact={isPdfMode}
+        padRows={!isPdfMode}
+      />
     </div>
   );
 }
