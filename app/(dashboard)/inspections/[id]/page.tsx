@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Inspection, Observation } from '@/types';
-import { formatInspectionDate, hasPendingObservations } from '@/lib/utils';
+import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel, isSupervisorSigned, isMechanicSigned } from '@/lib/utils';
 import { CHECKLIST_CATEGORIES } from '@/types';
 import Image from 'next/image';
 import { downloadInspectionPDF } from '@/lib/pdf/generator';
@@ -39,6 +39,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/hooks';
 import { withTimeout } from '@/lib/utils/async';
+import dynamic from 'next/dynamic';
+import { Input } from '@/components/ui/input';
+const SignaturePad = dynamic(() => import('@/components/forms/signature-pad'), { ssr: false });
 
 export default function InspectionDetailPage() {
   const params = useParams();
@@ -50,6 +53,10 @@ export default function InspectionDetailPage() {
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [selectedObservation, setSelectedObservation] = useState<Observation | null>(null);
+  const [signOpen, setSignOpen] = useState(false);
+  const [signRole, setSignRole] = useState<'supervisor' | 'mechanic' | null>(null);
+  const [signName, setSignName] = useState('');
+  const [savingSignature, setSavingSignature] = useState(false);
 
   useEffect(() => {
     if (!params?.id) {
@@ -192,6 +199,20 @@ export default function InspectionDetailPage() {
     return types[type] || type;
   };
 
+  // Notificación dinámica cuando faltan firmas
+  const [missingSignToastShown, setMissingSignToastShown] = useState(false);
+  useEffect(() => {
+    if (!inspection) return;
+    const label = getMissingSignaturesLabel(inspection);
+    if (label && !missingSignToastShown) {
+      toast.info(label);
+      setMissingSignToastShown(true);
+    }
+    if (!label && missingSignToastShown) {
+      setMissingSignToastShown(false);
+    }
+  }, [inspection?.supervisor_signature_url, inspection?.mechanic_signature_url, inspection?.supervisor_name, inspection?.mechanic_name]);
+
   const getStatusIcon = (status: string | null) => {
     switch (status) {
       case 'conforme':
@@ -272,10 +293,70 @@ export default function InspectionDetailPage() {
             </p>
           </div>
         </div>
-        <Button onClick={handleDownloadPDF} className="w-full md:w-auto">
-          <Download className="mr-2 h-4 w-4" />
-          Descargar PDF
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          {canEditInspections && inspection.status === 'draft' && (() => {
+            const onlyMissingSignatures = !hasPendingObservations(inspection) && !!getMissingSignaturesLabel(inspection);
+            return !onlyMissingSignatures;
+          })() && (
+            <Button
+              onClick={() => router.push(`/inspections/new?draft=${inspection.id}`)}
+              variant="outline"
+              className="w-full md:w-auto"
+            >
+              Continuar edición
+            </Button>
+          )}
+          {/* Botones para firmar cuando faltan firmas */}
+          {canEditInspections && !!getMissingSignaturesLabel(inspection) && (
+            <div className="flex flex-col gap-2 w-full md:w-auto">
+              {hasPendingObservations(inspection) && (
+                <p className="text-xs text-muted-foreground">
+                  Hay observaciones pendientes. Puede firmar, pero se recomienda responder primero.
+                </p>
+              )}
+              <div className="flex gap-2">
+                {!isSupervisorSigned(inspection) && (
+                  <Button
+                    variant="outline"
+                    className="w-full md:w-auto"
+                    disabled={false}
+                    onClick={() => {
+                      setSignRole('supervisor');
+                      try {
+                        const n = typeof window !== 'undefined' ? localStorage.getItem('inspections.supervisorName') : '';
+                        setSignName(n || '');
+                      } catch {}
+                      setSignOpen(true);
+                    }}
+                  >
+                    Firmar Supervisor
+                  </Button>
+                )}
+                {!isMechanicSigned(inspection) && (
+                  <Button
+                    variant="outline"
+                    className="w-full md:w-auto"
+                    disabled={false}
+                    onClick={() => {
+                      setSignRole('mechanic');
+                      try {
+                        const n = typeof window !== 'undefined' ? localStorage.getItem('inspections.mechanicName') : '';
+                        setSignName(n || '');
+                      } catch {}
+                      setSignOpen(true);
+                    }}
+                  >
+                    Firmar Mecánico
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          <Button onClick={handleDownloadPDF} className="w-full md:w-auto">
+            <Download className="mr-2 h-4 w-4" />
+            Descargar PDF
+          </Button>
+        </div>
       </div>
 
       {/* Información General */}
@@ -287,6 +368,11 @@ export default function InspectionDetailPage() {
           {hasPendingObservations(inspection) && (
             <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm">
               Hay observaciones del operador sin respuesta del mecánico. La inspección no está al 100%.
+            </div>
+          )}
+          {getMissingSignaturesLabel(inspection) && (
+            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+              {getMissingSignaturesLabel(inspection)}. La inspección está pendiente por firmas.
             </div>
           )}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -507,6 +593,65 @@ export default function InspectionDetailPage() {
             <Button variant="ghost" onClick={() => setReplyOpen(false)}>Cancelar</Button>
             <Button onClick={saveReply}>Guardar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para firmar Supervisor/Mecánico */}
+      <Dialog open={signOpen} onOpenChange={(open) => { setSignOpen(open); if (!open) { setSignRole(null); setSignName(''); } }}>
+        <DialogContent className="sm:max-w-md w-[95vw] max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{signRole === 'mechanic' ? 'Firma del Mecánico' : 'Firma del Supervisor'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Nombre</p>
+              <Input
+                placeholder={signRole === 'mechanic' ? 'Nombre del mecánico' : 'Nombre del supervisor'}
+                value={signName}
+                onChange={(e) => setSignName(e.target.value)}
+              />
+            </div>
+            <SignaturePad
+              label={signRole === 'mechanic' ? 'Firma del Mecánico' : 'Firma del Supervisor'}
+              onSave={async (sig) => {
+                if (!signRole) return;
+                if (!signName || signName.trim().length === 0) {
+                  toast.error('El nombre es requerido para guardar la firma');
+                  return;
+                }
+                setSavingSignature(true);
+                try {
+                  if (signRole === 'supervisor') {
+                    const { data, error } = await InspectionService.uploadSupervisorSignature(inspection.id!, signName, sig);
+                    if (error) throw new Error(error);
+                    try { if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', signName); } catch {}
+                    const updates = { supervisor_name: signName, supervisor_signature_url: data?.supervisor_signature_url || sig, supervisor_signature_date: data?.supervisor_signature_date || new Date().toISOString(), status: 'completed' as const };
+                    setInspection((prev) => prev ? { ...prev, ...updates } : prev);
+                    toast.success('Firma del supervisor guardada');
+                    const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
+                    if (missing) toast.info(missing);
+                  } else {
+                    const { data, error } = await InspectionService.uploadMechanicSignature(inspection.id!, signName, sig);
+                    if (error) throw new Error(error);
+                    try { if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', signName); } catch {}
+                    const updates = { mechanic_name: signName, mechanic_signature_url: data?.mechanic_signature_url || sig, mechanic_signature_date: data?.mechanic_signature_date || new Date().toISOString(), status: 'completed' as const };
+                    setInspection((prev) => prev ? { ...prev, ...updates } : prev);
+                    toast.success('Firma del mecánico guardada');
+                    const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
+                    if (missing) toast.info(missing);
+                  }
+                  setSignOpen(false);
+                  setSignRole(null);
+                  setSignName('');
+                } catch (err: any) {
+                  toast.error(err?.message || 'No se pudo guardar la firma');
+                } finally {
+                  setSavingSignature(false);
+                }
+              }}
+              onCancel={() => setSignOpen(false)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -6,7 +6,7 @@
  * Incluye reutilización de equipos de inspecciones previas
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useInspectionForm } from '@/context/inspection-context';
@@ -17,25 +17,74 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { equipmentSchema, EquipmentFormData } from '@/lib/validations';
 import { Equipment } from '@/types';
-import { Plus, Trash2, Edit, Package, History, Loader2, X } from 'lucide-react';
+import { Plus, Trash2, Edit, Package, History, Loader2, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { InspectionService } from '@/lib/services';
 
 export default function Step2Equipment() {
   const { formData, addEquipment, removeEquipment, updateEquipment } = useInspectionForm();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [showExisting, setShowExisting] = useState(false);
+  const [showExisting, setShowExisting] = useState(true);
   const [existingEquipment, setExistingEquipment] = useState<Equipment[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 3; // Máximo 3 equipos visibles por página
+
+  const filteredExisting = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = existingEquipment || [];
+    const filtered = !q
+      ? list
+      : list.filter((eq) => {
+          const haystack = [
+            eq.code,
+            eq.type,
+            eq.brand,
+            eq.model,
+            eq.serial_number,
+            String(eq.year || ''),
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
+        });
+    return filtered.slice().sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+  }, [existingEquipment, searchQuery]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil((filteredExisting.length || 0) / PAGE_SIZE)), [filteredExisting.length]);
+  const paginatedExisting = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredExisting.slice(start, start + PAGE_SIZE);
+  }, [filteredExisting, page]);
+
+  useEffect(() => {
+    // Reset de página al cambiar búsqueda
+    setPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    // Ajuste si la página actual excede el total tras filtrar
+    setPage((p) => Math.min(p, totalPages));
+  }, [totalPages]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<EquipmentFormData>({
     resolver: zodResolver(equipmentSchema),
   });
+  const watchedCode: string | undefined = watch('code');
+  const hasDuplicateInForm = watchedCode
+    ? formData.equipment.some((e) => e.code.trim().toUpperCase() === watchedCode.trim().toUpperCase())
+    : false;
+  const existingMatch = watchedCode
+    ? existingEquipment.find((eq) => eq.code.trim().toUpperCase() === watchedCode.trim().toUpperCase())
+    : undefined;
 
   useEffect(() => {
     if (showExisting) {
@@ -65,6 +114,25 @@ export default function Step2Equipment() {
   const onSubmit = (data: EquipmentFormData) => {
     if (!formData.general?.station) {
       toast.error('Debe completar la información general primero');
+      return;
+    }
+
+    // Validación: evitar duplicar código dentro del borrador actual
+    const duplicateCurrent = formData.equipment.some(
+      (e) => e.code.trim().toUpperCase() === data.code.trim().toUpperCase()
+    );
+    if (duplicateCurrent) {
+      toast.warning('Ya agregaste este equipo en la inspección actual');
+      return;
+    }
+
+    // Validación: si existe reutilizable con el mismo código, sugerir reutilizar y bloquear creación
+    const duplicateExisting = existingEquipment.some(
+      (eq) => eq.code.trim().toUpperCase() === data.code.trim().toUpperCase()
+    );
+    if (duplicateExisting) {
+      toast.warning('Este código ya existe. Usa "Equipos Existentes" para reutilizar.');
+      setShowExisting(true);
       return;
     }
 
@@ -110,7 +178,8 @@ export default function Step2Equipment() {
     });
 
     toast.success(`Equipo ${eq.code} agregado`);
-    setShowExisting(false);
+    // Mantener visible la lista de "Equipos Existentes" al reutilizar
+    setShowExisting(true);
   };
 
   const cancelEdit = () => {
@@ -156,6 +225,22 @@ export default function Step2Equipment() {
                   <Label>Código del Equipo *</Label>
                   <Input {...register('code')} placeholder="TLM-01-001" />
                   {errors.code && <p className="text-sm text-red-500">{errors.code.message}</p>}
+                  {watchedCode && existingMatch && (
+                    <div className="mt-2 rounded-md border border-yellow-300 bg-yellow-50 p-2 text-xs">
+                      Ya existe el equipo <span className="font-semibold">{existingMatch.code}</span>. Reutiliza desde "Equipos Existentes".
+                      <div className="mt-2 flex gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={() => handleSelectExisting(existingMatch!)}>
+                          Reutilizar
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShowExisting(true)}>
+                          Ver lista
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {watchedCode && hasDuplicateInForm && (
+                    <p className="text-xs text-red-500 mt-2">Este código ya fue agregado en esta inspección.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Tipo de Equipo *</Label>
@@ -192,7 +277,7 @@ export default function Step2Equipment() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button type="submit" className="flex-1">
+                <Button type="submit" className="flex-1" disabled={!!existingMatch || hasDuplicateInForm}>
                   <Plus className="mr-2 h-4 w-4" />
                   {editingIndex !== null ? 'Actualizar Equipo' : 'Agregar Equipo'}
                 </Button>
@@ -212,7 +297,9 @@ export default function Step2Equipment() {
       {showExisting && (
         <Card>
           <CardHeader>
-            <CardTitle>Equipos Registrados Anteriormente</CardTitle>
+            <CardTitle>
+              Equipos Registrados Anteriormente ({existingEquipment.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {loadingExisting ? (
@@ -224,26 +311,82 @@ export default function Step2Equipment() {
                 No hay equipos registrados. Crea tu primer equipo en "Nuevo Equipo".
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {existingEquipment.map((eq, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50 transition-colors"
-                  >
-                    <div>
-                      <p className="font-semibold">{eq.code}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {eq.type} - {eq.brand} {eq.model} ({eq.year})
-                      </p>
-                      <p className="text-xs text-muted-foreground">Serie: {eq.serial_number}</p>
-                    </div>
-                    <Button size="sm" onClick={() => handleSelectExisting(eq)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Agregar
-                    </Button>
+              <>
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar por código, tipo, marca, modelo o serie"
+                      className="pl-8"
+                    />
                   </div>
-                ))}
-              </div>
+                  {searchQuery && (
+                    <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')}>
+                      <X className="h-4 w-4" />
+                      Limpiar
+                    </Button>
+                  )}
+                </div>
+
+                {filteredExisting.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground">
+                    No hay resultados para "{searchQuery}".
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      {paginatedExisting.map((eq, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50 transition-colors"
+                        >
+                          <div>
+                          <p className="font-semibold">{eq.code}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {eq.type} - {eq.brand} {eq.model} ({eq.year})
+                          </p>
+                          <p className="text-xs text-muted-foreground">Serie: {eq.serial_number}</p>
+                          </div>
+                          <Button size="sm" onClick={() => handleSelectExisting(eq)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Agregar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                        className="gap-2"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Anterior
+                      </Button>
+
+                      <div className="text-sm text-muted-foreground">
+                        Página {page} de {totalPages} · Mostrando {paginatedExisting.length} de {filteredExisting.length}
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
+                        className="gap-2"
+                      >
+                        Siguiente
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -281,3 +424,4 @@ export default function Step2Equipment() {
     </div>
   );
 }
+

@@ -9,8 +9,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar fijo (asegurar visibilidad en todas las vistas de dashboard) */}
-      <aside className="flex w-64 shrink-0">
+      {/* Sidebar oculto en móvil, visible desde md+ */}
+      <aside className="hidden md:flex w-64 shrink-0">
         <Sidebar />
       </aside>
 
@@ -44,4 +44,3 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

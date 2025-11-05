@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Inspection } from '@/types';
-import { formatInspectionDate, hasPendingObservations } from '@/lib/utils';
+import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel } from '@/lib/utils';
 
 export default function InspectionsPage() {
   const { canCreateInspections } = usePermissions();
@@ -63,8 +63,13 @@ export default function InspectionsPage() {
   };
 
   const getStatusBadge = (inspection: Inspection) => {
+    const missingSig = getMissingSignaturesLabel(inspection);
     if (hasPendingObservations(inspection)) {
       return <Badge variant="warning">Pendiente</Badge>;
+    }
+    if (missingSig) {
+      // Mostrar 'Pendiente' cuando faltan firmas, con tooltip informativo
+      return <Badge variant="warning" title={missingSig}>Pendiente</Badge>;
     }
     if (inspection.status === 'completed') {
       return <Badge variant="success">Completada</Badge>;

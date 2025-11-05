@@ -33,17 +33,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password, full_name, role, station, phone } = body;
 
-    // Validaciones
-    if (!email || !password || !full_name || !role) {
-      return NextResponse.json(
-        { error: 'Faltan campos requeridos: email, password, full_name, role' },
-        { status: 400 }
-      );
-    }
+  // Validaciones
+  if (!email || !password || !full_name || !role) {
+    return NextResponse.json(
+      { error: 'Faltan campos requeridos: email, password, full_name, role' },
+      { status: 400 }
+    );
+  }
 
-    // Validar rol
-    if (!['admin', 'supervisor', 'inspector'].includes(role)) {
-      return NextResponse.json({ error: 'Rol inválido' }, { status: 400 });
+  // Validar rol
+  if (!['admin', 'supervisor', 'inspector'].includes(role)) {
+    return NextResponse.json({ error: 'Rol inválido' }, { status: 400 });
+  }
+
+    // Verificar si el email ya existe (evitar error genérico de Supabase)
+    // Primero buscamos en user_profiles, que se crea vía trigger al crear auth.users
+    const { data: existingProfiles, error: existingProfilesError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id')
+      .eq('email', email)
+      .limit(1);
+
+    if (!existingProfilesError && Array.isArray(existingProfiles) && existingProfiles.length > 0) {
+      return NextResponse.json(
+        { error: 'Este email ya está registrado' },
+        { status: 409 }
+      );
     }
 
     // Crear usuario en auth.users
@@ -60,9 +75,11 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       console.error('Error creando usuario en auth:', authError);
+      const message = authError?.message || 'Error creando usuario';
+      const isDuplicate = /already been registered/i.test(message) || /User already exists/i.test(message);
       return NextResponse.json(
-        { error: authError.message || 'Error creando usuario' },
-        { status: 500 }
+        { error: isDuplicate ? 'Este email ya está registrado' : message },
+        { status: isDuplicate ? 409 : 500 }
       );
     }
 

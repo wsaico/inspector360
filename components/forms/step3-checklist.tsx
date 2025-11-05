@@ -2,31 +2,50 @@
 
 import { useState } from 'react';
 import { useInspectionForm } from '@/context/inspection-context';
+import { InspectionService } from '@/lib/services/inspections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CHECKLIST_TEMPLATE, getChecklistGroupedByCategory } from '@/lib/checklist-template';
-import { CHECKLIST_CATEGORIES, ChecklistItem } from '@/types';
+import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
+import { ChecklistItem } from '@/types';
 import { CheckCircle2, XCircle, MinusCircle, Package, PenLine } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
 import { toast } from 'sonner';
 
 export default function Step3Checklist() {
-  const { formData, updateChecklist, setEquipmentSignature } = useInspectionForm();
+  const { formData, updateChecklist, setEquipmentSignature, draftInspectionId, equipmentDbIds } = useInspectionForm();
   const [selectedEquipment, setSelectedEquipment] = useState(0);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
-  const grouped = getChecklistGroupedByCategory();
+  // Iteramos directamente sobre el template para evitar contenedores vacíos por categoría
 
   const currentEquipment = formData.equipment[selectedEquipment];
   const currentChecklist = formData.checklists[currentEquipment?.code] || {};
   const currentSignature = formData.equipmentSignatures[currentEquipment?.code];
 
-  const handleStatusChange = (itemCode: string, status: ChecklistItem['status']) => {
+  const handleStatusChange = async (itemCode: string, status: ChecklistItem['status']) => {
+    // Actualiza estado local primero para responsividad inmediata
     updateChecklist(currentEquipment.code, itemCode, {
       status,
       observations: '',
     });
+
+    // Persistencia contra borrador si existe equipment_id
+    try {
+      const equipmentId = equipmentDbIds[currentEquipment.code];
+      if (draftInspectionId && equipmentId) {
+        const newChecklistData = {
+          ...(formData.checklists[currentEquipment.code] || {}),
+          [itemCode]: { status, observations: '' },
+        };
+        await InspectionService.updateEquipment(equipmentId, {
+          checklist_data: newChecklistData,
+        });
+      }
+    } catch (err: any) {
+      console.error('Error al persistir checklist:', err);
+      toast.error('No se pudo guardar el checklist en el borrador');
+    }
   };
 
   
@@ -37,10 +56,22 @@ export default function Step3Checklist() {
     return Math.round((completed / total) * 100);
   };
 
-  const handleSaveSignature = (signature: string) => {
+  const handleSaveSignature = async (signature: string) => {
+    // Actualiza estado local
     setEquipmentSignature(currentEquipment.code, signature);
     setShowSignaturePad(false);
-    toast.success('Firma del inspector guardada');
+
+    // Subir firma del inspector para el equipo si existe en BD
+    try {
+      const equipmentId = equipmentDbIds[currentEquipment.code];
+      if (draftInspectionId && equipmentId) {
+        await InspectionService.uploadInspectorSignature(equipmentId, signature);
+      }
+      toast.success('Firma del inspector guardada');
+    } catch (err: any) {
+      console.error('Error subiendo firma del inspector:', err);
+      toast.error('No se pudo subir la firma del inspector');
+    }
   };
 
   const isChecklistComplete = () => {
@@ -89,60 +120,55 @@ export default function Step3Checklist() {
         </CardContent>
       </Card>
 
-      {/* Checklist por Categoría */}
-      {Object.entries(grouped).map(([category, items]) => (
-        <Card key={category}>
-          <CardHeader>
-            <CardTitle>{CHECKLIST_CATEGORIES[category as keyof typeof CHECKLIST_CATEGORIES]}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {items.map((item) => {
-              const value = currentChecklist[item.code];
-              return (
-                <div key={item.code} className="space-y-3 rounded-lg border p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">{item.code}</p>
-                      <p className="text-sm">{item.description}</p>
-                    </div>
-                    {value?.status && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+      {/* Checklist plano (sin títulos de categoría) */}
+      <Card>
+        <CardContent className="space-y-4">
+          {CHECKLIST_TEMPLATE.map((item) => {
+            const value = currentChecklist[item.code];
+            return (
+              <div key={item.code} className="space-y-3 rounded-lg border p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">{item.code}</p>
+                    <p className="text-sm">{item.description}</p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      variant={value?.status === 'conforme' ? 'default' : 'outline'}
-                      onClick={() => handleStatusChange(item.code, 'conforme')}
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Conforme
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      variant={value?.status === 'no_conforme' ? 'default' : 'outline'}
-                      onClick={() => handleStatusChange(item.code, 'no_conforme')}
-                    >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      No Conforme
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      variant={value?.status === 'no_aplica' ? 'default' : 'outline'}
-                      onClick={() => handleStatusChange(item.code, 'no_aplica')}
-                    >
-                      <MinusCircle className="mr-2 h-4 w-4" />
-                      No Aplica
-                    </Button>
-                  </div>
-                  {/* Observación por ítem removida según requerimiento */}
+                  {value?.status && <CheckCircle2 className="h-5 w-5 text-green-600" />}
                 </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      ))}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant={value?.status === 'conforme' ? 'default' : 'outline'}
+                    onClick={() => handleStatusChange(item.code, 'conforme')}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Conforme
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant={value?.status === 'no_conforme' ? 'default' : 'outline'}
+                    onClick={() => handleStatusChange(item.code, 'no_conforme')}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    No Conforme
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant={value?.status === 'no_aplica' ? 'default' : 'outline'}
+                    onClick={() => handleStatusChange(item.code, 'no_aplica')}
+                  >
+                    <MinusCircle className="mr-2 h-4 w-4" />
+                    No Aplica
+                  </Button>
+                </div>
+                {/* Observación por ítem removida según requerimiento */}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
 
       {/* Firma del Inspector por Equipo */}
       {isChecklistComplete() && (

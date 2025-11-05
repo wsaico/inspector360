@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Context para el Formulario de Inspección
+ * Contexto para el Formulario de Inspeccion
  * Maneja el estado global del wizard de 4 pasos
  */
 
@@ -27,7 +27,7 @@ interface InspectionContextType {
   setSignatures: (data: InspectionFormData['signatures']) => void;
   setEquipmentSignature: (equipmentCode: string, signature: string) => void;
 
-  // Navegación
+  // Navegacion
   nextStep: () => void;
   prevStep: () => void;
   goToStep: (step: number) => void;
@@ -35,6 +35,14 @@ interface InspectionContextType {
   // Utilidades
   resetForm: () => void;
   canProceed: () => boolean;
+
+  // Draft y persistencia
+  draftInspectionId?: string | null;
+  setDraftInspectionId: (id: string | null) => void;
+  equipmentDbIds: Record<string, string>; // code -> equipment row id
+  setEquipmentDbId: (code: string, id: string) => void;
+  observationDbIds: Record<string, string>; // `${obs_id}-${equipment_code}` -> observation row id
+  setObservationDbId: (key: string, id: string) => void;
 }
 
 const InspectionContext = createContext<InspectionContextType | undefined>(undefined);
@@ -51,6 +59,9 @@ const initialFormData: InspectionFormData = {
 export function InspectionProvider({ children }: { children: ReactNode }) {
   const [formData, setFormData] = useState<InspectionFormData>(initialFormData);
   const [currentStep, setCurrentStep] = useState(1);
+  const [draftInspectionId, setDraftInspectionIdState] = useState<string | null>(null);
+  const [equipmentDbIds, setEquipmentDbIds] = useState<Record<string, string>>({});
+  const [observationDbIds, setObservationDbIds] = useState<Record<string, string>>({});
 
   const setGeneralInfo = useCallback((data: InspectionFormData['general']) => {
     setFormData(prev => ({ ...prev, general: data }));
@@ -73,7 +84,7 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
       const oldCode = newEquipment[index].code;
       newEquipment[index] = equipment;
 
-      // Si cambió el código, actualizar la key del checklist
+      // Si cambio el codigo, actualizar la key del checklist
       const newChecklists = { ...prev.checklists };
       if (oldCode !== equipment.code) {
         newChecklists[equipment.code] = newChecklists[oldCode] || {};
@@ -164,6 +175,18 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const setDraftInspectionId = useCallback((id: string | null) => {
+    setDraftInspectionIdState(id);
+  }, []);
+
+  const setEquipmentDbId = useCallback((code: string, id: string) => {
+    setEquipmentDbIds(prev => ({ ...prev, [code]: id }));
+  }, []);
+
+  const setObservationDbId = useCallback((key: string, id: string) => {
+    setObservationDbIds(prev => ({ ...prev, [key]: id }));
+  }, []);
+
   const nextStep = useCallback(() => {
     setCurrentStep(prev => Math.min(prev + 1, 5));
   }, []);
@@ -179,6 +202,9 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
   const resetForm = useCallback(() => {
     setFormData(initialFormData);
     setCurrentStep(1);
+    setDraftInspectionIdState(null);
+    setEquipmentDbIds({});
+    setObservationDbIds({});
   }, []);
 
   const canProceed = useCallback(() => {
@@ -188,28 +214,26 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
       case 2:
         return formData.equipment.length > 0;
       case 3:
-        // Observaciones son opcionales, siempre puede proceder
-        return true;
-      case 4:
-        // Verificar que todos los equipos tengan checklist completo (según template)
-        // y aplicar regla: si un equipo tiene uno o más ítems No Conformes,
-        // debe existir al menos una observación del operador para ese equipo.
+        // Checklist antes de observaciones: exigir que todos los equipos tengan checklist completo
         return formData.equipment.every(eq => {
           const checklist = formData.checklists[eq.code];
           const checklistCompleto = checklist && Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
-          if (!checklistCompleto) return false;
+          return !!checklistCompleto;
+        });
+      case 4:
+        // Observaciones despues del checklist: si hay No Conformes, exigir observacion del operador por equipo
+        return formData.equipment.every(eq => {
+          const checklist = formData.checklists[eq.code];
           const tieneNoConformes = Object.values(checklist || {}).some((item) => item?.status === 'no_conforme');
-          if (!tieneNoConformes) return true; // si todo es conforme, no exigir observación
+          if (!tieneNoConformes) return true; // si todo es conforme, observaci�n opcional
           const tieneObsOperador = formData.observations.some(
             (obs) => obs.equipment_code === eq.code && !!obs.obs_operator && obs.obs_operator.trim().length > 0
           );
           return tieneObsOperador;
         });
       case 5:
-        return (
-          formData.signatures.supervisor_name !== undefined &&
-          formData.signatures.supervisor_signature !== undefined
-        );
+        // Firmas finales son opcionales: permitir avanzar/completar
+        return true;
       default:
         return false;
     }
@@ -218,6 +242,12 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
   const value: InspectionContextType = {
     formData,
     currentStep,
+    draftInspectionId,
+    setDraftInspectionId,
+    equipmentDbIds,
+    setEquipmentDbId,
+    observationDbIds,
+    setObservationDbId,
     setGeneralInfo,
     addEquipment,
     updateEquipment,

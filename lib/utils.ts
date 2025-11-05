@@ -30,3 +30,29 @@ export function hasPendingObservations(inspection?: Inspection) {
     (obs) => (obs.obs_operator && obs.obs_operator.trim().length > 0) && (!obs.obs_maintenance || obs.obs_maintenance.trim().length === 0)
   );
 }
+
+// Firmas
+export function isSupervisorSigned(inspection?: Inspection) {
+  if (!inspection) return false;
+  const nameOk = !!inspection.supervisor_name && inspection.supervisor_name.trim().length > 0;
+  const sigOk = !!inspection.supervisor_signature_url && inspection.supervisor_signature_url.trim().length > 0;
+  return nameOk && sigOk;
+}
+
+export function isMechanicSigned(inspection?: Inspection) {
+  if (!inspection) return false;
+  const nameOk = !!inspection.mechanic_name && inspection.mechanic_name.trim().length > 0;
+  const sigOk = !!inspection.mechanic_signature_url && inspection.mechanic_signature_url.trim().length > 0;
+  return nameOk && sigOk;
+}
+
+export function getMissingSignaturesLabel(inspection?: Inspection): string | null {
+  if (!inspection) return null;
+  const sup = isSupervisorSigned(inspection);
+  const mec = isMechanicSigned(inspection);
+  if (sup && mec) return null;
+  if (!sup && !mec) return 'Faltan firmas: Supervisor y Mecánico';
+  if (!sup) return 'Falta firma: Supervisor';
+  if (!mec) return 'Falta firma: Mecánico';
+  return null;
+}

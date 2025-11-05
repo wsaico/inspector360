@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks';
 import { useInspectionForm } from '@/context/inspection-context';
@@ -17,18 +17,48 @@ import { toast } from 'sonner';
 export default function Step4Finalize() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { formData, setSignatures, resetForm } = useInspectionForm();
+  const { formData, setSignatures, resetForm, draftInspectionId, equipmentDbIds } = useInspectionForm();
   const [supervisorName, setSupervisorName] = useState('');
   const [supervisorSignature, setSupervisorSignature] = useState<string | null>(null);
   const [mechanicName, setMechanicName] = useState('');
   const [mechanicSignature, setMechanicSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Prefill names from localStorage
+  useEffect(() => {
+    try {
+      const supName = typeof window !== 'undefined' ? localStorage.getItem('inspections.supervisorName') : null;
+      const mecName = typeof window !== 'undefined' ? localStorage.getItem('inspections.mechanicName') : null;
+      if (supName) {
+        setSupervisorName(supName);
+        setSignatures({
+          ...formData.signatures,
+          supervisor_name: supName,
+        });
+      }
+      if (mecName) {
+        setMechanicName(mecName);
+        setSignatures({
+          ...formData.signatures,
+          mechanic_name: mecName,
+        });
+      }
+    } catch {}
+  }, []);
+
+  // Persist names to localStorage when they change
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', supervisorName || '');
+    } catch {}
+  }, [supervisorName]);
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', mechanicName || '');
+    } catch {}
+  }, [mechanicName]);
+
   const handleComplete = async () => {
-    if (!supervisorName || !supervisorSignature || !mechanicName || !mechanicSignature) {
-      toast.error('Complete todos los campos requeridos (ambas firmas)');
-      return;
-    }
 
     if (!profile?.id) {
       toast.error('Usuario no autenticado');
@@ -38,47 +68,78 @@ export default function Step4Finalize() {
     setIsSubmitting(true);
 
     try {
-      // 1. Crear inspección
-      const { data: inspection, error: inspectionError} = await InspectionService.createInspection({
-        user_id: profile.id,
-        station: formData.general!.station,
-        inspection_date: formData.general!.inspection_date,
-        inspection_type: formData.general!.inspection_type,
-        inspector_name: formData.general!.inspector_name,
-      });
-
-      if (inspectionError || !inspection) {
-        throw new Error(inspectionError);
+      // 1. Obtener o crear inspección según borrador
+      let inspectionId: string | null = null;
+      if (draftInspectionId) {
+        // Usamos el borrador existente, asegurando actualizar info general (por si cambió)
+        const { error: updateDraftError } = await InspectionService.updateInspection(draftInspectionId, {
+          station: formData.general!.station,
+          inspection_date: formData.general!.inspection_date,
+          inspection_type: formData.general!.inspection_type,
+          inspector_name: formData.general!.inspector_name,
+        });
+        if (updateDraftError) {
+          throw new Error(updateDraftError);
+        }
+        inspectionId = draftInspectionId;
+      } else {
+        const { data: created, error: createError } = await InspectionService.createInspection({
+          user_id: profile.id,
+          station: formData.general!.station,
+          inspection_date: formData.general!.inspection_date,
+          inspection_type: formData.general!.inspection_type,
+          inspector_name: formData.general!.inspector_name,
+        });
+        if (createError || !created) throw new Error(createError);
+        inspectionId = created.id!;
       }
 
-      // 2. Agregar equipos
+      // 2. Agregar/Actualizar equipos
       for (let i = 0; i < formData.equipment.length; i++) {
         const eq = formData.equipment[i];
         const checklistData = formData.checklists[eq.code];
         const equipmentSignature = formData.equipmentSignatures[eq.code];
-
-        const { data: equipmentResult, error: equipmentError } = await InspectionService.addEquipment(inspection.id!, {
-          ...eq,
-          checklist_data: checklistData,
-          order_index: i,
-        });
-
-        if (equipmentError) {
-          throw new Error(`Error agregando equipo: ${equipmentError}`);
+        const existingId = equipmentDbIds[eq.code];
+        let equipmentRowId: string | null = null;
+        if (existingId) {
+          const { data: updatedEq, error: updateEqError } = await InspectionService.updateEquipment(existingId, {
+            ...eq,
+            checklist_data: checklistData,
+            order_index: i,
+          });
+          if (updateEqError) throw new Error(`Error actualizando equipo: ${updateEqError}`);
+          equipmentRowId = updatedEq?.id ?? existingId;
+        } else {
+          const { data: equipmentResult, error: equipmentError } = await InspectionService.addEquipment(inspectionId!, {
+            ...eq,
+            checklist_data: checklistData,
+            order_index: i,
+          });
+          if (equipmentError) throw new Error(`Error agregando equipo: ${equipmentError}`);
+          equipmentRowId = equipmentResult?.id ?? null;
         }
 
         // 2.1 Guardar firma del inspector por equipo si existe
-        if (equipmentSignature && equipmentResult) {
-          await InspectionService.uploadInspectorSignature(equipmentResult.id!, equipmentSignature);
+        if (equipmentSignature && equipmentRowId) {
+          await InspectionService.uploadInspectorSignature(equipmentRowId, equipmentSignature);
         }
       }
 
       // 2.5 Guardar observaciones agregadas en el formulario (si existen)
       if (formData.observations && formData.observations.length > 0) {
+        // Evitar duplicados consultando existentes
+        let existingKeys = new Set<string>();
+        if (inspectionId) {
+          const { data: existingInspection } = await InspectionService.getInspectionById(inspectionId);
+          const existingObs = (existingInspection?.observations || []) as any[];
+          existingKeys = new Set(existingObs.map(o => `${o.equipment_code}::${o.obs_id}`));
+        }
         for (let i = 0; i < formData.observations.length; i++) {
           const o = formData.observations[i];
+          const key = `${o.equipment_code}::${o.obs_id}`;
+          if (existingKeys.has(key)) continue; // omitir duplicados
           await InspectionService.createObservation({
-            inspection_id: inspection.id!,
+            inspection_id: inspectionId!,
             obs_id: o.obs_id,
             equipment_code: o.equipment_code,
             obs_operator: o.obs_operator,
@@ -89,16 +150,16 @@ export default function Step4Finalize() {
       }
 
       // 3. Completar con firmas
-      await InspectionService.completeInspection(inspection.id!, {
-        supervisorName,
-        supervisorSignature,
-        mechanicName,
-        mechanicSignature,
+      await InspectionService.completeInspection(inspectionId!, {
+        supervisorName: supervisorName || null,
+        supervisorSignature: supervisorSignature || null,
+        mechanicName: mechanicName || null,
+        mechanicSignature: mechanicSignature || null,
       });
 
       toast.success('Inspección completada exitosamente');
       resetForm();
-      router.push(`/inspections/${inspection.id}`);
+      router.push(`/inspections/${inspectionId}`);
     } catch (error: any) {
       toast.error(`Error al completar la inspección: ${error.message}`);
     } finally {
@@ -144,7 +205,7 @@ export default function Step4Finalize() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nombre del Supervisor *</Label>
+            <Label>Nombre del Supervisor</Label>
           <Input
             value={supervisorName}
             onChange={(e) => {
@@ -157,6 +218,7 @@ export default function Step4Finalize() {
             }}
             placeholder="Nombre completo del supervisor"
           />
+          <p className="text-xs text-muted-foreground">Se guarda en este navegador para reutilizar.</p>
         </div>
         <SignaturePad
           label="Firma del Supervisor"
@@ -168,7 +230,6 @@ export default function Step4Finalize() {
               supervisor_name: supervisorName,
             });
           }}
-          required
         />
         </CardContent>
       </Card>
@@ -179,7 +240,7 @@ export default function Step4Finalize() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nombre del Mecánico *</Label>
+            <Label>Nombre del Mecánico</Label>
           <Input
             value={mechanicName}
             onChange={(e) => {
@@ -192,6 +253,7 @@ export default function Step4Finalize() {
             }}
             placeholder="Nombre completo del mecánico"
           />
+          <p className="text-xs text-muted-foreground">Se guarda en este navegador para reutilizar.</p>
         </div>
         <SignaturePad
           label="Firma del Mecánico"
@@ -203,7 +265,6 @@ export default function Step4Finalize() {
               mechanic_name: mechanicName,
             });
           }}
-          required
         />
         </CardContent>
       </Card>
@@ -212,7 +273,7 @@ export default function Step4Finalize() {
         className="w-full"
         size="lg"
         onClick={handleComplete}
-        disabled={!supervisorName || !supervisorSignature || !mechanicName || !mechanicSignature || isSubmitting}
+        disabled={isSubmitting}
       >
         {isSubmitting ? (
           <>

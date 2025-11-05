@@ -197,56 +197,138 @@ export class InspectionService {
   static async completeInspection(
     inspectionId: string,
     signaturesData: {
-      supervisorName: string;
-      supervisorSignature: string;
-      mechanicName: string;
-      mechanicSignature: string;
+      supervisorName?: string | null;
+      supervisorSignature?: string | null;
+      mechanicName?: string | null;
+      mechanicSignature?: string | null;
     }
   ) {
     try {
-      // 1. Subir firma del supervisor a Storage
-      const supervisorBlob = await fetch(signaturesData.supervisorSignature).then((r) =>
-        r.blob()
-      );
-      const supervisorFileName = `signatures/${inspectionId}/supervisor-${Date.now()}.png`;
+      // 1-4. Subir firmas si existen y obtener URLs públicas
+      let supervisorUrl: string | null = null;
+      if (signaturesData.supervisorSignature) {
+        const supervisorBlob = await fetch(signaturesData.supervisorSignature).then((r) => r.blob());
+        const supervisorFileName = `signatures/${inspectionId}/supervisor-${Date.now()}.png`;
+        const { error: supervisorUploadError } = await supabase.storage
+          .from('signatures')
+          .upload(supervisorFileName, supervisorBlob, { upsert: true });
+        if (supervisorUploadError) throw supervisorUploadError;
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('signatures').getPublicUrl(supervisorFileName);
+        supervisorUrl = publicUrl;
+      }
 
-      const { error: supervisorUploadError } = await supabase.storage
-        .from('signatures')
-        .upload(supervisorFileName, supervisorBlob, { upsert: true });
+      let mechanicUrl: string | null = null;
+      if (signaturesData.mechanicSignature) {
+        const mechanicBlob = await fetch(signaturesData.mechanicSignature).then((r) => r.blob());
+        const mechanicFileName = `signatures/${inspectionId}/mechanic-${Date.now()}.png`;
+        const { error: mechanicUploadError } = await supabase.storage
+          .from('signatures')
+          .upload(mechanicFileName, mechanicBlob, { upsert: true });
+        if (mechanicUploadError) throw mechanicUploadError;
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('signatures').getPublicUrl(mechanicFileName);
+        mechanicUrl = publicUrl;
+      }
 
-      if (supervisorUploadError) throw supervisorUploadError;
+      // 5. Determinar estado: 'completed' solo si ambas firmas y nombres
+      // Cuando solo faltan firmas, no consideramos 'borrador' a nivel de UI/flujo.
+      // Marcamos como 'completed' y la UI mostrará 'Pendiente' por firmas faltantes.
+      const finalStatus: 'completed' | 'draft' = 'completed';
 
-      // 2. Obtener URL pública del supervisor
-      const {
-        data: { publicUrl: supervisorUrl },
-      } = supabase.storage.from('signatures').getPublicUrl(supervisorFileName);
-
-      // 3. Subir firma del mecánico a Storage
-      const mechanicBlob = await fetch(signaturesData.mechanicSignature).then((r) =>
-        r.blob()
-      );
-      const mechanicFileName = `signatures/${inspectionId}/mechanic-${Date.now()}.png`;
-
-      const { error: mechanicUploadError } = await supabase.storage
-        .from('signatures')
-        .upload(mechanicFileName, mechanicBlob, { upsert: true });
-
-      if (mechanicUploadError) throw mechanicUploadError;
-
-      // 4. Obtener URL pública del mecánico
-      const {
-        data: { publicUrl: mechanicUrl },
-      } = supabase.storage.from('signatures').getPublicUrl(mechanicFileName);
-
-      // 5. Actualizar inspección con ambas firmas
+      // 6. Actualizar inspección con datos presentes (firmas opcionales)
       const { data, error } = await supabase
         .from('inspections')
         .update({
-          supervisor_name: signaturesData.supervisorName,
+          supervisor_name: signaturesData.supervisorName ?? null,
           supervisor_signature_url: supervisorUrl,
-          supervisor_signature_date: new Date().toISOString(),
-          mechanic_name: signaturesData.mechanicName,
+          supervisor_signature_date: supervisorUrl ? new Date().toISOString() : null,
+          mechanic_name: signaturesData.mechanicName ?? null,
           mechanic_signature_url: mechanicUrl,
+          mechanic_signature_date: mechanicUrl ? new Date().toISOString() : null,
+          status: finalStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', inspectionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error completing inspection:', error);
+      return { data: null, error: error.message };
+    }
+  } 
+
+  /**
+   * Sube firma del supervisor y actualiza la inspección
+   */
+  static async uploadSupervisorSignature(
+    inspectionId: string,
+    name: string,
+    signature: string
+  ) {
+    try {
+      const signatureBlob = await fetch(signature).then((r) => r.blob());
+      const fileName = `signatures/${inspectionId}/supervisor-${Date.now()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from('signatures')
+        .upload(fileName, signatureBlob, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('signatures').getPublicUrl(fileName);
+
+      const { data, error } = await supabase
+        .from('inspections')
+        .update({
+          supervisor_name: name,
+          supervisor_signature_url: publicUrl,
+          supervisor_signature_date: new Date().toISOString(),
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', inspectionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error uploading supervisor signature:', error);
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Sube firma del mecánico y actualiza la inspección
+   */
+  static async uploadMechanicSignature(
+    inspectionId: string,
+    name: string,
+    signature: string
+  ) {
+    try {
+      const signatureBlob = await fetch(signature).then((r) => r.blob());
+      const fileName = `signatures/${inspectionId}/mechanic-${Date.now()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from('signatures')
+        .upload(fileName, signatureBlob, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('signatures').getPublicUrl(fileName);
+
+      const { data, error } = await supabase
+        .from('inspections')
+        .update({
+          mechanic_name: name,
+          mechanic_signature_url: publicUrl,
           mechanic_signature_date: new Date().toISOString(),
           status: 'completed',
           updated_at: new Date().toISOString(),
@@ -258,7 +340,7 @@ export class InspectionService {
       if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error completing inspection:', error);
+      console.error('Error uploading mechanic signature:', error);
       return { data: null, error: error.message };
     }
   }
@@ -518,4 +600,3 @@ export class InspectionService {
     }
   }
 }
-
