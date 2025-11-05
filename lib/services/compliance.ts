@@ -19,44 +19,77 @@ type EquipmentWithMetaRow = {
 
 export class ComplianceService {
   /**
+   * Parámetros opcionales para filtrar por estación y mes
+   */
+  static getMonthRange(month?: string) {
+    // month formato 'YYYY-MM'. Si no, usar mes actual
+    const now = new Date();
+    const [y, m] = month ? month.split('-').map(Number) : [now.getFullYear(), now.getMonth() + 1];
+    const start = new Date(y!, (m! - 1), 1);
+    const end = new Date(y!, (m! - 1) + 1, 0);
+    return { start: start.toISOString(), end: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString(), daysInMonth: end.getDate() };
+  }
+  /**
    * Obtiene estadísticas generales
    */
-  static async getOverallStats() {
+  static async getOverallStats(filters?: { station?: string; month?: string }) {
     try {
-      // Total de inspecciones completadas
-      const { count: totalInspections, error: totalError } = await supabase
-        .from('inspections')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed');
-
-      if (totalError) throw totalError;
-
-      // Inspecciones completadas este mes
-      const firstDayOfMonth = new Date(
-        new Date().getFullYear(),
-        new Date().getMonth(),
-        1
-      ).toISOString();
-
-      const { count: completedThisMonth, error: monthError } = await supabase
+      const { start, end } = ComplianceService.getMonthRange(filters?.month);
+      // Base query por rango de mes y estado completado
+      const baseInspections = supabase
         .from('inspections')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'completed')
-        .gte('created_at', firstDayOfMonth);
+        .gte('created_at', start)
+        .lte('created_at', end);
+
+      // Total de inspecciones completadas (aplicando filtro de estación si corresponde)
+      const totalQuery = filters?.station ? baseInspections.eq('station', filters.station) : baseInspections;
+      const { count: totalInspections, error: totalError } = await totalQuery;
+
+      if (totalError) throw totalError;
+
+      // Inspecciones completadas este mes (mismo rango, mismo filtro)
+      const monthQuery = filters?.station ? baseInspections.eq('station', filters.station) : baseInspections;
+      const { count: completedThisMonth, error: monthError } = await monthQuery;
 
       if (monthError) throw monthError;
 
-      // Total de equipos inspeccionados
-      const { count: equipmentInspected, error: equipmentError } = await supabase
-        .from('equipment')
-        .select('*', { count: 'exact', head: true });
+      // Total de equipos inspeccionados (vinculados a inspecciones COMPLETADAS del mes y filtrados por estación)
+      // 1) Obtener IDs de inspecciones dentro del rango y estado completado
+      const baseIdsQuery = supabase
+        .from('inspections')
+        .select('id')
+        .eq('status', 'completed')
+        .gte('created_at', start)
+        .lte('created_at', end);
+      const idsQuery = filters?.station ? baseIdsQuery.eq('station', filters.station) : baseIdsQuery;
+      const { data: inspectionsForMonth, error: idsError } = await idsQuery;
+      if (idsError) throw idsError;
 
-      if (equipmentError) throw equipmentError;
+      const ids = (inspectionsForMonth || [])
+        .map((i: { id?: string | null }) => i?.id || null)
+        .filter((v: string | null): v is string => typeof v === 'string' && v.length > 0);
+
+      let equipmentInspected = 0;
+      if (ids.length > 0) {
+        const { count, error: equipmentError } = await supabase
+          .from('equipment')
+          .select('*', { count: 'exact', head: true })
+          .in('inspection_id', ids);
+        if (equipmentError) throw equipmentError;
+        equipmentInspected = count || 0;
+      } else {
+        equipmentInspected = 0;
+      }
 
       // Calcular tasa de cumplimiento
-      const { data: allEquipment, error: equipmentDataError } = await supabase
+      const eqDataQuery = supabase
         .from('equipment')
         .select('checklist_data');
+      const { data: allEquipment, error: equipmentDataError } = await (
+        filters?.station ? eqDataQuery.eq('station', filters.station) : eqDataQuery
+      );
 
       if (equipmentDataError) throw equipmentDataError;
 
@@ -97,13 +130,18 @@ export class ComplianceService {
   /**
    * Obtiene tendencias mensuales
    */
-  static async getMonthlyTrends() {
+  static async getMonthlyTrends(filters?: { station?: string; month?: string }) {
     try {
-      const { data: inspections, error } = await supabase
+      const { start, end } = ComplianceService.getMonthRange(filters?.month);
+      const base = supabase
         .from('inspections')
         .select('created_at')
         .eq('status', 'completed')
+        .gte('created_at', start)
+        .lte('created_at', end)
         .order('created_at', { ascending: true });
+      const query = filters?.station ? base.eq('station', filters.station) : base;
+      const { data: inspections, error } = await query;
 
       if (error) throw error;
 
@@ -136,11 +174,12 @@ export class ComplianceService {
   /**
    * Obtiene desglose de cumplimiento
    */
-  static async getComplianceBreakdown() {
+  static async getComplianceBreakdown(filters?: { station?: string }) {
     try {
-      const { data: allEquipment, error } = await supabase
+      const base = supabase
         .from('equipment')
         .select('checklist_data');
+      const { data: allEquipment, error } = await (filters?.station ? base.eq('station', filters.station) : base);
 
       if (error) throw error;
 
@@ -175,11 +214,12 @@ export class ComplianceService {
   /**
    * Obtiene top de no conformidades por ítem
    */
-  static async getTopIssues(limit: number = 10) {
+  static async getTopIssues(limit: number = 10, filters?: { station?: string }) {
     try {
-      const { data: allEquipment, error } = await supabase
+      const base = supabase
         .from('equipment')
         .select('checklist_data');
+      const { data: allEquipment, error } = await (filters?.station ? base.eq('station', filters.station) : base);
 
       if (error) throw error;
 
@@ -331,6 +371,53 @@ export class ComplianceService {
       return { data: categoryStats, error: null };
     } catch (error: any) {
       console.error('Error fetching compliance by category:', error);
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Cumplimiento por días del mes: una inspección al día
+   * Cuenta máximo una por día. Para SIG/Admin puede agregarse por todas las estaciones.
+   */
+  static async getDailyCompliance(filters?: { station?: string; month?: string; aggregateAll?: boolean }) {
+    try {
+      const { start, end, daysInMonth } = ComplianceService.getMonthRange(filters?.month);
+      const base = supabase
+        .from('inspections')
+        .select('created_at, station, status')
+        .eq('status', 'completed')
+        .gte('created_at', start)
+        .lte('created_at', end);
+      const query = filters?.station && !filters.aggregateAll ? base.eq('station', filters.station) : base;
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Contar máximo 1 inspección COMPLETADA por día, sin duplicar por estación
+      const seenDays: Set<string> = new Set();
+      data?.forEach((i: { created_at: string }) => {
+        const d = new Date(i.created_at);
+        const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString();
+        if (!seenDays.has(dayKey)) {
+          seenDays.add(dayKey);
+        }
+      });
+
+      // Construir desglose por día (0/1), para graficar contra la meta 1/día
+      const startDate = new Date(start);
+      const year = startDate.getFullYear();
+      const monthIndex = startDate.getMonth();
+      const breakdown = Array.from({ length: daysInMonth }, (_, idx) => {
+        const date = new Date(year, monthIndex, idx + 1);
+        const key = date.toDateString();
+        const has = seenDays.has(key);
+        return { day: idx + 1, value: has ? 1 : 0 };
+      });
+
+      const daysWithInspection = seenDays.size;
+      const rate = daysInMonth > 0 ? Math.round((daysWithInspection / daysInMonth) * 100) : 0;
+      return { data: { daysWithInspection, daysInMonth, rate, breakdown }, error: null };
+    } catch (error: any) {
+      console.error('Error fetching daily compliance:', error);
       return { data: null, error: error.message };
     }
   }

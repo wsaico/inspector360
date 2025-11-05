@@ -51,16 +51,41 @@ export class InspectionService {
    * Obtiene todas las inspecciones según los permisos del usuario
    * El RLS de Supabase maneja automáticamente el filtrado por rol
    */
-  static async getInspections() {
+  static async getInspections(opts?: { page?: number; pageSize?: number; station?: string; start?: string; end?: string }) {
     try {
+      const page = opts?.page && opts.page > 0 ? opts.page : 1;
+      const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 0; // 0 = sin paginación
+      const from = pageSize > 0 ? (page - 1) * pageSize : undefined;
+      const to = pageSize > 0 && typeof from === 'number' ? from + pageSize - 1 : undefined;
+
       // Obtener inspecciones con equipos
-      const { data: inspections, error: inspectionsError } = await supabase
+      let inspectionsRes;
+      let query = supabase
         .from('inspections')
         .select(`
           *,
           equipment (*)
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false });
+
+      // Filtros opcionales por estación y rango de fechas
+      if (opts?.station) {
+        query = query.eq('station', opts.station);
+      }
+      if (opts?.start) {
+        query = query.gte('created_at', opts.start);
+      }
+      if (opts?.end) {
+        query = query.lte('created_at', opts.end);
+      }
+
+      if (typeof from === 'number' && typeof to === 'number') {
+        inspectionsRes = await query.range(from, to);
+      } else {
+        inspectionsRes = await query;
+      }
+
+      const { data: inspections, error: inspectionsError, count } = inspectionsRes as any;
 
       if (inspectionsError) {
         console.error('Error fetching inspections:', inspectionsError);
@@ -69,7 +94,7 @@ export class InspectionService {
 
       const ids = (inspections || []).map((i: { id?: string }) => i.id).filter(Boolean);
       if (!ids || ids.length === 0) {
-        return { data: inspections || [], error: null };
+        return { data: inspections || [], error: null, total: count ?? (inspections?.length || 0) };
       }
 
       // Obtener observaciones asociadas en un solo query y adjuntar
@@ -99,7 +124,7 @@ export class InspectionService {
         };
       });
 
-      return { data: withObs, error: null };
+      return { data: withObs, error: null, total: count ?? (inspections?.length || 0), page, pageSize };
     } catch (error: any) {
       console.error('Error fetching inspections:', error);
       return { data: null, error: error.message };

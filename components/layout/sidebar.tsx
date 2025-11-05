@@ -51,7 +51,7 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, signOut } = useAuth();
+  const { profile, loading, signOut } = useAuth();
   const permissions = usePermissions();
 
   const handleSignOut = async () => {
@@ -65,6 +65,8 @@ export function Sidebar() {
   };
 
   const filteredNavigation = navigation.filter((item) => {
+    // Mientras el perfil está cargando, no filtramos para evitar parpadeo
+    if (loading) return true;
     if (!item.permission) return true;
     return permissions[item.permission];
   });

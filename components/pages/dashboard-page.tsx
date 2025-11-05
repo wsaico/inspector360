@@ -12,18 +12,86 @@ import {
   Plus,
   FileText,
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ComplianceService } from '@/lib/services/compliance';
+import { InspectionService } from '@/lib/services';
+import { hasPendingObservations, getMissingSignaturesLabel } from '@/lib/utils';
+import { STATIONS } from '@/types/roles';
+import { StationsService } from '@/lib/services/stations';
+import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const { profile, error } = useAuth();
-  const { canCreateInspections } = usePermissions();
+  const { canCreateInspections, canViewAllStations } = usePermissions();
 
-  // Datos mock - serán reemplazados con datos reales
-  const stats = {
+  const [loading, setLoading] = useState(false);
+  const [month, setMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [station, setStation] = useState<string | undefined>(undefined);
+  const [stats, setStats] = useState({
     totalInspections: 0,
     completedThisMonth: 0,
     pendingReview: 0,
     complianceRate: 0,
-  };
+  });
+
+  const showAllStations = canViewAllStations || (!profile?.station) || String(profile?.station).toLowerCase() === 'todas';
+
+  useEffect(() => {
+    if (!showAllStations && profile?.station) {
+      setStation(profile.station);
+    }
+  }, [profile?.station, showAllStations]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const overall = await ComplianceService.getOverallStats({ station, month });
+        const daily = await ComplianceService.getDailyCompliance({ station, month, aggregateAll: showAllStations && !station });
+
+        const total = overall.data?.totalInspections || 0;
+        const completed = overall.data?.completedThisMonth || 0;
+        const complianceRate = daily.data?.rate || 0;
+
+        // Calcular pendientes: inspecciones con observaciones del operador sin respuesta del mecánico
+        // o con firmas faltantes, dentro del rango del mes seleccionado y alcance de estación.
+        const { start, end } = ComplianceService.getMonthRange(month);
+        // Obtener inspecciones ya filtradas por estación y mes para evitar mezclar estaciones
+        const { data: scoped } = await InspectionService.getInspections({ station: station || undefined, start, end });
+
+        const pendingReview = (scoped || []).reduce((acc: number, i: any) => {
+          const hasPending = hasPendingObservations(i) || !!getMissingSignaturesLabel(i);
+          return acc + (hasPending ? 1 : 0);
+        }, 0);
+
+        setStats({
+          totalInspections: total,
+          completedThisMonth: completed,
+          pendingReview,
+          complianceRate,
+        });
+      } catch (e) {
+        console.error(e);
+        toast.error('No se pudo cargar estadísticas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [station, month, showAllStations]);
+
+  const [stationOptions, setStationOptions] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    const loadStations = async () => {
+      const res = await StationsService.listAll();
+      const active = (res.data || []).filter(s => s.is_active);
+      setStationOptions(active.map(s => ({ value: s.code, label: s.name })));
+    };
+    loadStations();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -105,6 +173,40 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {/* Filtros */}
+      <div className="grid gap-3 md:grid-cols-3">
+        <div>
+          <label className="text-xs text-gray-500">Mes</label>
+          <input
+            type="month"
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500">Estación</label>
+          {showAllStations ? (
+            <select
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              value={station || ''}
+              onChange={(e) => setStation(e.target.value || undefined)}
+            >
+              <option value="">Todas</option>
+              {stationOptions.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-gray-100"
+              value={profile?.station || ''}
+              readOnly
+            />
+          )}
+        </div>
+      </div>
+
       {/* Statistics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -156,7 +258,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.complianceRate}%</div>
             <p className="text-xs text-muted-foreground">
-              Tasa de cumplimiento
+              Meta: 1 inspección por día del mes
             </p>
           </CardContent>
         </Card>

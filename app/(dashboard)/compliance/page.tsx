@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks';
+import { useEffect, useMemo, useState } from 'react';
+import { useAuth, usePermissions } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,6 +18,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 import {
   TrendingUp,
@@ -29,9 +30,12 @@ import {
 } from 'lucide-react';
 import { ComplianceService } from '@/lib/services/compliance';
 import { toast } from 'sonner';
+import { STATIONS } from '@/types/roles';
+import { StationsService } from '@/lib/services/stations';
 
 export default function CompliancePage() {
   const { profile, loading: profileLoading } = useAuth();
+  const { canViewAllStations } = usePermissions();
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     totalInspections: 0,
@@ -42,6 +46,36 @@ export default function CompliancePage() {
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [complianceData, setComplianceData] = useState<any[]>([]);
   const [topIssues, setTopIssues] = useState<any[]>([]);
+  const [month, setMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [station, setStation] = useState<string | undefined>(undefined);
+  const [dailyCompliance, setDailyCompliance] = useState<{ daysWithInspection: number; daysInMonth: number; rate: number }>({ daysWithInspection: 0, daysInMonth: 0, rate: 0 });
+  const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
+
+  // Solo permitir "todas" si realmente tiene permiso o su estación es "todas"
+  // Fuerza tipo boolean para evitar uniones con string/undefined que rompen el build
+  const showAllStations: boolean = Boolean(
+    canViewAllStations || (profile?.station && String(profile?.station).toLowerCase() === 'todas')
+  );
+  const [stationOptions, setStationOptions] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    // Forzar filtro por estación si el usuario no puede ver todas
+    if (!canViewAllStations) {
+      const s = profile?.station ? String(profile.station) : undefined;
+      setStation(s);
+    }
+  }, [profile?.station, canViewAllStations]);
+
+  useEffect(() => {
+    const loadStations = async () => {
+      const res = await StationsService.listAll();
+      const active = (res.data || []).filter(s => s.is_active);
+      setStationOptions(active.map(s => ({ value: s.code, label: s.name })));
+    };
+    loadStations();
+  }, []);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -49,17 +83,22 @@ export default function CompliancePage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [statsData, trendsData, complianceResult, issuesData] = await Promise.all([
-          ComplianceService.getOverallStats(),
-          ComplianceService.getMonthlyTrends(),
-          ComplianceService.getComplianceBreakdown(),
-          ComplianceService.getTopIssues(),
+        const [statsData, trendsData, complianceResult, issuesData, daily] = await Promise.all([
+          ComplianceService.getOverallStats({ station, month }),
+          ComplianceService.getMonthlyTrends({ station, month }),
+          ComplianceService.getComplianceBreakdown({ station }),
+          ComplianceService.getTopIssues(10, { station }),
+          ComplianceService.getDailyCompliance({ station, month, aggregateAll: showAllStations && !station }),
         ]);
 
         if (statsData.data) setStats(statsData.data);
         if (trendsData.data) setMonthlyData(trendsData.data);
         if (complianceResult.data) setComplianceData(complianceResult.data);
         if (issuesData.data) setTopIssues(issuesData.data);
+        if (daily.data) {
+          setDailyCompliance({ daysWithInspection: daily.data.daysWithInspection, daysInMonth: daily.data.daysInMonth, rate: daily.data.rate });
+          setDailyBreakdown(daily.data.breakdown || []);
+        }
       } catch (error) {
         console.error('Error loading dashboard:', error);
         toast.error('Error al cargar el dashboard');
@@ -69,7 +108,7 @@ export default function CompliancePage() {
     };
 
     fetchData();
-  }, [profileLoading]);
+  }, [profileLoading, station, month, showAllStations]);
 
   const COLORS = ['#093071', '#8EBB37', '#F59E0B', '#EF4444'];
 
@@ -89,6 +128,40 @@ export default function CompliancePage() {
         <p className="text-sm text-muted-foreground">
           Métricas y estadísticas de inspecciones
         </p>
+      </div>
+
+      {/* Filtros */}
+      <div className="grid gap-3 md:grid-cols-3">
+        <div>
+          <label className="text-xs text-gray-500">Mes</label>
+          <input
+            type="month"
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500">Estación</label>
+          {showAllStations ? (
+            <select
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              value={station || ''}
+              onChange={(e) => setStation(e.target.value || undefined)}
+            >
+              <option value="">Todas</option>
+              {stationOptions.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-gray-100"
+              value={profile?.station || ''}
+              readOnly
+            />
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -123,15 +196,13 @@ export default function CompliancePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Tasa de Cumplimiento
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Cumplimiento Diario</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.complianceRate}%</div>
+            <div className="text-2xl font-bold">{dailyCompliance.rate}%</div>
             <p className="text-xs text-muted-foreground">
-              Items conformes promedio
+              {dailyCompliance.daysWithInspection} días con inspección de {dailyCompliance.daysInMonth}
             </p>
           </CardContent>
         </Card>
@@ -149,6 +220,33 @@ export default function CompliancePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cumplimiento Diario vs Meta (1 por día) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cumplimiento Diario vs Meta</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={dailyBreakdown}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="day" label={{ value: 'Día del mes', position: 'insideBottom', offset: -5 }} />
+              <YAxis domain={[0, 1]} ticks={[0, 1]} />
+              <Tooltip />
+              <Legend />
+              <ReferenceLine y={1} stroke="#10B981" strokeDasharray="3 3" label={{ value: 'Meta 1/día', fill: '#10B981', position: 'insideTopRight' }} />
+              <Bar dataKey="value" name="Cumplió (≥1 inspección)">
+                {dailyBreakdown.map((d, idx) => (
+                  <Cell key={`cell-${idx}`} fill={d.value === 1 ? '#22C55E' : '#EF4444'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Se cuenta máximo una inspección completada por día.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Charts Row 1 */}
       <div className="grid gap-4 md:grid-cols-2">

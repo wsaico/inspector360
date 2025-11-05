@@ -123,7 +123,7 @@ export class UserService {
   }
 
   /**
-   * Obtiene usuarios por estación
+   * Obtiene usuarios por estaciÃ³n
    */
   static async getUsersByStation(station: string) {
     try {
@@ -158,6 +158,29 @@ export class UserService {
       return { data, error: null };
     } catch (error: any) {
       console.error('Error fetching users by role:', error);
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Elimina un usuario por ID (solo admin)
+   * Llama a la API backend para borrar con Supabase Admin
+   */
+  static async deleteUser(userId: string) {
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error eliminando usuario');
+      }
+
+      return { data: result, error: null };
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
       return { data: null, error: error.message };
     }
   }

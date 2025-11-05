@@ -19,6 +19,10 @@ interface AuthState {
 }
 
 export function useAuth() {
+  // Persistencia manual para mejorar experiencia ante cortes de red
+  const PERSIST_KEY = 'i360.auth.persist';
+  const TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     profile: null,
@@ -26,14 +30,46 @@ export function useAuth() {
     error: null,
   });
 
+  const readPersisted = (): { user: SupabaseUser | null; profile: UserProfile | null; savedAt: number } => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(PERSIST_KEY) : null;
+      if (!raw) return { user: null, profile: null, savedAt: 0 };
+      const obj = JSON.parse(raw);
+      return { user: obj.user || null, profile: obj.profile || null, savedAt: obj.savedAt || 0 };
+    } catch {
+      return { user: null, profile: null, savedAt: 0 };
+    }
+  };
+
+  const writePersisted = (user: SupabaseUser | null, profile: UserProfile | null) => {
+    try {
+      if (typeof window === 'undefined') return;
+      window.localStorage.setItem(PERSIST_KEY, JSON.stringify({ user, profile, savedAt: Date.now() }));
+    } catch {}
+  };
+
+  const clearPersisted = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      window.localStorage.removeItem(PERSIST_KEY);
+    } catch {}
+  };
+
   useEffect(() => {
     // Obtener sesión inicial con guardia de tiempo
     const getSession = async () => {
       try {
-        const sessionRes = await withTimeout(supabase.auth.getSession(), 4000);
+        const sessionRes = await withTimeout(supabase.auth.getSession(), 10000);
 
         if (!sessionRes) {
-          // Si tarda demasiado, no bloqueamos la UI
+          // Si tarda demasiado, intentar usar persistencia local (válido hasta 24h)
+          const persisted = readPersisted();
+          const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
+          if (notExpired && persisted.user) {
+            setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: 'Sesión mantenida (timeout), reintenta conexión' });
+            return;
+          }
+          // Sin persistencia válida, no bloqueamos la UI pero mostramos error
           setAuthState({ user: null, profile: null, loading: false, error: 'Tiempo de espera al validar sesión' });
           return;
         }
@@ -43,13 +79,30 @@ export function useAuth() {
         if (error) throw error;
 
         if (session?.user) {
-          await loadUserProfile(session.user);
+          const loadedProfile = await loadUserProfile(session.user);
+          // Persistir inmediata para resiliencia con el perfil correcto
+          writePersisted(session.user, loadedProfile);
         } else {
-          setAuthState({ user: null, profile: null, loading: false, error: null });
+          // Antes de limpiar, verificar persistencia y TTL
+          const persisted = readPersisted();
+          const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
+          if (notExpired && persisted.user) {
+            setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: null });
+          } else {
+            setAuthState({ user: null, profile: null, loading: false, error: null });
+            clearPersisted();
+          }
         }
       } catch (error) {
         console.error('Error loading session:', error);
-        setAuthState({ user: null, profile: null, loading: false, error: 'Error al cargar la sesión' });
+        // Mantener sesión si existe persistida y no expirada
+        const persisted = readPersisted();
+        const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
+        if (notExpired && persisted.user) {
+          setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: 'Sesión mantenida (error de red)' });
+        } else {
+          setAuthState({ user: null, profile: null, loading: false, error: 'Error al cargar la sesión' });
+        }
       }
     };
 
@@ -59,9 +112,22 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         if (session?.user) {
-          await loadUserProfile(session.user);
+          const loadedProfile = await loadUserProfile(session.user);
+          writePersisted(session.user, loadedProfile);
         } else {
-          setAuthState({ user: null, profile: null, loading: false, error: null });
+          // Sólo limpiar al recibir sign_out explícito
+          if (event === 'SIGNED_OUT') {
+            clearPersisted();
+            setAuthState({ user: null, profile: null, loading: false, error: null });
+          } else {
+            const persisted = readPersisted();
+            const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
+            if (notExpired && persisted.user) {
+              setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: null });
+            } else {
+              setAuthState({ user: null, profile: null, loading: false, error: null });
+            }
+          }
         }
       }
     );
@@ -71,7 +137,27 @@ export function useAuth() {
     };
   }, []);
 
-  const loadUserProfile = async (supabaseUser: SupabaseUser) => {
+  // Refresco proactivo de sesión para evitar expiraciones prematuras
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        // Intentar refrescar si hay usuario
+        if (authState.user) {
+          // Algunos entornos requieren refresh explícito
+          if ((supabase as any)?.auth?.refreshSession) {
+            await withTimeout((supabase as any).auth.refreshSession(), 8000);
+          } else {
+            await withTimeout(supabase.auth.getSession(), 8000);
+          }
+        }
+      } catch (e) {
+        // No romper la sesión por errores intermitentes
+      }
+    }, 10 * 60 * 1000); // cada 10 minutos
+    return () => clearInterval(interval);
+  }, [authState.user]);
+
+  const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<UserProfile | null> => {
     try {
       const profileRes = await withTimeout(
         supabase
@@ -79,7 +165,7 @@ export function useAuth() {
           .select('*')
           .eq('id', supabaseUser.id)
           .single(),
-        6000
+        15000
       );
 
       // Si el perfil tarda, no bloquear: usar metadata como fallback
@@ -88,11 +174,11 @@ export function useAuth() {
         if (metaProfile) {
           setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: 'Perfil cargado parcialmente (timeout DB)' });
           console.warn('Perfil cargado desde metadata por timeout de DB');
-          return;
+          return metaProfile;
         }
         // Sin metadata útil, mantener usuario y error
         setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Tiempo de espera al obtener perfil' });
-        return;
+        return null;
       }
 
       const { data: profile, error } = profileRes as { data: any, error: any };
@@ -103,7 +189,7 @@ export function useAuth() {
         console.warn('Error loading user profile:', errMsg);
         if (metaProfile) {
           setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: `Perfil parcial: ${errMsg}` });
-          return;
+          return metaProfile;
         }
         throw new Error(errMsg);
       }
@@ -113,7 +199,7 @@ export function useAuth() {
         if (metaProfile) {
           setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: 'Perfil cargado parcialmente (no encontrado en DB)' });
           console.warn('Perfil cargado desde metadata por ausencia en DB');
-          return;
+          return metaProfile;
         }
         throw new Error('No se encontró el perfil del usuario');
       }
@@ -122,7 +208,7 @@ export function useAuth() {
       if (!isActive) {
         // Usuario inactivo: mantener usuario para permitir signOut pero indicar error
         setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Usuario inactivo' });
-        return;
+        return null;
       }
 
       setAuthState({
@@ -131,14 +217,17 @@ export function useAuth() {
         loading: false,
         error: null,
       });
+      return profile as UserProfile;
     } catch (error: any) {
       console.error('Failed to load user profile:', error?.message || error);
       const metaProfile = buildProfileFromMetadata(supabaseUser);
       if (metaProfile) {
         setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: `Perfil parcial: ${error?.message || 'Error desconocido'}` });
+        return metaProfile;
       } else {
         // IMPORTANTE: NO cerrar sesión del usuario, solo mostrar error para evitar loop
         setAuthState({ user: supabaseUser, profile: null, loading: false, error: `Error al cargar perfil: ${error?.message || 'Error'}` });
+        return null;
       }
     }
   };
@@ -166,7 +255,8 @@ export function useAuth() {
       if (error) throw error;
 
       if (data.user) {
-        await loadUserProfile(data.user);
+        const loadedProfile = await loadUserProfile(data.user);
+        writePersisted(data.user, loadedProfile);
       }
 
       return { success: true, error: null };
@@ -182,6 +272,7 @@ export function useAuth() {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       setAuthState({ user: null, profile: null, loading: false, error: null });
+      clearPersisted();
       return { success: true, error: null };
     } catch (error: any) {
       const errorMessage = error.message || 'Error al cerrar sesión';
@@ -198,33 +289,53 @@ export function useAuth() {
     signOut,
   };
 }
+
   const buildProfileFromMetadata = (supabaseUser: SupabaseUser): UserProfile | null => {
-    try {
-      const meta = (supabaseUser as any).user_metadata || (supabaseUser as any).app_metadata || {};
-      const email = (supabaseUser as any).email as string | undefined;
-      const full_name = (meta && meta.full_name) ? meta.full_name : (email || '');
-      const metaRole = meta?.role;
-      const allowedRoles = ['admin', 'supervisor', 'inspector'];
-      const role = typeof metaRole === 'string' && allowedRoles.includes(metaRole) ? (metaRole as UserProfile['role']) : undefined;
-      const station = meta?.station || undefined;
+  try {
+    const meta = (supabaseUser as any).user_metadata || (supabaseUser as any).app_metadata || {};
+    const email = (supabaseUser as any).email as string | undefined;
+    const full_name = (meta && meta.full_name) ? meta.full_name : (email || '');
+    const metaRoleRaw = meta?.role as string | undefined;
+    const allowedRoles = ['admin', 'supervisor', 'inspector', 'sig'] as const;
+    const normalizedRole = typeof metaRoleRaw === 'string' ? metaRoleRaw.trim().toLowerCase() : undefined;
+    const synonyms: Record<string, UserProfile['role']> = {
+      admin: 'admin',
+      administrador: 'admin',
+      'administrador principal': 'admin',
+      supervisor: 'supervisor',
+      inspectora: 'inspector',
+      inspector: 'inspector',
+      sig: 'sig',
+      'sistema de información geográfica': 'sig',
+    };
+    const mappedRole = normalizedRole ? (synonyms[normalizedRole] || normalizedRole) : undefined;
+    let role = mappedRole && (allowedRoles as readonly string[]).includes(mappedRole)
+      ? (mappedRole as UserProfile['role'])
+      : undefined;
 
-      // Solo construir perfil parcial si metadata tiene un rol válido
-      if (!email || !full_name || !role) {
-        return null;
-      }
+    // Fallback explícito para el administrador conocido si no hay role en metadata
+    if (!role && email && email.trim().toLowerCase() === 'admin@inspector360.com') {
+      role = 'admin';
+    }
+    const station = meta?.station || undefined;
 
-      return {
-        id: supabaseUser.id,
-        email,
-        full_name,
-        role,
-        station,
-        phone: meta?.phone || undefined,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as UserProfile;
-    } catch {
+    // Solo construir perfil parcial si metadata tiene un rol válido
+    if (!email || !full_name || !role) {
       return null;
     }
-  };
+
+    return {
+      id: supabaseUser.id,
+      email,
+      full_name,
+      role,
+      station,
+      phone: meta?.phone || undefined,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as UserProfile;
+  } catch {
+    return null;
+  }
+};

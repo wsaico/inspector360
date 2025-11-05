@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Shield, Settings as SettingsIcon, Loader2, MapPin } from 'lucide-react';
+import { Users, Shield, Settings as SettingsIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -60,28 +60,6 @@ export default function SettingsPage() {
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 Crear, editar y administrar usuarios del sistema
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        {/* Estaciones */}
-        <Link href="/settings/stations">
-          <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <MapPin className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Estaciones</CardTitle>
-                  <CardDescription>Añadir o quitar estaciones activas</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Gestiona qué estaciones están disponibles en el sistema
               </p>
             </CardContent>
           </Card>

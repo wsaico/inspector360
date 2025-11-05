@@ -9,6 +9,7 @@ import { useAuth, usePermissions } from '@/hooks';
 import { InspectionService } from '@/lib/services';
 import type { Inspection, Observation } from '@/types';
 import { getMissingSignaturesLabel } from '@/lib/utils';
+import { scopeInspectionsByStation } from '@/lib/utils/scope';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -75,14 +76,10 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
 
   // Inspecciones dentro del alcance (todas o filtradas por estación del perfil)
   const scopedInspections = useMemo(() => {
-    const station = profile?.station;
-    const stationStr = (station as any)?.toString?.().toLowerCase?.();
-    const globalScope = canViewAllStations || stationStr === 'todas' || stationStr === 'all';
-    return globalScope
-      ? inspections
-      : station
-        ? inspections.filter((i) => i.station === station)
-        : [];
+    return scopeInspectionsByStation(inspections, {
+      station: profile?.station,
+      canViewAllStations,
+    });
   }, [inspections, profile?.station, canViewAllStations]);
 
   const pendingByEquipment = useMemo(() => {

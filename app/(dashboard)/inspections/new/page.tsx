@@ -44,7 +44,7 @@ function InspectionWizardContent() {
         inspection_type: data.inspection_type,
         inspector_name: data.inspector_name,
       });
-      (data.equipment || []).forEach((eq, idx) => {
+      (data.equipment || []).forEach((eq: import('@/types').Equipment, idx: number) => {
         addEquipment({
           code: eq.code,
           type: eq.type,
@@ -64,7 +64,7 @@ function InspectionWizardContent() {
           updateChecklist(eq.code, code, value as any);
         });
       });
-      (data.observations || []).forEach((obs, idx) => {
+      (data.observations || []).forEach((obs: import('@/types').Observation, idx: number) => {
         addObservation({
           obs_id: obs.obs_id,
           equipment_code: obs.equipment_code,

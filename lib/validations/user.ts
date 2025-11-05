@@ -10,7 +10,7 @@ export const userSchema = z
     password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
     full_name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
     role: z.enum(['admin', 'supervisor', 'sig'], 'Rol requerido'),
-    station: z.enum(['AQP', 'CUZ', 'CIX', 'TRU', 'CJA', 'TPP', 'PIU']).optional(),
+    station: z.string().min(3, 'Código de estación inválido').optional(),
   })
   .refine(
     (data) => {
@@ -43,7 +43,7 @@ export const updateUserSchema = z
   .object({
     full_name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres').optional(),
     role: z.enum(['admin', 'supervisor', 'sig']).optional(),
-    station: z.enum(['AQP', 'CUZ', 'CIX', 'TRU', 'CJA', 'TPP', 'PIU']).optional(),
+    station: z.string().min(3, 'Código de estación inválido').optional(),
     is_active: z.boolean().optional(),
   })
   .refine(

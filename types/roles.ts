@@ -3,18 +3,20 @@
  * Define los roles de usuario y sus permisos en el sistema
  */
 
-export type UserRole = 'admin' | 'supervisor' | 'inspector';
+export type UserRole = 'admin' | 'supervisor' | 'inspector' | 'sig';
 
 export const ROLES = {
   ADMIN: 'admin',
   SUPERVISOR: 'supervisor',
   INSPECTOR: 'inspector',
+  SIG: 'sig',
 } as const;
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
   supervisor: 'Supervisor',
   inspector: 'Inspector',
+  sig: 'SIG',
 };
 
 export interface RolePermissions {
@@ -55,6 +57,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canExportReports: false,
     canAccessSettings: false,
   },
+  sig: {
+    canManageUsers: false,
+    canViewAllStations: true,
+    canCreateInspections: false,
+    canEditInspections: false,
+    canDeleteInspections: false,
+    canExportReports: true,
+    canAccessSettings: false,
+  },
 };
 
 /**
@@ -72,7 +83,7 @@ export interface UserProfile {
   updated_at: string;
 }
 
-export type Station = 'AQP' | 'CUZ' | 'CIX' | 'TRU' | 'CJA' | 'TPP' | 'PIU';
+export type Station = string;
 
 export const STATIONS: Record<Station, string> = {
   AQP: 'Arequipa',

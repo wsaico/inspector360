@@ -5,9 +5,10 @@
  * Recopila datos básicos de la inspección
  */
 
+import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuth } from '@/hooks';
+import { useAuth, usePermissions } from '@/hooks';
 import { useInspectionForm } from '@/context/inspection-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -15,10 +16,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { inspectionGeneralSchema, InspectionGeneralFormData } from '@/lib/validations';
 import { STATIONS, INSPECTION_TYPES } from '@/types';
+// Nota: Tipamos estación usando el esquema de validación para evitar que se infiera como string
 import { Calendar, MapPin, User, FileText } from 'lucide-react';
 
 export default function Step1General() {
-  const { user } = useAuth();
+  const { profile, user } = useAuth();
+  const { canViewAllStations } = usePermissions();
   const { formData, setGeneralInfo } = useInspectionForm();
 
   const {
@@ -29,25 +32,49 @@ export default function Step1General() {
     trigger,
   } = useForm<InspectionGeneralFormData>({
     resolver: zodResolver(inspectionGeneralSchema),
-    defaultValues: formData.general || {
-      inspection_date: new Date(),
-      inspection_type: 'periodica',
-      inspector_name: '',
-      station: 'AQP',
+    defaultValues: async () => {
+      if (formData.general) {
+        const g = formData.general;
+        return {
+          inspection_date: new Date(g.inspection_date as any),
+          inspection_type: g.inspection_type as InspectionGeneralFormData['inspection_type'],
+          inspector_name: g.inspector_name,
+          station: g.station as InspectionGeneralFormData['station'],
+        } satisfies InspectionGeneralFormData;
+      }
+      const code = (profile?.station as any) || 'AQP';
+      return {
+        inspection_date: new Date(),
+        inspection_type: 'periodica',
+        inspector_name: '',
+        station: code as InspectionGeneralFormData['station'],
+      } satisfies InspectionGeneralFormData;
     },
   });
+
+  // Si el perfil llega tarde, sincronizar la estación por defecto
+  // y mantenerla fija para usuarios sin permiso global
+  React.useEffect(() => {
+    const s = (profile?.station as any) || undefined;
+    if (s) {
+      setValue('station', s as InspectionGeneralFormData['station']);
+      handleFieldChange();
+    }
+  }, [profile?.station]);
 
   // Guardar datos cada vez que cambian los campos
   const handleFieldChange = async () => {
     const isValid = await trigger();
     if (isValid) {
-      const values = {
+      const values: InspectionGeneralFormData = {
         inspection_date: (document.getElementById('inspection_date') as HTMLInputElement)?.value
           ? new Date((document.getElementById('inspection_date') as HTMLInputElement).value)
           : new Date(),
-        inspection_type: (document.getElementById('inspection_type') as HTMLSelectElement)?.value as any || 'periodica',
+        inspection_type:
+          ((document.getElementById('inspection_type') as HTMLSelectElement)?.value as InspectionGeneralFormData['inspection_type']) || 'periodica',
         inspector_name: (document.getElementById('inspector_name') as HTMLInputElement)?.value || '',
-        station: (document.getElementById('station') as HTMLSelectElement)?.value as any || 'AQP',
+        station:
+          (((document.getElementById('station') as HTMLSelectElement)?.value as any) || 'AQP') as InspectionGeneralFormData['station'],
       };
       setGeneralInfo(values);
     }
@@ -149,13 +176,18 @@ export default function Step1General() {
                 id="station"
                 {...register('station')}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                disabled={user?.role === 'supervisor'}
+                disabled={!canViewAllStations}
                 onChange={(e) => {
                   register('station').onChange(e);
                   handleFieldChange();
                 }}
               >
-                {Object.entries(STATIONS).map(([code, name]) => (
+                {(canViewAllStations
+                  ? Object.entries(STATIONS)
+                  : profile?.station
+                    ? [[String(profile.station), STATIONS[String(profile.station) as keyof typeof STATIONS]]]
+                    : []
+                ).map(([code, name]) => (
                   <option key={code} value={code}>
                     {code} - {name}
                   </option>
@@ -164,7 +196,7 @@ export default function Step1General() {
               {errors.station && (
                 <p className="text-sm text-red-500">{errors.station.message}</p>
               )}
-              {user?.role === 'supervisor' && (
+              {!canViewAllStations && (
                 <p className="text-xs text-muted-foreground">
                   Tu estación está asignada automáticamente
                 </p>

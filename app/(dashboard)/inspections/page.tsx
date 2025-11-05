@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { usePermissions } from '@/hooks';
+import { useAuth, usePermissions } from '@/hooks';
 import { InspectionService } from '@/lib/services';
 import { withTimeout } from '@/lib/utils/async';
 import { Button } from '@/components/ui/button';
@@ -27,21 +27,26 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Inspection } from '@/types';
+import { scopeInspectionsByStation } from '@/lib/utils/scope';
 import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel } from '@/lib/utils';
 
 export default function InspectionsPage() {
-  const { canCreateInspections } = usePermissions();
+  const { profile } = useAuth();
+  const { canCreateInspections, canDeleteInspections, canViewAllStations } = usePermissions();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     loadInspections();
-  }, []);
+  }, [page, pageSize]);
 
   const loadInspections = async () => {
     setLoading(true);
     // Evitar spinner infinito: aplicar timeout suave
-    const result = await withTimeout(InspectionService.getInspections(), 8000);
+    const result = await withTimeout(InspectionService.getInspections({ page, pageSize }), 8000);
 
     if (!result) {
       // Corte de espera: mostramos tabla vacía y aviso
@@ -50,16 +55,39 @@ export default function InspectionsPage() {
       return;
     }
 
-    const { data, error } = result;
+    const { data, error, total: t } = result as any;
 
     if (error) {
       toast.error('Error al cargar inspecciones');
       console.error(error);
     } else {
       setInspections(data || []);
+      setTotal(typeof t === 'number' ? t : (data?.length || 0));
     }
 
     setLoading(false);
+  };
+
+  const scopedInspections = useMemo(() => {
+    return scopeInspectionsByStation(inspections, {
+      station: profile?.station,
+      canViewAllStations,
+    });
+  }, [inspections, profile?.station, canViewAllStations]);
+
+  const handleDelete = async (inspection: Inspection) => {
+    if (!inspection?.id) return;
+    const label = inspection.form_code || inspection.id;
+    const ok = window.confirm(`¿Eliminar la inspección ${label}? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    const res = await InspectionService.deleteInspection(inspection.id);
+    if (res.success) {
+      toast.success('Inspección eliminada');
+      // Recargar respetando paginación actual
+      await loadInspections();
+    } else {
+      toast.error(res.error || 'Error al eliminar inspección');
+    }
   };
 
   const getStatusBadge = (inspection: Inspection) => {
@@ -96,14 +124,8 @@ export default function InspectionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Inspecciones</h2>
-          <p className="text-sm text-muted-foreground">
-            Gestión de inspecciones técnicas de equipos
-          </p>
-        </div>
+      {/* Acciones de página (sin duplicar título, el Navbar ya lo muestra) */}
+      <div className="flex items-center justify-end">
         {canCreateInspections && (
           <Link href="/inspections/new">
             <Button>
@@ -120,7 +142,7 @@ export default function InspectionsPage() {
           <CardTitle>Todas las Inspecciones</CardTitle>
         </CardHeader>
         <CardContent>
-          {inspections.length === 0 ? (
+          {scopedInspections.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FileText className="mb-4 h-12 w-12 text-gray-400" />
               <p className="mb-2 text-lg font-semibold text-gray-900">
@@ -152,7 +174,7 @@ export default function InspectionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inspections.map((inspection) => (
+                {scopedInspections.map((inspection) => (
                   <TableRow key={inspection.id}>
                     <TableCell className="font-medium">
                       {inspection.form_code || 'Sin código'}
@@ -178,12 +200,26 @@ export default function InspectionsPage() {
                     </TableCell>
                     <TableCell>{getStatusBadge(inspection)}</TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/inspections/${inspection.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver
-                        </Button>
-                      </Link>
+                      <div className="flex justify-end gap-2">
+                        <Link href={`/inspections/${inspection.id}`}>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver
+                          </Button>
+                        </Link>
+                        {canDeleteInspections && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDelete(inspection)}
+                          >
+                            {/* lucide trash icon */}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                            Eliminar
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -191,6 +227,49 @@ export default function InspectionsPage() {
             </Table>
           )}
         </CardContent>
+        {/* Paginación */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-6 pb-6">
+          <div className="text-sm text-muted-foreground">
+            {total > 0 ? (
+              <span>
+                Mostrando {Math.min((page - 1) * pageSize + 1, total)}–{Math.min(page * pageSize, total)} de {total}
+              </span>
+            ) : (
+              <span>Sin resultados</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={page * pageSize >= total}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Siguiente
+            </Button>
+            <select
+              className="ml-2 rounded-md border px-2 py-1 text-sm"
+              value={pageSize}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setPage(1);
+                setPageSize(v);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
       </Card>
     </div>
   );
