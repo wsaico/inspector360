@@ -222,7 +222,7 @@ const FORATA057Template: React.FC<{
     <div className="w-full bg-white p-4 forata-root" style={{ fontFamily: 'Calibri, Arial, sans-serif', fontSize: compact ? '10pt' : '11pt' }}>
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: ${compact ? '0.2in' : '0.25in'}; }
+           @page { size: A4 landscape; margin: ${compact ? '0.2in' : '0.25in'}; }
           html, body { margin: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .forata-root { width: 297mm; min-height: 210mm; }
           .forata-table, .forata-table td, .forata-table th { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -232,6 +232,24 @@ const FORATA057Template: React.FC<{
         .forata-table .no-border { border: none; }
         .forata-table .border-bottom { border-bottom: 1px solid #000; }
         .forata-table .border-top { border-top: 1px solid #000; }
+
+        /* Header azul del checklist (pantalla y impresión) */
+        .forata-checklist-header td,
+        .forata-checklist-header th {
+          background-color: #002060;
+          color: #ffffff;
+        }
+
+        @media print {
+          .forata-checklist-header td,
+          .forata-checklist-header th,
+          .forata-checklist-header {
+            background-color: #002060 !important;
+            color: #ffffff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        }
       `}</style>
 
       <table className="forata-table">
@@ -292,7 +310,7 @@ const FORATA057Template: React.FC<{
           
 
           {/* Checklist Headers */}
-          <tr style={{ height: rowHeight(126), backgroundColor: '#002060', color: 'white' }}>
+          <tr className="forata-checklist-header" style={{ height: rowHeight(126) }}>
             <td className="text-center font-bold" style={{ fontSize: fs(11), width: '80px' }}>CÓDIGO</td>
             <td className="text-center font-bold" style={{ fontSize: fs(11), width: '55px' }}>HORA</td>
             {checkHeaders.map((header, idx) => (
