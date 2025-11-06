@@ -141,15 +141,11 @@ export async function GET(
     const targetUrl = `${origin}/templates/forata057?id=${encodeURIComponent(id)}&pdf=1&print=true&logo=${logoParam}`;
     diag['targetUrl'] = targetUrl;
 
-    const isServerless = !!(process.env.AWS_REGION || process.env.VERCEL);
-    diag['serverless'] = isServerless;
+    // Priorizar Chromium en entornos serverless (Vercel/Lambda); si no existe, intentar Chrome local.
+    const chromiumPath = await chromium.executablePath();
+    diag['chromiumPath'] = !!chromiumPath;
 
-    if (isServerless) {
-      const executablePath = await chromium.executablePath();
-      if (!executablePath) {
-        throw new Error('chromium.executablePath() no resolvió ruta en entorno serverless');
-      }
-      diag['executablePath'] = !!executablePath;
+    if (chromiumPath) {
       browser = await puppeteerCore.launch({
         headless: true,
         args: [
@@ -159,7 +155,7 @@ export async function GET(
           '--disable-setuid-sandbox',
           '--font-render-hinting=medium',
         ],
-        executablePath,
+        executablePath: chromiumPath,
       });
     } else {
       const localChrome = resolveLocalChromePath();
@@ -171,11 +167,14 @@ export async function GET(
           args: ['--no-sandbox', '--font-render-hinting=medium'],
         });
       } else {
+        // Último recurso: usar Puppeteer solo en desarrollo local
+        const isDev = process.env.NODE_ENV === 'development';
+        diag['puppeteerFallback'] = isDev;
+        if (!isDev) {
+          throw new Error('No se encontró Chromium ni Chrome local para generar PDF');
+        }
         const puppeteer = (await import('puppeteer')).default;
-        browser = await puppeteer.launch({
-          headless: true,
-          args: ['--no-sandbox', '--font-render-hinting=medium'],
-        });
+        browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--font-render-hinting=medium'] });
       }
     }
 
