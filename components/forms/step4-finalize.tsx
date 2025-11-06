@@ -168,143 +168,167 @@ export default function Step4Finalize() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-6">
+      {/* Resumen compacto */}
       <Card>
-        <CardHeader>
-          <CardTitle>Resumen de la Inspección</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Resumen de la Inspección</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label className="text-muted-foreground">Fecha</Label>
-              <p className="font-semibold">{formData.general?.inspection_date.toLocaleDateString('es')}</p>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg bg-gray-50 p-3">
+              <Label className="text-xs text-muted-foreground">Fecha</Label>
+              <p className="text-sm font-semibold">{formData.general?.inspection_date.toLocaleDateString('es')}</p>
             </div>
-            <div>
-              <Label className="text-muted-foreground">Tipo</Label>
-              <p className="font-semibold">{formData.general?.inspection_type}</p>
+            <div className="rounded-lg bg-gray-50 p-3">
+              <Label className="text-xs text-muted-foreground">Tipo</Label>
+              <p className="text-sm font-semibold">{formData.general?.inspection_type}</p>
             </div>
-            <div>
-              <Label className="text-muted-foreground">Inspector</Label>
-              <p className="font-semibold">{formData.general?.inspector_name}</p>
+            <div className="rounded-lg bg-gray-50 p-3">
+              <Label className="text-xs text-muted-foreground">Inspector</Label>
+              <p className="text-sm font-semibold truncate">{formData.general?.inspector_name}</p>
             </div>
-            <div>
-              <Label className="text-muted-foreground">Estación</Label>
-              <p className="font-semibold">{formData.general?.station}</p>
+            <div className="rounded-lg bg-gray-50 p-3">
+              <Label className="text-xs text-muted-foreground">Estación</Label>
+              <p className="text-sm font-semibold">{formData.general?.station}</p>
             </div>
-            <div>
-              <Label className="text-muted-foreground">Equipos</Label>
-              <p className="font-semibold">{formData.equipment.length} equipo(s)</p>
+            <div className="rounded-lg bg-gray-50 p-3 sm:col-span-2">
+              <Label className="text-xs text-muted-foreground">Equipos inspeccionados</Label>
+              <p className="text-sm font-semibold">{formData.equipment.length} equipo(s)</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Firma del Supervisor o Encargado de Estación</CardTitle>
+      {/* Sección Supervisor - Mejorada para móvil */}
+      <Card className="border-blue-200 bg-blue-50/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+              <span className="text-sm font-bold text-blue-700">1</span>
+            </div>
+            Supervisor o Encargado de Estación
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nombre del Supervisor</Label>
-          <Input
-            value={supervisorName}
-            onChange={(e) => {
-              const value = e.target.value;
-              setSupervisorName(value);
+            <Label htmlFor="supervisor-name" className="text-sm font-medium">Nombre del Supervisor</Label>
+            <Input
+              id="supervisor-name"
+              value={supervisorName}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSupervisorName(value);
+                setSignatures({
+                  ...formData.signatures,
+                  supervisor_name: value,
+                });
+              }}
+              placeholder="Ej: Juan Pérez García"
+              className="bg-white"
+            />
+            <p className="text-xs text-muted-foreground">
+              💾 Se guarda automáticamente para la próxima inspección
+            </p>
+          </div>
+          <SignaturePad
+            label="Firma del Supervisor"
+            onSave={(sig) => {
+              setSupervisorSignature(sig);
               setSignatures({
                 ...formData.signatures,
-                supervisor_name: value,
+                supervisor_signature: sig,
+                supervisor_name: supervisorName,
               });
             }}
-            placeholder="Nombre completo del supervisor"
+            onChange={(sig) => {
+              setSupervisorSignature(sig);
+              setSignatures({
+                ...formData.signatures,
+                supervisor_signature: sig,
+                supervisor_name: supervisorName,
+              });
+            }}
+            initialValue={supervisorSignature || formData.signatures.supervisor_signature || undefined}
           />
-          <p className="text-xs text-muted-foreground">Se guarda en este navegador para reutilizar.</p>
-        </div>
-        <SignaturePad
-          label="Firma del Supervisor"
-          onSave={(sig) => {
-            setSupervisorSignature(sig);
-            setSignatures({
-              ...formData.signatures,
-              supervisor_signature: sig,
-              supervisor_name: supervisorName,
-            });
-          }}
-          onChange={(sig) => {
-            setSupervisorSignature(sig);
-            setSignatures({
-              ...formData.signatures,
-              supervisor_signature: sig,
-              supervisor_name: supervisorName,
-            });
-          }}
-          initialValue={supervisorSignature || formData.signatures.supervisor_signature || undefined}
-        />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Firma del Mecánico de Estación</CardTitle>
+      {/* Sección Mecánico - Mejorada para móvil */}
+      <Card className="border-green-200 bg-green-50/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+              <span className="text-sm font-bold text-green-700">2</span>
+            </div>
+            Mecánico de Estación
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nombre del Mecánico</Label>
-          <Input
-            value={mechanicName}
-            onChange={(e) => {
-              const value = e.target.value;
-              setMechanicName(value);
+            <Label htmlFor="mechanic-name" className="text-sm font-medium">Nombre del Mecánico</Label>
+            <Input
+              id="mechanic-name"
+              value={mechanicName}
+              onChange={(e) => {
+                const value = e.target.value;
+                setMechanicName(value);
+                setSignatures({
+                  ...formData.signatures,
+                  mechanic_name: value,
+                });
+              }}
+              placeholder="Ej: María López Ruiz"
+              className="bg-white"
+            />
+            <p className="text-xs text-muted-foreground">
+              💾 Se guarda automáticamente para la próxima inspección
+            </p>
+          </div>
+          <SignaturePad
+            label="Firma del Mecánico"
+            onSave={(sig) => {
+              setMechanicSignature(sig);
               setSignatures({
                 ...formData.signatures,
-                mechanic_name: value,
+                mechanic_signature: sig,
+                mechanic_name: mechanicName,
               });
             }}
-            placeholder="Nombre completo del mecánico"
+            onChange={(sig) => {
+              setMechanicSignature(sig);
+              setSignatures({
+                ...formData.signatures,
+                mechanic_signature: sig,
+                mechanic_name: mechanicName,
+              });
+            }}
+            initialValue={mechanicSignature || formData.signatures.mechanic_signature || undefined}
           />
-          <p className="text-xs text-muted-foreground">Se guarda en este navegador para reutilizar.</p>
-        </div>
-        <SignaturePad
-          label="Firma del Mecánico"
-          onSave={(sig) => {
-            setMechanicSignature(sig);
-            setSignatures({
-              ...formData.signatures,
-              mechanic_signature: sig,
-              mechanic_name: mechanicName,
-            });
-          }}
-          onChange={(sig) => {
-            setMechanicSignature(sig);
-            setSignatures({
-              ...formData.signatures,
-              mechanic_signature: sig,
-              mechanic_name: mechanicName,
-            });
-          }}
-          initialValue={mechanicSignature || formData.signatures.mechanic_signature || undefined}
-        />
         </CardContent>
       </Card>
 
-      <Button
-        className="w-full"
-        size="lg"
-        onClick={handleComplete}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Guardando Inspección...
-          </>
-        ) : (
-          <>
-            <CheckCircle2 className="mr-2 h-5 w-5" />
-            Completar Inspección
-          </>
-        )}
-      </Button>
+      {/* Botón de completar - Fixed en móvil */}
+      <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-2">
+        <Button
+          className="w-full shadow-lg"
+          size="lg"
+          onClick={handleComplete}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Guardando Inspección...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="mr-2 h-5 w-5" />
+              Completar Inspección
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

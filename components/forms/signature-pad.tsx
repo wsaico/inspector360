@@ -1,16 +1,18 @@
 'use client';
 
 /**
- * Componente de Firma Digital
- * Utiliza react-signature-canvas para capturar firmas
+ * Componente de Firma Digital Mejorado
+ * - Persistencia automática mientras el usuario dibuja
+ * - Vista previa de firma guardada
+ * - Resistente al cierre de teclado móvil
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eraser, Check, X } from 'lucide-react';
+import { Eraser, Check, X, Edit2, CheckCircle } from 'lucide-react';
 
 interface SignaturePadProps {
   onSave: (signature: string) => void;
@@ -31,113 +33,197 @@ export default function SignaturePad({
 }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
   const [isEmpty, setIsEmpty] = useState(true);
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [showCanvas, setShowCanvas] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
 
-  const handleClear = () => {
+  // Cargar firma inicial si existe
+  useEffect(() => {
+    if (initialValue) {
+      setSavedSignature(initialValue);
+      setShowCanvas(false);
+    }
+  }, [initialValue]);
+
+  const handleClear = useCallback(() => {
     sigCanvas.current?.clear();
     setIsEmpty(true);
-  };
+    setIsDrawing(false);
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       const dataURL = sigCanvas.current.toDataURL('image/png');
+      setSavedSignature(dataURL);
+      setShowCanvas(false);
       onSave(dataURL);
-      toast.success('Firma guardada');
+      toast.success('Firma guardada correctamente', { duration: 2000 });
+    } else {
+      toast.error('Debe firmar antes de guardar');
     }
-  };
+  }, [onSave]);
 
-  const handleEnd = () => {
+  const handleEdit = useCallback(() => {
+    setShowCanvas(true);
+    // Restaurar firma guardada en el canvas para editar
+    setTimeout(() => {
+      if (savedSignature && sigCanvas.current) {
+        try {
+          sigCanvas.current.fromDataURL(savedSignature);
+          setIsEmpty(false);
+        } catch (error) {
+          console.error('Error loading signature:', error);
+        }
+      }
+    }, 100);
+  }, [savedSignature]);
+
+  const handleBegin = useCallback(() => {
+    setIsDrawing(true);
+  }, []);
+
+  const handleEnd = useCallback(() => {
+    setIsDrawing(false);
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       setIsEmpty(false);
+      // Auto-guardar mientras dibuja (persistencia inmediata)
       try {
         const dataURL = sigCanvas.current.toDataURL('image/png');
         if (onChange) onChange(dataURL);
-      } catch {}
-    }
-  };
-
-  // Cargar una firma inicial si existe (rehidratar en móviles al re-render)
-  useEffect(() => {
-    try {
-      if (initialValue && sigCanvas.current) {
-        // Solo si el canvas está vacío para evitar sobreescribir firmas nuevas
-        if (sigCanvas.current.isEmpty()) {
-          sigCanvas.current.fromDataURL(initialValue);
-          setIsEmpty(false);
-        }
+      } catch (error) {
+        console.error('Error saving signature:', error);
       }
-    } catch {}
-  }, [initialValue]);
+    }
+  }, [onChange]);
+
+  const handleRemove = useCallback(() => {
+    setSavedSignature(null);
+    setShowCanvas(true);
+    handleClear();
+    onSave('');
+  }, [handleClear, onSave]);
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-lg">
-          <span>
+    <div className="w-full space-y-3">
+      {/* Header con indicador de estado */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700">
             {label}
             {required && <span className="ml-1 text-red-500">*</span>}
           </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Canvas de firma */}
-        <div className="relative overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-white">
-          <SignatureCanvas
-            ref={sigCanvas}
-            canvasProps={{
-              className: 'w-full h-48 cursor-crosshair touch-none',
-              style: { touchAction: 'none' },
-            }}
-            backgroundColor="white"
-            penColor="#093071"
-            onEnd={handleEnd}
-          />
-          {isEmpty && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <p className="text-sm text-gray-400">
-                Firme aquí usando el mouse o touch
-              </p>
+          {savedSignature && !showCanvas && (
+            <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              <CheckCircle className="h-3 w-3" />
+              Guardada
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Vista previa de firma guardada */}
+      {savedSignature && !showCanvas && (
+        <div className="space-y-3">
+          <div className="relative overflow-hidden rounded-lg border-2 border-green-300 bg-white p-4">
+            <img
+              src={savedSignature}
+              alt="Firma guardada"
+              className="mx-auto h-32 w-full object-contain"
+            />
+            <div className="absolute right-2 top-2 rounded-full bg-green-500 p-1">
+              <Check className="h-3 w-3 text-white" />
             </div>
-          )}
-        </div>
-
-        {/* Botones de acción */}
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClear}
-            disabled={isEmpty}
-            className="w-full sm:w-auto"
-          >
-            <Eraser className="mr-2 h-4 w-4" />
-            Limpiar
-          </Button>
-          {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
-              <X className="mr-2 h-4 w-4" />
-              Cancelar
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleEdit}
+              className="flex-1"
+            >
+              <Edit2 className="mr-2 h-4 w-4" />
+              Editar Firma
             </Button>
-          )}
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={isEmpty}
-            className="bg-primary w-full sm:w-auto"
-          >
-            <Check className="mr-2 h-4 w-4" />
-            Guardar Firma
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRemove}
+              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Eliminar
+            </Button>
+          </div>
         </div>
+      )}
 
-        {/* Instrucciones */}
-        <div className="rounded-lg bg-blue-50 p-3">
-          <p className="text-xs text-blue-900">
-            💡 <strong>Instrucciones:</strong> Firme dentro del recuadro usando
-            el mouse (computadora) o el dedo (tablet/móvil). Puede limpiar y
-            volver a firmar si es necesario.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+      {/* Canvas de firma (solo visible cuando no hay firma guardada o en modo edición) */}
+      {(!savedSignature || showCanvas) && (
+        <Card className="border-2 border-dashed">
+          <CardContent className="p-4 space-y-3">
+            {/* Canvas */}
+            <div className="relative overflow-hidden rounded-lg border-2 border-gray-300 bg-white">
+              <SignatureCanvas
+                ref={sigCanvas}
+                canvasProps={{
+                  className: 'w-full h-40 sm:h-48 cursor-crosshair touch-none',
+                  style: { touchAction: 'none' },
+                }}
+                backgroundColor="white"
+                penColor="#093071"
+                onBegin={handleBegin}
+                onEnd={handleEnd}
+              />
+              {isEmpty && !isDrawing && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <p className="text-sm text-gray-400 text-center px-4">
+                    Firme aquí con el dedo o el mouse
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClear}
+                disabled={isEmpty}
+                className="flex-1"
+              >
+                <Eraser className="mr-2 h-4 w-4" />
+                Limpiar
+              </Button>
+              {savedSignature && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCanvas(false)}
+                  className="flex-1"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancelar
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={isEmpty}
+                className="flex-1 bg-primary"
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Guardar
+              </Button>
+            </div>
+
+            {/* Instrucción compacta */}
+            <p className="text-xs text-center text-gray-500">
+              La firma se guarda automáticamente mientras dibuja
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
