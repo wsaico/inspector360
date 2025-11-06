@@ -10,6 +10,8 @@ import { createServerClient } from '@supabase/ssr';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Aumenta el límite de ejecución en Vercel (Node) para generación de PDF
+export const maxDuration = 30;
 
 function getOrigin(req: NextRequest): string {
   // Preferir el origin real de Next para evitar puertos incorrectos en dev
@@ -124,7 +126,13 @@ export async function GET(
       }
       browser = await puppeteerCore.launch({
         headless: true,
-        args: [...chromium.args, '--disable-dev-shm-usage', '--no-sandbox', '--font-render-hinting=medium'],
+        args: [
+          ...chromium.args,
+          '--disable-dev-shm-usage',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--font-render-hinting=medium',
+        ],
         executablePath,
       });
     } else {
@@ -146,7 +154,8 @@ export async function GET(
 
     const page = await browser.newPage();
     await page.emulateMediaType('print');
-    await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+    // En Vercel, networkidle0 puede no disparar por conexiones persistentes; usar domcontentloaded + banderas propias
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 5000 }).catch(() => {});
     await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0), { timeout: 10000 }).catch(() => {});
     await new Promise((res) => setTimeout(res, 300));
