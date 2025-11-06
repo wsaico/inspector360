@@ -7,6 +7,7 @@ import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { createServerClient } from '@supabase/ssr';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -61,6 +62,8 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
+  const reqUrl = new URL(request.url);
+  const debug = reqUrl.searchParams.get('debug') === '1';
   if (!id) {
     return NextResponse.json({ error: 'Falta el id de inspección' }, { status: 400 });
   }
@@ -69,11 +72,13 @@ export async function GET(
 
   let browser: Browser | null = null;
   try {
+    const diag: Record<string, any> = { origin, debug };
     // Validar existencia de la inspección usando cliente de Supabase en servidor (sesión del usuario)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json({ error: 'Supabase no configurado' }, { status: 500 });
+      const payload = { error: 'Supabase no configurado', details: 'Faltan NEXT_PUBLIC_SUPABASE_URL y/o NEXT_PUBLIC_SUPABASE_ANON_KEY' };
+      return NextResponse.json(payload, { status: 500 });
     }
     // Preparar respuesta base para que Supabase pueda refrescar cookies de sesión
     const baseResponse = new NextResponse();
@@ -96,7 +101,23 @@ export async function GET(
       },
     });
 
-    const { data: inspectionRow, error: dbError } = await supabase
+    // Fallback: si el cliente envía Authorization: Bearer <token>, usamos ese token
+    // para validar la inspección aunque no haya cookies (caso dominios de preview)
+    const authHeader = request.headers.get('authorization') || '';
+    const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+    diag['authHeader'] = !!authHeader;
+    diag['bearerProvided'] = !!bearerToken;
+    const supabaseWithToken = bearerToken
+      ? createSupabaseClient(supabaseUrl, supabaseKey, {
+          global: { headers: { Authorization: `Bearer ${bearerToken}` } },
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        })
+      : null;
+
+    const client = supabaseWithToken || supabase;
+    const { data: inspectionRow, error: dbError } = await client
       .from('inspections')
       .select('id')
       .eq('id', id)
@@ -108,7 +129,9 @@ export async function GET(
       if (notFound) {
         return NextResponse.json({ error: 'Inspección no encontrada' }, { status: 404 });
       }
-      return NextResponse.json({ error: 'Error consultando la inspección', details: dbError?.message }, { status: 500 });
+      const payload: any = { error: 'Error consultando la inspección', details: dbError?.message };
+      if (debug) payload['diag'] = { ...diag, dbError: dbError?.message };
+      return NextResponse.json(payload, { status: 500 });
     }
     if (!inspectionRow?.id) {
       return NextResponse.json({ error: 'Inspección no encontrada' }, { status: 404 });
@@ -116,14 +139,17 @@ export async function GET(
 
     const logoParam = encodeURIComponent(`${origin}/logo.png`);
     const targetUrl = `${origin}/templates/forata057?id=${encodeURIComponent(id)}&pdf=1&print=true&logo=${logoParam}`;
+    diag['targetUrl'] = targetUrl;
 
     const isServerless = !!(process.env.AWS_REGION || process.env.VERCEL);
+    diag['serverless'] = isServerless;
 
     if (isServerless) {
       const executablePath = await chromium.executablePath();
       if (!executablePath) {
         throw new Error('chromium.executablePath() no resolvió ruta en entorno serverless');
       }
+      diag['executablePath'] = !!executablePath;
       browser = await puppeteerCore.launch({
         headless: true,
         args: [
@@ -137,6 +163,7 @@ export async function GET(
       });
     } else {
       const localChrome = resolveLocalChromePath();
+      diag['localChrome'] = localChrome || null;
       if (localChrome) {
         browser = await puppeteerCore.launch({
           headless: true,
@@ -168,6 +195,7 @@ export async function GET(
           .split(';')
           .map((s) => s.trim())
           .filter((s) => s.includes('='));
+        diag['cookieCount'] = rawCookies.length;
         const cookieParams = rawCookies.map((s) => {
           const eq = s.indexOf('=');
           const name = s.slice(0, eq);
@@ -187,6 +215,7 @@ export async function GET(
     } catch {}
     // En Vercel, networkidle0 puede no disparar por conexiones persistentes; usar domcontentloaded + banderas propias
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    diag['navigated'] = true;
     await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 5000 }).catch(() => {});
     await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0), { timeout: 10000 }).catch(() => {});
     await new Promise((res) => setTimeout(res, 300));
@@ -199,6 +228,7 @@ export async function GET(
       preferCSSPageSize: true,
       margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
     });
+    try { diag['pdfBytes'] = (pdf as any)?.byteLength ?? (pdf as any)?.length ?? null; } catch {}
 
     await page.close();
     await browser.close();
@@ -206,11 +236,17 @@ export async function GET(
 
     const filename = `FOR-ATA-057-${id}.pdf`;
     // Construir respuesta final reutilizando headers que incluyen Set-Cookie que pudo agregar Supabase
-    const final = new NextResponse(pdf as any, { headers: baseResponse.headers });
-    final.headers.set('Content-Type', 'application/pdf');
-    final.headers.set('Content-Disposition', `attachment; filename="${filename}"`);
-    final.headers.set('Cache-Control', 'no-store');
-    return final;
+    if (debug) {
+      const final = NextResponse.json({ ok: true, filename, diag }, { headers: baseResponse.headers });
+      final.headers.set('Cache-Control', 'no-store');
+      return final;
+    } else {
+      const final = new NextResponse(pdf as any, { headers: baseResponse.headers });
+      final.headers.set('Content-Type', 'application/pdf');
+      final.headers.set('Content-Disposition', `attachment; filename="${filename}"`);
+      final.headers.set('Cache-Control', 'no-store');
+      return final;
+    }
   } catch (error: any) {
     if (browser) {
       try { await browser.close(); } catch {}
@@ -220,9 +256,8 @@ export async function GET(
       stack: error?.stack,
       serverless: !!(process.env.AWS_REGION || process.env.VERCEL),
     });
-    return NextResponse.json(
-      { error: 'No se pudo generar el PDF', details: String(error?.message || error) },
-      { status: 500 }
-    );
+    const payload: any = { error: 'No se pudo generar el PDF', details: String(error?.message || error) };
+    if (debug) payload['diag'] = { debug: true };
+    return NextResponse.json(payload, { status: 500 });
   }
 }
