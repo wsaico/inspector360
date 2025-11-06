@@ -12,7 +12,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 // Aumenta el límite de ejecución en Vercel (Node) para generación de PDF
-export const maxDuration = 30;
+export const maxDuration = 60; // Aumentado a 60 segundos para Vercel
 
 function getOrigin(req: NextRequest): string {
   // Preferir el origin real de Next para evitar puertos incorrectos en dev
@@ -187,26 +187,39 @@ export async function GET(
       }
     } else {
       // Producción/Serverless: usar Chromium de @sparticuz/chromium
-      const chromiumPath = await chromium.executablePath();
-      diag['chromiumPath'] = !!chromiumPath;
+      console.log('[PDF] Running in serverless mode, using @sparticuz/chromium');
 
-      if (chromiumPath && fs.existsSync(chromiumPath)) {
+      try {
+        const chromiumPath = await chromium.executablePath();
+        diag['chromiumPath'] = chromiumPath;
+        console.log('[PDF] Chromium path:', chromiumPath);
+
         browser = await puppeteerCore.launch({
-          headless: true,
           args: [
             ...chromium.args,
+            '--disable-gpu',
             '--disable-dev-shm-usage',
-            '--no-sandbox',
             '--disable-setuid-sandbox',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--no-sandbox',
             '--font-render-hinting=medium',
           ],
+          defaultViewport: { width: 1920, height: 1080 },
           executablePath: chromiumPath,
+          headless: true,
         });
-        diag['browserSource'] = 'chromium';
-      } else {
+        diag['browserSource'] = 'chromium-serverless';
+        console.log('[PDF] Browser launched successfully in serverless mode');
+      } catch (chromiumError: any) {
+        console.error('[PDF] Chromium serverless error:', chromiumError?.message);
+        diag['chromiumError'] = chromiumError?.message;
+
         // Fallback a Chrome local incluso en serverless
         const localChrome = resolveLocalChromePath();
         if (localChrome) {
+          console.log('[PDF] Falling back to local Chrome:', localChrome);
           browser = await puppeteerCore.launch({
             headless: true,
             executablePath: localChrome,
@@ -214,7 +227,7 @@ export async function GET(
           });
           diag['browserSource'] = 'localChrome-fallback';
         } else {
-          throw new Error('No se encontró Chromium ni Chrome local para generar PDF en producción');
+          throw new Error(`No se encontró Chromium ni Chrome para generar PDF. Error: ${chromiumError?.message}`);
         }
       }
     }
@@ -254,12 +267,20 @@ export async function GET(
       }
     } catch {}
     // En Vercel, networkidle0 puede no disparar por conexiones persistentes; usar domcontentloaded + banderas propias
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    console.log('[PDF] Navigating to:', targetUrl);
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     diag['navigated'] = true;
-    await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 5000 }).catch(() => {});
-    await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0), { timeout: 10000 }).catch(() => {});
-    await new Promise((res) => setTimeout(res, 300));
+    console.log('[PDF] Page loaded, waiting for template ready flag');
+    await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 10000 }).catch(() => {
+      console.warn('[PDF] Template ready timeout, continuing anyway');
+    });
+    console.log('[PDF] Waiting for images to load');
+    await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0), { timeout: 15000 }).catch(() => {
+      console.warn('[PDF] Images load timeout, continuing anyway');
+    });
+    await new Promise((res) => setTimeout(res, 500)); // Pequeño delay adicional
     await page.evaluate(() => (document as any).fonts?.ready).catch(() => {});
+    console.log('[PDF] Generating PDF...');
 
     const pdf = await page.pdf({
       format: 'A4',
