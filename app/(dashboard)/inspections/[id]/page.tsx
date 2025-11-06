@@ -35,12 +35,14 @@ import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel
 import { CHECKLIST_CATEGORIES } from '@/types';
 import Image from 'next/image';
 import { downloadInspectionPDF } from '@/lib/pdf/generator';
+import { getChecklistItem } from '@/lib/checklist-template';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/hooks';
 import { withTimeout } from '@/lib/utils/async';
 import dynamic from 'next/dynamic';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/lib/supabase/client';
 const SignaturePad = dynamic(() => import('@/components/forms/signature-pad'), { ssr: false });
 
 export default function InspectionDetailPage() {
@@ -239,6 +241,9 @@ export default function InspectionDetailPage() {
     }
   };
 
+  // Firma temporal para rehidratación en móviles dentro del modal
+  const [tempSignature, setTempSignature] = useState<string | null>(null);
+
   const handleDownloadPDF = async () => {
     if (!inspection) return;
 
@@ -246,7 +251,18 @@ export default function InspectionDetailPage() {
       const toastId = toast.loading('Generando PDF (FOR-ATA-057) ...');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 45000);
-      const res = await fetch(`/api/inspections/${inspection.id}/pdf`, { method: 'GET', signal: controller.signal });
+      // Enviar Authorization: Bearer <token> para permitir validación en server
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch(`/api/inspections/${inspection.id}/pdf`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+        signal: controller.signal,
+      });
       clearTimeout(timeout);
       if (!res.ok) {
         throw new Error(`Error ${res.status}: no se pudo generar el PDF`);
@@ -514,7 +530,7 @@ export default function InspectionDetailPage() {
                             {checklistItems.map(([code, item]) => (
                               <TableRow key={code} id={`row-${equipment.code}-${code}`}>
                                 <TableCell className="font-medium">{code}</TableCell>
-                                <TableCell>{item.description || '-'}</TableCell>
+                                <TableCell>{item.description || getChecklistItem(code)?.description || '-'}</TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     {getStatusIcon(item.status)}
@@ -660,6 +676,7 @@ export default function InspectionDetailPage() {
                   setSignOpen(false);
                   setSignRole(null);
                   setSignName('');
+                  setTempSignature(null);
                 } catch (err: any) {
                   toast.error(err?.message || 'No se pudo guardar la firma');
                 } finally {
@@ -667,6 +684,8 @@ export default function InspectionDetailPage() {
                 }
               }}
               onCancel={() => setSignOpen(false)}
+              onChange={(sig) => setTempSignature(sig)}
+              initialValue={tempSignature || undefined}
             />
           </div>
         </DialogContent>
