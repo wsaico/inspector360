@@ -12,6 +12,12 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 function getOrigin(req: NextRequest): string {
+  // Preferir el origin real de Next para evitar puertos incorrectos en dev
+  try {
+    // nextUrl.origin existe en Next.js y refleja el host/puerto correcto
+    const origin = (req as any).nextUrl?.origin as string | undefined;
+    if (origin) return origin;
+  } catch {}
   const proto = req.headers.get('x-forwarded-proto') || 'http';
   const host = req.headers.get('host') || 'localhost:3000';
   return `${proto}://${host}`;
@@ -26,8 +32,11 @@ function resolveLocalChromePath(): string | undefined {
 
   if (platform === 'win32') {
     candidates.push(
-      'C\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      // Edge como alternativa
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
       path.join(process.env.LOCALAPPDATA || 'C:\\Users', 'Google', 'Chrome', 'Application', 'chrome.exe')
     );
   } else if (platform === 'darwin') {
