@@ -219,11 +219,13 @@ const FORATA057Template: React.FC<{
   const fs = (pt: number) => (compact ? `${Math.max(pt - 3, 7)}pt` : `${pt}pt`);
   const rowHeight = (px: number) => (compact ? `${Math.max(px - 10, 14)}px` : `${px}px`);
   return (
-    <div className="w-full bg-white p-4" style={{ fontFamily: 'Calibri, Arial, sans-serif', fontSize: compact ? '10pt' : '11pt' }}>
+    <div className="w-full bg-white p-4 forata-root" style={{ fontFamily: 'Calibri, Arial, sans-serif', fontSize: compact ? '10pt' : '11pt' }}>
       <style>{`
         @media print {
-          @page { margin: ${compact ? '0.2in' : '0.25in'}; }
-          body { margin: 0; }
+          @page { size: A4 landscape; margin: ${compact ? '0.2in' : '0.25in'}; }
+          html, body { margin: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .forata-root { width: 297mm; min-height: 210mm; }
+          .forata-table, .forata-table td, .forata-table th { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
         .forata-table { border-collapse: collapse; width: 100%; }
         .forata-table td, .forata-table th { border: 1px solid #000; padding: 4px; }
