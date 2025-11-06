@@ -154,6 +154,37 @@ export async function GET(
 
     const page = await browser.newPage();
     await page.emulateMediaType('print');
+    // Inyectar cookies del request en el contexto del navegador
+    // Esto permite que la página de template se renderice autenticada (Supabase/SSR)
+    try {
+      const originUrl = new URL(origin);
+      const cookieHeader = request.headers.get('cookie') || '';
+      if (cookieHeader) {
+        // Asegurar que la primera navegación lleve las cookies
+        await page.setExtraHTTPHeaders({ Cookie: cookieHeader });
+
+        // Además registrar cookies en el navegador para subsiguientes requests
+        const rawCookies = cookieHeader
+          .split(';')
+          .map((s) => s.trim())
+          .filter((s) => s.includes('='));
+        const cookieParams = rawCookies.map((s) => {
+          const eq = s.indexOf('=');
+          const name = s.slice(0, eq);
+          const value = s.slice(eq + 1);
+          return {
+            name,
+            value,
+            domain: originUrl.hostname,
+            path: '/',
+            secure: originUrl.protocol === 'https:',
+          } as any;
+        });
+        if (cookieParams.length > 0) {
+          await page.setCookie(...cookieParams);
+        }
+      }
+    } catch {}
     // En Vercel, networkidle0 puede no disparar por conexiones persistentes; usar domcontentloaded + banderas propias
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 5000 }).catch(() => {});
