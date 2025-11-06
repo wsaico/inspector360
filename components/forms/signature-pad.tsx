@@ -33,15 +33,18 @@ export default function SignaturePad({
 }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
   const [isEmpty, setIsEmpty] = useState(true);
-  const [savedSignature, setSavedSignature] = useState<string | null>(null);
-  const [showCanvas, setShowCanvas] = useState(false);
+  const [savedSignature, setSavedSignature] = useState<string | null>(initialValue || null);
+  const [showCanvas, setShowCanvas] = useState(!initialValue); // Mostrar canvas solo si NO hay firma inicial
   const [isDrawing, setIsDrawing] = useState(false);
 
-  // Cargar firma inicial si existe
+  // Sincronizar savedSignature con initialValue cuando cambia
   useEffect(() => {
-    if (initialValue) {
+    if (initialValue && initialValue !== savedSignature) {
       setSavedSignature(initialValue);
-      setShowCanvas(false);
+      setShowCanvas(false); // Ocultar canvas si hay firma
+    } else if (!initialValue && savedSignature) {
+      // Si se limpia initialValue desde el padre, mantener savedSignature pero mostrar que está guardada
+      // No hacer nada, mantener la firma guardada localmente
     }
   }, [initialValue]);
 
@@ -55,13 +58,17 @@ export default function SignaturePad({
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       const dataURL = sigCanvas.current.toDataURL('image/png');
       setSavedSignature(dataURL);
+      setShowCanvas(false); // Ocultar canvas para mostrar preview
+      onSave(dataURL); // Notificar al padre con toast
+      toast.success('Firma guardada', { duration: 2000 });
+    } else if (savedSignature) {
+      // Si ya hay una firma guardada (del auto-save), solo ocultar canvas
       setShowCanvas(false);
-      onSave(dataURL);
-      toast.success('Firma guardada correctamente', { duration: 2000 });
+      toast.success('Firma guardada', { duration: 2000 });
     } else {
       toast.error('Debe firmar antes de guardar');
     }
-  }, [onSave]);
+  }, [onSave, savedSignature]);
 
   const handleEdit = useCallback(() => {
     setShowCanvas(true);
@@ -89,6 +96,9 @@ export default function SignaturePad({
       // Auto-guardar mientras dibuja (persistencia inmediata)
       try {
         const dataURL = sigCanvas.current.toDataURL('image/png');
+        // Guardar localmente para que no se pierda
+        setSavedSignature(dataURL);
+        // Notificar al padre que hay cambios (sin mostrar toast)
         if (onChange) onChange(dataURL);
       } catch (error) {
         console.error('Error saving signature:', error);
