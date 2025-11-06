@@ -1,14 +1,48 @@
-import type { NextRequest } from 'next/server';
+﻿import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
-import type { Browser } from 'puppeteer';
+import puppeteerCore from 'puppeteer-core';
+import type { Browser } from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
+import { createServerClient } from '@supabase/ssr';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 function getOrigin(req: NextRequest): string {
   const proto = req.headers.get('x-forwarded-proto') || 'http';
   const host = req.headers.get('host') || 'localhost:3000';
   return `${proto}://${host}`;
+}
+
+function resolveLocalChromePath(): string | undefined {
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH;
+  if (envPath && fs.existsSync(envPath)) return envPath;
+
+  const platform = os.platform();
+  const candidates: string[] = [];
+
+  if (platform === 'win32') {
+    candidates.push(
+      'C\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      path.join(process.env.LOCALAPPDATA || 'C:\\Users', 'Google', 'Chrome', 'Application', 'chrome.exe')
+    );
+  } else if (platform === 'darwin') {
+    candidates.push(
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium'
+    );
+  } else {
+    candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
+  }
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return undefined;
 }
 
 export async function GET(
@@ -21,29 +55,92 @@ export async function GET(
   }
 
   const origin = getOrigin(request);
-  const templateUrl = `${origin}/templates/forata057?id=${encodeURIComponent(id)}&pdf=1`;
 
   let browser: Browser | null = null;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--font-render-hinting=medium'],
+    // Validar existencia de la inspección usando cliente de Supabase en servidor (sesión del usuario)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ error: 'Supabase no configurado' }, { status: 500 });
+    }
+    // Preparar respuesta base para que Supabase pueda refrescar cookies de sesión
+    const baseResponse = new NextResponse();
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          try {
+            baseResponse.cookies.set({ name, value, ...options });
+          } catch {}
+        },
+        remove(name: string, options: any) {
+          try {
+            // NextResponse no tiene remove directo; set con maxAge 0
+            baseResponse.cookies.set({ name, value: '', ...options, maxAge: 0 });
+          } catch {}
+        },
+      },
     });
+
+    const { data: inspectionRow, error: dbError } = await supabase
+      .from('inspections')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (dbError) {
+      // Si falla por permisos/timeout, devolvemos 500; si no existe, 404
+      const notFound = dbError?.code === 'PGRST116' || /No rows/.test(dbError?.message || '');
+      if (notFound) {
+        return NextResponse.json({ error: 'Inspección no encontrada' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Error consultando la inspección', details: dbError?.message }, { status: 500 });
+    }
+    if (!inspectionRow?.id) {
+      return NextResponse.json({ error: 'Inspección no encontrada' }, { status: 404 });
+    }
+
+    const logoParam = encodeURIComponent(`${origin}/logo.png`);
+    const targetUrl = `${origin}/templates/forata057?id=${encodeURIComponent(id)}&pdf=1&print=true&logo=${logoParam}`;
+
+    const isServerless = !!(process.env.AWS_REGION || process.env.VERCEL);
+
+    if (isServerless) {
+      const executablePath = await chromium.executablePath();
+      if (!executablePath) {
+        throw new Error('chromium.executablePath() no resolvió ruta en entorno serverless');
+      }
+      browser = await puppeteerCore.launch({
+        headless: true,
+        args: [...chromium.args, '--disable-dev-shm-usage', '--no-sandbox', '--font-render-hinting=medium'],
+        executablePath,
+      });
+    } else {
+      const localChrome = resolveLocalChromePath();
+      if (localChrome) {
+        browser = await puppeteerCore.launch({
+          headless: true,
+          executablePath: localChrome,
+          args: ['--no-sandbox', '--font-render-hinting=medium'],
+        });
+      } else {
+        const puppeteer = (await import('puppeteer')).default;
+        browser = await puppeteer.launch({
+          headless: true,
+          args: ['--no-sandbox', '--font-render-hinting=medium'],
+        });
+      }
+    }
+
     const page = await browser.newPage();
-    // Asegurar fondos y estilos de impresión
     await page.emulateMediaType('print');
-    // Cargar la plantilla y esperar a que la red esté inactiva para mejorar carga de recursos
-    await page.goto(templateUrl, { waitUntil: 'networkidle0', timeout: 30000 });
-    // Esperar señal de readiness emitida por la plantilla una vez cargados los datos
-    await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 30000 }).catch(() => {});
-    // Esperar que todas las imágenes estén cargadas (firmas y logos)
-    await page.waitForFunction(
-      () => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0),
-      { timeout: 10000 }
-    ).catch(() => {});
-    // Breve margen para layout final
+    await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+    await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 5000 }).catch(() => {});
+    await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0), { timeout: 10000 }).catch(() => {});
     await new Promise((res) => setTimeout(res, 300));
-    // Esperar fuentes si aplica
     await page.evaluate(() => (document as any).fonts?.ready).catch(() => {});
 
     const pdf = await page.pdf({
@@ -59,18 +156,21 @@ export async function GET(
     browser = null;
 
     const filename = `FOR-ATA-057-${id}.pdf`;
-    return new Response(pdf as any, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Cache-Control': 'no-store',
-      },
-    });
+    // Construir respuesta final reutilizando headers que incluyen Set-Cookie que pudo agregar Supabase
+    const final = new NextResponse(pdf as any, { headers: baseResponse.headers });
+    final.headers.set('Content-Type', 'application/pdf');
+    final.headers.set('Content-Disposition', `attachment; filename="${filename}"`);
+    final.headers.set('Cache-Control', 'no-store');
+    return final;
   } catch (error: any) {
     if (browser) {
       try { await browser.close(); } catch {}
     }
-    console.error('PDF endpoint error:', error);
+    console.error('PDF endpoint error:', {
+      message: error?.message || String(error),
+      stack: error?.stack,
+      serverless: !!(process.env.AWS_REGION || process.env.VERCEL),
+    });
     return NextResponse.json(
       { error: 'No se pudo generar el PDF', details: String(error?.message || error) },
       { status: 500 }

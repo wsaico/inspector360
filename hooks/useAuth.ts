@@ -21,7 +21,7 @@ interface AuthState {
 export function useAuth() {
   // Persistencia manual para mejorar experiencia ante cortes de red
   const PERSIST_KEY = 'i360.auth.persist';
-  const TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+  const TTL_MS = 5 * 60 * 1000; // 5 minutos: evita sesiones zombis tras expirar
 
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -62,14 +62,13 @@ export function useAuth() {
         const sessionRes = await withTimeout(supabase.auth.getSession(), 10000);
 
         if (!sessionRes) {
-          // Si tarda demasiado, intentar usar persistencia local (válido hasta 24h)
+          // Si tarda demasiado, usar persistencia solo si es muy reciente
           const persisted = readPersisted();
           const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
           if (notExpired && persisted.user) {
             setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: 'Sesión mantenida (timeout), reintenta conexión' });
             return;
           }
-          // Sin persistencia válida, no bloqueamos la UI pero mostramos error
           setAuthState({ user: null, profile: null, loading: false, error: 'Tiempo de espera al validar sesión' });
           return;
         }
@@ -83,24 +82,19 @@ export function useAuth() {
           // Persistir inmediata para resiliencia con el perfil correcto
           writePersisted(session.user, loadedProfile);
         } else {
-          // Antes de limpiar, verificar persistencia y TTL
-          const persisted = readPersisted();
-          const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
-          if (notExpired && persisted.user) {
-            setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: null });
-          } else {
-            setAuthState({ user: null, profile: null, loading: false, error: null });
-            clearPersisted();
-          }
+          // Sin sesión válida: limpiar y marcar no autenticado
+          clearPersisted();
+          setAuthState({ user: null, profile: null, loading: false, error: null });
         }
       } catch (error) {
         console.error('Error loading session:', error);
-        // Mantener sesión si existe persistida y no expirada
+        // Mantener sesión solo si persistencia es muy reciente (error de red puntual)
         const persisted = readPersisted();
         const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
         if (notExpired && persisted.user) {
           setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: 'Sesión mantenida (error de red)' });
         } else {
+          clearPersisted();
           setAuthState({ user: null, profile: null, loading: false, error: 'Error al cargar la sesión' });
         }
       }
@@ -114,21 +108,12 @@ export function useAuth() {
         if (session?.user) {
           const loadedProfile = await loadUserProfile(session.user);
           writePersisted(session.user, loadedProfile);
-        } else {
-          // Sólo limpiar al recibir sign_out explícito
-          if (event === 'SIGNED_OUT') {
-            clearPersisted();
-            setAuthState({ user: null, profile: null, loading: false, error: null });
-          } else {
-            const persisted = readPersisted();
-            const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
-            if (notExpired && persisted.user) {
-              setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: null });
-            } else {
-              setAuthState({ user: null, profile: null, loading: false, error: null });
-            }
-          }
+          return;
         }
+
+        // Sin sesión: tratar como sign out para evitar UI zombie
+        clearPersisted();
+        setAuthState({ user: null, profile: null, loading: false, error: null });
       }
     );
 
@@ -147,6 +132,10 @@ export function useAuth() {
           // Asegurar perfil actualizado tras refresh
           const loadedProfile = await loadUserProfile(session.user);
           writePersisted(session.user, loadedProfile);
+        } else {
+          // Si al refrescar ya no hay sesión, cerrar explícitamente
+          clearPersisted();
+          setAuthState({ user: null, profile: null, loading: false, error: null });
         }
       } catch {
         // Ignorar errores esporádicos de red
