@@ -216,7 +216,17 @@ function TemplateWithData() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 16 }}>Vista FOR-ATA-057</h2>
           <button
-            onClick={() => window.print()}
+            onClick={() => {
+              const params = new URLSearchParams(window.location.search);
+              const id = params.get('id');
+              if (id) {
+                const url = `/api/inspections/${encodeURIComponent(id)}/pdf`;
+                window.open(url, '_blank');
+              } else {
+                // Fallback: si no hay id, imprimir navegador
+                window.print();
+              }
+            }}
             style={{
               padding: '8px 12px',
               borderRadius: 6,
