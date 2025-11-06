@@ -227,7 +227,7 @@ const FORATA057Template: React.FC<{
           .forata-root { width: 297mm; min-height: 210mm; }
           .forata-table, .forata-table td, .forata-table th { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
-        .forata-table { border-collapse: collapse; width: 100%; }
+        .forata-table { border-collapse: collapse; width: 100%; border: 1px solid #000; }
         .forata-table td, .forata-table th { border: 1px solid #000; padding: 4px; }
         .forata-table .no-border { border: none; }
         .forata-table .border-bottom { border-bottom: 1px solid #000; }
@@ -249,6 +249,13 @@ const FORATA057Template: React.FC<{
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+          /* Bordes uniformes de 1px en impresión */
+          .forata-table, .forata-table td, .forata-table th {
+            border-color: #000 !important;
+            border-style: solid !important;
+            border-width: 1px !important;
+          }
+          .forata-table { border-spacing: 0 !important; }
         }
       `}</style>
 
