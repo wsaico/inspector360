@@ -57,3 +57,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Reglas de impresión para mantener colores y orientación */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
