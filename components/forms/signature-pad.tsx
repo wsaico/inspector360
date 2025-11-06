@@ -5,7 +5,7 @@
  * Utiliza react-signature-canvas para capturar firmas
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ interface SignaturePadProps {
   onCancel?: () => void;
   label?: string;
   required?: boolean;
+  onChange?: (signature: string) => void;
+  initialValue?: string;
 }
 
 export default function SignaturePad({
@@ -24,6 +26,8 @@ export default function SignaturePad({
   onCancel,
   label = 'Firma Digital',
   required = false,
+  onChange,
+  initialValue,
 }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
   const [isEmpty, setIsEmpty] = useState(true);
@@ -44,8 +48,25 @@ export default function SignaturePad({
   const handleEnd = () => {
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       setIsEmpty(false);
+      try {
+        const dataURL = sigCanvas.current.toDataURL('image/png');
+        if (onChange) onChange(dataURL);
+      } catch {}
     }
   };
+
+  // Cargar una firma inicial si existe (rehidratar en móviles al re-render)
+  useEffect(() => {
+    try {
+      if (initialValue && sigCanvas.current) {
+        // Solo si el canvas está vacío para evitar sobreescribir firmas nuevas
+        if (sigCanvas.current.isEmpty()) {
+          sigCanvas.current.fromDataURL(initialValue);
+          setIsEmpty(false);
+        }
+      }
+    } catch {}
+  }, [initialValue]);
 
   return (
     <Card className="w-full">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { InspectionService } from '@/lib/services';
+import { handleSessionError } from '@/lib/supabase/session-validator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +85,12 @@ export default function InspectionDetailPage() {
 
       const { data, error } = result as any;
       if (error) {
+        // Manejar error de sesión expirada
+        if (error === 'SESSION_EXPIRED') {
+          toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+          setTimeout(() => router.push('/login'), 1500);
+          return;
+        }
         toast.error('Error al cargar la inspección');
         console.error(error);
         router.replace('/inspections');
@@ -265,6 +272,13 @@ export default function InspectionDetailPage() {
       });
       clearTimeout(timeout);
       if (!res.ok) {
+        // Detectar error de sesión
+        if (res.status === 401 || res.status === 403) {
+          toast.dismiss(toastId);
+          toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+          setTimeout(() => router.push('/login'), 1500);
+          return;
+        }
         throw new Error(`Error ${res.status}: no se pudo generar el PDF`);
       }
       const blob = await res.blob();

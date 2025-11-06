@@ -28,7 +28,10 @@ function getOrigin(req: NextRequest): string {
 
 function resolveLocalChromePath(): string | undefined {
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH;
-  if (envPath && fs.existsSync(envPath)) return envPath;
+  if (envPath && fs.existsSync(envPath)) {
+    console.log('[Chrome Detection] Found via env var:', envPath);
+    return envPath;
+  }
 
   const platform = os.platform();
   const candidates: string[] = [];
@@ -51,9 +54,18 @@ function resolveLocalChromePath(): string | undefined {
     candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
   }
 
+  console.log('[Chrome Detection] Platform:', platform);
+  console.log('[Chrome Detection] Checking candidates:', candidates.length);
+
   for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
+    const exists = fs.existsSync(candidate);
+    if (exists) {
+      console.log('[Chrome Detection] Found:', candidate);
+      return candidate;
+    }
   }
+
+  console.log('[Chrome Detection] No Chrome found in standard locations');
   return undefined;
 }
 
@@ -73,108 +85,137 @@ export async function GET(
   let browser: Browser | null = null;
   try {
     const diag: Record<string, any> = { origin, debug };
-    // Validar existencia de la inspección usando cliente de Supabase en servidor (sesión del usuario)
+    // Validación de inspección con Supabase (omitir en desarrollo si faltan ENV)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseKey) {
-      const payload = { error: 'Supabase no configurado', details: 'Faltan NEXT_PUBLIC_SUPABASE_URL y/o NEXT_PUBLIC_SUPABASE_ANON_KEY' };
-      return NextResponse.json(payload, { status: 500 });
-    }
-    // Preparar respuesta base para que Supabase pueda refrescar cookies de sesión
+    const devNoSupabase = (!supabaseUrl || !supabaseKey) && process.env.NODE_ENV === 'development';
     const baseResponse = new NextResponse();
-    const supabase = createServerClient(supabaseUrl, supabaseKey, {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+    if (!devNoSupabase) {
+      // Preparar cliente de Supabase con cookies y/o Authorization
+      const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value;
+          },
+          set(name: string, value: string, options: any) {
+            try {
+              baseResponse.cookies.set({ name, value, ...options });
+            } catch {}
+          },
+          remove(name: string, options: any) {
+            try {
+              baseResponse.cookies.set({ name, value: '', ...options, maxAge: 0 });
+            } catch {}
+          },
         },
-        set(name: string, value: string, options: any) {
-          try {
-            baseResponse.cookies.set({ name, value, ...options });
-          } catch {}
-        },
-        remove(name: string, options: any) {
-          try {
-            // NextResponse no tiene remove directo; set con maxAge 0
-            baseResponse.cookies.set({ name, value: '', ...options, maxAge: 0 });
-          } catch {}
-        },
-      },
-    });
+      });
 
-    // Fallback: si el cliente envía Authorization: Bearer <token>, usamos ese token
-    // para validar la inspección aunque no haya cookies (caso dominios de preview)
-    const authHeader = request.headers.get('authorization') || '';
-    const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
-      ? authHeader.slice(7).trim()
-      : '';
-    diag['authHeader'] = !!authHeader;
-    diag['bearerProvided'] = !!bearerToken;
-    const supabaseWithToken = bearerToken
-      ? createSupabaseClient(supabaseUrl, supabaseKey, {
-          global: { headers: { Authorization: `Bearer ${bearerToken}` } },
-          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-        })
-      : null;
+      const authHeader = request.headers.get('authorization') || '';
+      const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
+        ? authHeader.slice(7).trim()
+        : '';
+      diag['authHeader'] = !!authHeader;
+      diag['bearerProvided'] = !!bearerToken;
+      const supabaseWithToken = bearerToken
+        ? createSupabaseClient(supabaseUrl!, supabaseKey!, {
+            global: { headers: { Authorization: `Bearer ${bearerToken}` } },
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          })
+        : null;
 
-    const client = supabaseWithToken || supabase;
-    const { data: inspectionRow, error: dbError } = await client
-      .from('inspections')
-      .select('id')
-      .eq('id', id)
-      .single();
+      const client = supabaseWithToken || supabase;
+      const { data: inspectionRow, error: dbError } = await client
+        .from('inspections')
+        .select('id')
+        .eq('id', id)
+        .single();
 
-    if (dbError) {
-      // Si falla por permisos/timeout, devolvemos 500; si no existe, 404
-      const notFound = dbError?.code === 'PGRST116' || /No rows/.test(dbError?.message || '');
-      if (notFound) {
+      if (dbError) {
+        const notFound = dbError?.code === 'PGRST116' || /No rows/.test(dbError?.message || '');
+        if (notFound) {
+          return NextResponse.json({ error: 'Inspección no encontrada' }, { status: 404 });
+        }
+        const payload: any = { error: 'Error consultando la inspección', details: dbError?.message };
+        if (debug) payload['diag'] = { ...diag, dbError: dbError?.message };
+        return NextResponse.json(payload, { status: 500 });
+      }
+      if (!inspectionRow?.id) {
         return NextResponse.json({ error: 'Inspección no encontrada' }, { status: 404 });
       }
-      const payload: any = { error: 'Error consultando la inspección', details: dbError?.message };
-      if (debug) payload['diag'] = { ...diag, dbError: dbError?.message };
-      return NextResponse.json(payload, { status: 500 });
-    }
-    if (!inspectionRow?.id) {
-      return NextResponse.json({ error: 'Inspección no encontrada' }, { status: 404 });
+    } else {
+      // En desarrollo sin Supabase: continuar sin validar la existencia en BD
+      diag['devNoSupabase'] = true;
     }
 
     const logoParam = encodeURIComponent(`${origin}/logo.png`);
     const targetUrl = `${origin}/templates/forata057?id=${encodeURIComponent(id)}&pdf=1&print=true&logo=${logoParam}`;
     diag['targetUrl'] = targetUrl;
 
-    // Priorizar Chromium en entornos serverless (Vercel/Lambda); si no existe, intentar Chrome local.
-    const chromiumPath = await chromium.executablePath();
-    diag['chromiumPath'] = !!chromiumPath;
+    // Estrategia: En desarrollo local, priorizar Chrome instalado; en producción usar Chromium serverless
+    const isDev = process.env.NODE_ENV === 'development';
+    const isServerless = !!(process.env.AWS_REGION || process.env.VERCEL);
 
-    if (chromiumPath) {
-      browser = await puppeteerCore.launch({
-        headless: true,
-        args: [
-          ...chromium.args,
-          '--disable-dev-shm-usage',
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--font-render-hinting=medium',
-        ],
-        executablePath: chromiumPath,
-      });
-    } else {
+    if (isDev && !isServerless) {
+      // Desarrollo local: usar Chrome local primero
       const localChrome = resolveLocalChromePath();
       diag['localChrome'] = localChrome || null;
+
       if (localChrome) {
         browser = await puppeteerCore.launch({
           headless: true,
           executablePath: localChrome,
-          args: ['--no-sandbox', '--font-render-hinting=medium'],
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--font-render-hinting=medium',
+          ],
         });
+        diag['browserSource'] = 'localChrome';
       } else {
-        // Último recurso: usar Puppeteer solo en desarrollo local
-        const isDev = process.env.NODE_ENV === 'development';
-        diag['puppeteerFallback'] = isDev;
-        if (!isDev) {
-          throw new Error('No se encontró Chromium ni Chrome local para generar PDF');
+        // Fallback: intentar puppeteer con Chrome incluido
+        try {
+          const puppeteer = (await import('puppeteer')).default;
+          browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--font-render-hinting=medium']
+          });
+          diag['browserSource'] = 'puppeteer';
+        } catch (puppeteerError) {
+          throw new Error(`No se encontró Chrome local en el sistema. Por favor instala Google Chrome o configura PUPPETEER_EXECUTABLE_PATH. Error: ${puppeteerError}`);
         }
-        const puppeteer = (await import('puppeteer')).default;
-        browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--font-render-hinting=medium'] });
+      }
+    } else {
+      // Producción/Serverless: usar Chromium de @sparticuz/chromium
+      const chromiumPath = await chromium.executablePath();
+      diag['chromiumPath'] = !!chromiumPath;
+
+      if (chromiumPath && fs.existsSync(chromiumPath)) {
+        browser = await puppeteerCore.launch({
+          headless: true,
+          args: [
+            ...chromium.args,
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--font-render-hinting=medium',
+          ],
+          executablePath: chromiumPath,
+        });
+        diag['browserSource'] = 'chromium';
+      } else {
+        // Fallback a Chrome local incluso en serverless
+        const localChrome = resolveLocalChromePath();
+        if (localChrome) {
+          browser = await puppeteerCore.launch({
+            headless: true,
+            executablePath: localChrome,
+            args: ['--no-sandbox', '--font-render-hinting=medium'],
+          });
+          diag['browserSource'] = 'localChrome-fallback';
+        } else {
+          throw new Error('No se encontró Chromium ni Chrome local para generar PDF en producción');
+        }
       }
     }
 
@@ -250,13 +291,36 @@ export async function GET(
     if (browser) {
       try { await browser.close(); } catch {}
     }
-    console.error('PDF endpoint error:', {
+
+    const errorInfo = {
       message: error?.message || String(error),
       stack: error?.stack,
       serverless: !!(process.env.AWS_REGION || process.env.VERCEL),
-    });
-    const payload: any = { error: 'No se pudo generar el PDF', details: String(error?.message || error) };
-    if (debug) payload['diag'] = { debug: true };
+      isDev: process.env.NODE_ENV === 'development',
+      platform: os.platform(),
+    };
+
+    console.error('[PDF Generation Error]', errorInfo);
+
+    // Mensajes de error más específicos
+    let userMessage = 'No se pudo generar el PDF';
+    if (error?.message?.includes('Chrome') || error?.message?.includes('chromium')) {
+      userMessage = 'No se encontró Chrome/Chromium en el sistema';
+    } else if (error?.message?.includes('timeout')) {
+      userMessage = 'Tiempo de espera excedido al generar el PDF';
+    } else if (error?.message?.includes('Inspección no encontrada')) {
+      userMessage = 'Inspección no encontrada';
+    }
+
+    const payload: any = {
+      error: userMessage,
+      details: debug ? String(error?.message || error) : undefined,
+    };
+
+    if (debug) {
+      payload['diag'] = errorInfo;
+    }
+
     return NextResponse.json(payload, { status: 500 });
   }
 }

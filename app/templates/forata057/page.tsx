@@ -5,6 +5,7 @@ import { FOR_ATA_057_FOOTER_NOTE } from '@/lib/constants';
 import { InspectionProvider, useInspectionForm } from '@/context/inspection-context';
 import { useSearchParams } from 'next/navigation';
 import { InspectionService } from '@/lib/services';
+import { supabase } from '@/lib/supabase/client';
 
 function TemplateWithData() {
   const { formData } = useInspectionForm();
@@ -216,14 +217,51 @@ function TemplateWithData() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 16 }}>Vista FOR-ATA-057</h2>
           <button
-            onClick={() => {
-              const params = new URLSearchParams(window.location.search);
-              const id = params.get('id');
-              if (id) {
-                const url = `/api/inspections/${encodeURIComponent(id)}/pdf`;
-                window.open(url, '_blank');
-              } else {
-                // Fallback: si no hay id, imprimir navegador
+            onClick={async () => {
+              try {
+                const params = new URLSearchParams(window.location.search);
+                const id = params.get('id');
+                if (!id) {
+                  window.print();
+                  return;
+                }
+
+                // Obtener token de sesión para Authorization: Bearer <token>
+                const { data: { session } } = await supabase.auth.getSession();
+                const headers: Record<string, string> = {};
+                if (session?.access_token) {
+                  headers['Authorization'] = `Bearer ${session.access_token}`;
+                }
+
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 45000);
+                const res = await fetch(`/api/inspections/${encodeURIComponent(id)}/pdf`, {
+                  method: 'GET',
+                  headers,
+                  credentials: 'include',
+                  signal: controller.signal,
+                });
+                clearTimeout(timeout);
+
+                if (!res.ok) {
+                  // Fallback: si el backend no responde, usar impresión del navegador
+                  console.error('Error descargando PDF desde backend:', res.status, await res.text().catch(() => ''));
+                  window.print();
+                  return;
+                }
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `FOR-ATA-057-${id}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              } catch (error) {
+                console.error('Error generando/descargando PDF:', error);
+                // Fallback de último recurso
                 window.print();
               }
             }}

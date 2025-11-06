@@ -1,10 +1,14 @@
 /**
  * Servicio de Inspecciones
  * Gestiona todas las operaciones CRUD de inspecciones
+ *
+ * IMPORTANTE: Todas las operaciones validan la sesión antes de ejecutar
+ * para prevenir operaciones fallidas con sesiones expiradas
  */
 
 import { supabase } from '@/lib/supabase/client';
 import { Inspection, Equipment } from '@/types';
+import { withSessionValidation, SessionError } from '@/lib/supabase/session-validator';
 
 export class InspectionService {
   /**
@@ -53,80 +57,86 @@ export class InspectionService {
    */
   static async getInspections(opts?: { page?: number; pageSize?: number; station?: string; start?: string; end?: string }) {
     try {
-      const page = opts?.page && opts.page > 0 ? opts.page : 1;
-      const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 0; // 0 = sin paginación
-      const from = pageSize > 0 ? (page - 1) * pageSize : undefined;
-      const to = pageSize > 0 && typeof from === 'number' ? from + pageSize - 1 : undefined;
+      return await withSessionValidation(async () => {
+        const page = opts?.page && opts.page > 0 ? opts.page : 1;
+        const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 0; // 0 = sin paginación
+        const from = pageSize > 0 ? (page - 1) * pageSize : undefined;
+        const to = pageSize > 0 && typeof from === 'number' ? from + pageSize - 1 : undefined;
 
-      // Obtener inspecciones con equipos
-      let inspectionsRes;
-      let query = supabase
-        .from('inspections')
-        .select(`
-          *,
-          equipment (*)
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false });
+        // Obtener inspecciones con equipos
+        let inspectionsRes;
+        let query = supabase
+          .from('inspections')
+          .select(`
+            *,
+            equipment (*)
+          `, { count: 'exact' })
+          .order('created_at', { ascending: false });
 
-      // Filtros opcionales por estación y rango de fechas
-      if (opts?.station) {
-        query = query.eq('station', opts.station);
-      }
-      if (opts?.start) {
-        query = query.gte('created_at', opts.start);
-      }
-      if (opts?.end) {
-        query = query.lte('created_at', opts.end);
-      }
+        // Filtros opcionales por estación y rango de fechas
+        if (opts?.station) {
+          query = query.eq('station', opts.station);
+        }
+        if (opts?.start) {
+          query = query.gte('created_at', opts.start);
+        }
+        if (opts?.end) {
+          query = query.lte('created_at', opts.end);
+        }
 
-      if (typeof from === 'number' && typeof to === 'number') {
-        inspectionsRes = await query.range(from, to);
-      } else {
-        inspectionsRes = await query;
-      }
+        if (typeof from === 'number' && typeof to === 'number') {
+          inspectionsRes = await query.range(from, to);
+        } else {
+          inspectionsRes = await query;
+        }
 
-      const { data: inspections, error: inspectionsError, count } = inspectionsRes as any;
+        const { data: inspections, error: inspectionsError, count } = inspectionsRes as any;
 
-      if (inspectionsError) {
-        console.error('Error fetching inspections:', inspectionsError);
-        throw inspectionsError;
-      }
+        if (inspectionsError) {
+          console.error('[InspectionService] Error fetching inspections:', inspectionsError);
+          throw inspectionsError;
+        }
 
-      const ids = (inspections || []).map((i: { id?: string }) => i.id).filter(Boolean);
-      if (!ids || ids.length === 0) {
-        return { data: inspections || [], error: null, total: count ?? (inspections?.length || 0) };
-      }
+        const ids = (inspections || []).map((i: { id?: string }) => i.id).filter(Boolean);
+        if (!ids || ids.length === 0) {
+          return { data: inspections || [], error: null, total: count ?? (inspections?.length || 0) };
+        }
 
-      // Obtener observaciones asociadas en un solo query y adjuntar
-      const { data: obs, error: obsError } = await supabase
-        .from('observations')
-        .select('id, inspection_id, obs_id, equipment_code, obs_operator, obs_maintenance, order_index, created_at, updated_at')
-        .in('inspection_id', ids);
+        // Obtener observaciones asociadas en un solo query y adjuntar
+        const { data: obs, error: obsError } = await supabase
+          .from('observations')
+          .select('id, inspection_id, obs_id, equipment_code, obs_operator, obs_maintenance, order_index, created_at, updated_at')
+          .in('inspection_id', ids);
 
-      if (obsError) {
-        console.warn('Observations fetch failed, continuing without them:', obsError);
-        return { data: inspections || [], error: null };
-      }
+        if (obsError) {
+          console.warn('[InspectionService] Observations fetch failed, continuing without them:', obsError);
+          return { data: inspections || [], error: null };
+        }
 
-      const byInspection: Record<string, any[]> = {};
-      (obs || []).forEach((o: any) => {
-        const key = o.inspection_id;
-        if (!byInspection[key]) byInspection[key] = [];
-        byInspection[key].push(o);
-      });
+        const byInspection: Record<string, any[]> = {};
+        (obs || []).forEach((o: any) => {
+          const key = o.inspection_id;
+          if (!byInspection[key]) byInspection[key] = [];
+          byInspection[key].push(o);
+        });
 
-      const withObs = (inspections || []).map((i: Inspection) => {
-        const attached = byInspection[i.id!] || [];
-        const derived = InspectionService.deriveObservationsFromEquipment(i.equipment as Equipment[] | undefined, attached);
-        return {
-          ...i,
-          observations: attached.length > 0 ? attached : derived,
-        };
-      });
+        const withObs = (inspections || []).map((i: Inspection) => {
+          const attached = byInspection[i.id!] || [];
+          const derived = InspectionService.deriveObservationsFromEquipment(i.equipment as Equipment[] | undefined, attached);
+          return {
+            ...i,
+            observations: attached.length > 0 ? attached : derived,
+          };
+        });
 
-      return { data: withObs, error: null, total: count ?? (inspections?.length || 0), page, pageSize };
+        return { data: withObs, error: null, total: count ?? (inspections?.length || 0), page, pageSize };
+      }, 'Get Inspections');
     } catch (error: any) {
-      console.error('Error fetching inspections:', error);
+      if (error instanceof SessionError) {
+        console.error('[InspectionService] Session error:', error.message);
+        return { data: null, error: 'SESSION_EXPIRED' };
+      }
+      console.error('[InspectionService] Error fetching inspections:', error);
       return { data: null, error: error.message };
     }
   }
@@ -136,33 +146,39 @@ export class InspectionService {
    */
   static async getInspectionById(id: string) {
     try {
-      // Obtener inspección con equipos
-      const { data: inspection, error: inspectionError } = await supabase
-        .from('inspections')
-        .select(`
-          *,
-          equipment (*)
-        `)
-        .eq('id', id)
-        .single();
+      return await withSessionValidation(async () => {
+        // Obtener inspección con equipos
+        const { data: inspection, error: inspectionError } = await supabase
+          .from('inspections')
+          .select(`
+            *,
+            equipment (*)
+          `)
+          .eq('id', id)
+          .single();
 
-      if (inspectionError) throw inspectionError;
+        if (inspectionError) throw inspectionError;
 
-      // Obtener observaciones asociadas explícitamente
-      const { data: observations, error: obsError } = await supabase
-        .from('observations')
-        .select('id, inspection_id, obs_id, equipment_code, obs_operator, obs_maintenance, order_index, created_at, updated_at')
-        .eq('inspection_id', id);
+        // Obtener observaciones asociadas explícitamente
+        const { data: observations, error: obsError } = await supabase
+          .from('observations')
+          .select('id, inspection_id, obs_id, equipment_code, obs_operator, obs_maintenance, order_index, created_at, updated_at')
+          .eq('inspection_id', id);
 
-      if (obsError) {
-        console.warn('Observations fetch failed for inspection:', id, obsError);
-      }
+        if (obsError) {
+          console.warn('[InspectionService] Observations fetch failed for inspection:', id, obsError);
+        }
 
-      const derived = InspectionService.deriveObservationsFromEquipment(inspection?.equipment as Equipment[] | undefined, observations || []);
-      const finalObs = (observations && observations.length > 0) ? observations : derived;
-      return { data: { ...inspection, observations: finalObs }, error: null };
+        const derived = InspectionService.deriveObservationsFromEquipment(inspection?.equipment as Equipment[] | undefined, observations || []);
+        const finalObs = (observations && observations.length > 0) ? observations : derived;
+        return { data: { ...inspection, observations: finalObs }, error: null };
+      }, 'Get Inspection By ID');
     } catch (error: any) {
-      console.error('Error fetching inspection:', error);
+      if (error instanceof SessionError) {
+        console.error('[InspectionService] Session error:', error.message);
+        return { data: null, error: 'SESSION_EXPIRED' };
+      }
+      console.error('[InspectionService] Error fetching inspection:', error);
       return { data: null, error: error.message };
     }
   }
@@ -172,23 +188,29 @@ export class InspectionService {
    */
   static async createInspection(inspectionData: Partial<Inspection>) {
     try {
-      const { data, error } = await supabase
-        .from('inspections')
-        .insert({
-          user_id: inspectionData.user_id,
-          station: inspectionData.station,
-          inspection_date: inspectionData.inspection_date,
-          inspection_type: inspectionData.inspection_type,
-          inspector_name: inspectionData.inspector_name,
-          status: 'draft',
-        })
-        .select()
-        .single();
+      return await withSessionValidation(async () => {
+        const { data, error } = await supabase
+          .from('inspections')
+          .insert({
+            user_id: inspectionData.user_id,
+            station: inspectionData.station,
+            inspection_date: inspectionData.inspection_date,
+            inspection_type: inspectionData.inspection_type,
+            inspector_name: inspectionData.inspector_name,
+            status: 'draft',
+          })
+          .select()
+          .single();
 
-      if (error) throw error;
-      return { data, error: null };
+        if (error) throw error;
+        return { data, error: null };
+      }, 'Create Inspection');
     } catch (error: any) {
-      console.error('Error creating inspection:', error);
+      if (error instanceof SessionError) {
+        console.error('[InspectionService] Session error:', error.message);
+        return { data: null, error: 'SESSION_EXPIRED' };
+      }
+      console.error('[InspectionService] Error creating inspection:', error);
       return { data: null, error: error.message };
     }
   }
@@ -198,20 +220,25 @@ export class InspectionService {
    */
   static async updateInspection(id: string, updates: Partial<Inspection>) {
     try {
-      const { data, error } = await supabase
-        .from('inspections')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      return await withSessionValidation(async () => {
+        const { data, error } = await supabase
+          .from('inspections')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .select()
+          .single();
 
-      if (error) throw error;
-      return { data, error: null };
+        if (error) throw error;
+        return { data, error: null };
+      }, 'Update Inspection');
     } catch (error: any) {
-      console.error('Error updating inspection:', error);
+      if (error instanceof SessionError) {
+        return { data: null, error: 'SESSION_EXPIRED' };
+      }
+      console.error('[InspectionService] Error updating inspection:', error);
       return { data: null, error: error.message };
     }
   }
@@ -396,32 +423,37 @@ export class InspectionService {
     equipmentData: Partial<Equipment>
   ) {
     try {
-      const { data, error } = await supabase
-        .from('equipment')
-        .insert({
-          inspection_id: inspectionId,
-          code: equipmentData.code,
-          type: equipmentData.type,
-          brand: equipmentData.brand,
-          model: equipmentData.model,
-          year: equipmentData.year,
-          serial_number: equipmentData.serial_number,
-          motor_serial: equipmentData.motor_serial,
-          station: equipmentData.station,
-          checklist_data: equipmentData.checklist_data || {},
-          order_index: equipmentData.order_index || 0,
-        })
-        .select()
-        .single();
+      return await withSessionValidation(async () => {
+        const { data, error } = await supabase
+          .from('equipment')
+          .insert({
+            inspection_id: inspectionId,
+            code: equipmentData.code,
+            type: equipmentData.type,
+            brand: equipmentData.brand,
+            model: equipmentData.model,
+            year: equipmentData.year,
+            serial_number: equipmentData.serial_number,
+            motor_serial: equipmentData.motor_serial,
+            station: equipmentData.station,
+            checklist_data: equipmentData.checklist_data || {},
+            order_index: equipmentData.order_index || 0,
+          })
+          .select()
+          .single();
 
-      if (error) {
-        console.error('Error adding equipment:', error);
-        throw error;
-      }
+        if (error) {
+          console.error('[InspectionService] Error adding equipment:', error);
+          throw error;
+        }
 
-      return { data, error: null };
+        return { data, error: null };
+      }, 'Add Equipment');
     } catch (error: any) {
-      console.error('Error adding equipment:', error);
+      if (error instanceof SessionError) {
+        return { data: null, error: 'SESSION_EXPIRED' };
+      }
+      console.error('[InspectionService] Error adding equipment:', error);
       return { data: null, error: error.message };
     }
   }

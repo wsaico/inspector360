@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth, usePermissions } from '@/hooks';
 import { InspectionService } from '@/lib/services';
 import { withTimeout } from '@/lib/utils/async';
@@ -31,6 +32,7 @@ import { scopeInspectionsByStation } from '@/lib/utils/scope';
 import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel } from '@/lib/utils';
 
 export default function InspectionsPage() {
+  const router = useRouter();
   const { profile } = useAuth();
   const { canCreateInspections, canDeleteInspections, canViewAllStations } = usePermissions();
   const [inspections, setInspections] = useState<Inspection[]>([]);
@@ -60,8 +62,19 @@ export default function InspectionsPage() {
     const { data, error, total: t } = result as any;
 
     if (error) {
+      // Detectar sesión expirada
+      if (error === 'SESSION_EXPIRED') {
+        console.warn('[InspectionsPage] Sesión expirada detectada');
+        toast.error('Tu sesión ha expirado. Redirigiendo al login...', { duration: 3000 });
+        setInspections([]);
+        setLoading(false);
+        setTimeout(() => router.push('/login'), 1500);
+        return;
+      }
+
       toast.error('Error al cargar inspecciones');
-      console.error(error);
+      console.error('[InspectionsPage] Error:', error);
+      setInspections([]);
     } else {
       setInspections(data || []);
       // El total proporcionado por el backend ya respeta la estación si se aplicó filtro.

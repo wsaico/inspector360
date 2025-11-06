@@ -56,47 +56,45 @@ export function useAuth() {
   };
 
   useEffect(() => {
-    // Obtener sesión inicial con guardia de tiempo
+    // IMPORTANTE: Usar getUser() en lugar de getSession() para validación real
+    // getUser() valida el token con el servidor, getSession() solo lee localStorage
     const getSession = async () => {
       try {
-        const sessionRes = await withTimeout(supabase.auth.getSession(), 10000);
+        // Primero intentar validación real con el servidor
+        const userRes = await withTimeout(supabase.auth.getUser(), 10000);
 
-        if (!sessionRes) {
-          // Si tarda demasiado, usar persistencia solo si es muy reciente
-          const persisted = readPersisted();
-          const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
-          if (notExpired && persisted.user) {
-            setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: 'Sesión mantenida (timeout), reintenta conexión' });
-            return;
-          }
+        if (!userRes) {
+          // Si tarda demasiado, marcar como no autenticado (no usar cache)
+          console.warn('[useAuth] Timeout al validar sesión con servidor');
+          clearPersisted();
           setAuthState({ user: null, profile: null, loading: false, error: 'Tiempo de espera al validar sesión' });
           return;
         }
 
-        const { data: { session }, error } = sessionRes as { data: { session: Session | null }, error: any };
+        const { data: { user }, error } = userRes as { data: { user: SupabaseUser | null }, error: any };
 
-        if (error) throw error;
+        // Error de autenticación: sesión inválida o expirada
+        if (error) {
+          console.warn('[useAuth] Error de autenticación:', error.message);
+          clearPersisted();
+          setAuthState({ user: null, profile: null, loading: false, error: null });
+          return;
+        }
 
-        if (session?.user) {
-          const loadedProfile = await loadUserProfile(session.user);
-          // Persistir inmediata para resiliencia con el perfil correcto
-          writePersisted(session.user, loadedProfile);
+        if (user) {
+          const loadedProfile = await loadUserProfile(user);
+          // Persistir para resiliencia temporal (solo como fallback de UI)
+          writePersisted(user, loadedProfile);
         } else {
-          // Sin sesión válida: limpiar y marcar no autenticado
+          // Sin usuario válido: limpiar y marcar no autenticado
           clearPersisted();
           setAuthState({ user: null, profile: null, loading: false, error: null });
         }
       } catch (error) {
-        console.error('Error loading session:', error);
-        // Mantener sesión solo si persistencia es muy reciente (error de red puntual)
-        const persisted = readPersisted();
-        const notExpired = persisted.savedAt > 0 && (Date.now() - persisted.savedAt) < TTL_MS;
-        if (notExpired && persisted.user) {
-          setAuthState({ user: persisted.user, profile: persisted.profile, loading: false, error: 'Sesión mantenida (error de red)' });
-        } else {
-          clearPersisted();
-          setAuthState({ user: null, profile: null, loading: false, error: 'Error al cargar la sesión' });
-        }
+        console.error('[useAuth] Error validando sesión:', error);
+        // NO mantener sesión en cache si hay error - seguridad primero
+        clearPersisted();
+        setAuthState({ user: null, profile: null, loading: false, error: 'Error al cargar la sesión' });
       }
     };
 
@@ -122,31 +120,41 @@ export function useAuth() {
     };
   }, []);
 
-  // Refresco proactivo de sesión para evitar expiraciones prematuras
+  // Validación proactiva de sesión para detectar expiraciones
   useEffect(() => {
-    const refreshNow = async () => {
+    const validateNow = async () => {
       try {
-        const res = await withTimeout(supabase.auth.getSession(), 8000);
-        const { data: { session } } = res as { data: { session: Session | null } };
-        if (session?.user) {
-          // Asegurar perfil actualizado tras refresh
-          const loadedProfile = await loadUserProfile(session.user);
-          writePersisted(session.user, loadedProfile);
-        } else {
-          // Si al refrescar ya no hay sesión, cerrar explícitamente
+        // Usar getUser() para validación real con servidor
+        const res = await withTimeout(supabase.auth.getUser(), 8000);
+
+        if (!res) {
+          console.warn('[useAuth] Timeout en validación periódica de sesión');
+          return;
+        }
+
+        const { data: { user }, error } = res as { data: { user: SupabaseUser | null }, error: any };
+
+        if (error || !user) {
+          // Sesión expirada detectada
+          console.warn('[useAuth] Sesión expirada detectada en validación periódica');
           clearPersisted();
           setAuthState({ user: null, profile: null, loading: false, error: null });
+        } else if (user && authState.user) {
+          // Sesión válida: actualizar perfil si es necesario
+          const loadedProfile = await loadUserProfile(user);
+          writePersisted(user, loadedProfile);
         }
-      } catch {
-        // Ignorar errores esporádicos de red
+      } catch (error) {
+        console.error('[useAuth] Error en validación periódica:', error);
+        // No cerrar sesión por error puntual de red
       }
     };
 
-    const interval = setInterval(refreshNow, 5 * 60 * 1000); // cada 5 minutos
+    const interval = setInterval(validateNow, 2 * 60 * 1000); // cada 2 minutos (más frecuente)
 
     const onVisibleOrOnline = () => {
-      // Al volver al foco o conexión, intentar refrescar inmediatamente
-      refreshNow();
+      // Al volver al foco o conexión, validar inmediatamente
+      validateNow();
     };
 
     if (typeof window !== 'undefined') {

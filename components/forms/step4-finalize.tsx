@@ -230,6 +230,15 @@ export default function Step4Finalize() {
               supervisor_name: supervisorName,
             });
           }}
+          onChange={(sig) => {
+            setSupervisorSignature(sig);
+            setSignatures({
+              ...formData.signatures,
+              supervisor_signature: sig,
+              supervisor_name: supervisorName,
+            });
+          }}
+          initialValue={supervisorSignature || formData.signatures.supervisor_signature || undefined}
         />
         </CardContent>
       </Card>
@@ -265,6 +274,15 @@ export default function Step4Finalize() {
               mechanic_name: mechanicName,
             });
           }}
+          onChange={(sig) => {
+            setMechanicSignature(sig);
+            setSignatures({
+              ...formData.signatures,
+              mechanic_signature: sig,
+              mechanic_name: mechanicName,
+            });
+          }}
+          initialValue={mechanicSignature || formData.signatures.mechanic_signature || undefined}
         />
         </CardContent>
       </Card>

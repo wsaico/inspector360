@@ -208,6 +208,11 @@ export default function Step3Checklist() {
                 required
                 onSave={handleSaveSignature}
                 onCancel={() => setShowSignaturePad(false)}
+                onChange={(sig) => {
+                  // Autoguarda localmente para prevenir pérdidas por re-render
+                  setEquipmentSignature(currentEquipment.code, sig);
+                }}
+                initialValue={currentSignature || undefined}
               />
             ) : (
               <div className="text-center py-8">
