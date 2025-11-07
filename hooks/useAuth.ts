@@ -71,6 +71,9 @@ export function useAuth() {
         }
 
         if (session?.user) {
+          // ✅ OPTIMIZADO: Marcar autenticado INMEDIATAMENTE
+          setAuthState({ user: session.user, profile: null, loading: false, error: null });
+
           // Cargar perfil en background - no bloquear UI
           loadUserProfile(session.user).then((profile) => {
             writePersisted(session.user, profile);
@@ -95,9 +98,14 @@ export function useAuth() {
         console.log('[useAuth] Auth event:', event);
 
         if (session?.user) {
-          // Usuario autenticado - cargar perfil
-          const loadedProfile = await loadUserProfile(session.user);
-          writePersisted(session.user, loadedProfile);
+          // ✅ OPTIMIZADO: Login INMEDIATO - Perfil en background
+          // Primero marcar como autenticado SIN esperar perfil
+          setAuthState({ user: session.user, profile: null, loading: false, error: null });
+
+          // Cargar perfil en background sin bloquear
+          loadUserProfile(session.user).then((loadedProfile) => {
+            writePersisted(session.user, loadedProfile);
+          });
         } else {
           // Sesión terminada - limpiar
           clearPersisted();
