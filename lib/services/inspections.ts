@@ -59,18 +59,14 @@ export class InspectionService {
     try {
       return await withSessionValidation(async () => {
         const page = opts?.page && opts.page > 0 ? opts.page : 1;
-        const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 0; // 0 = sin paginación
-        const from = pageSize > 0 ? (page - 1) * pageSize : undefined;
-        const to = pageSize > 0 && typeof from === 'number' ? from + pageSize - 1 : undefined;
+        const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 10; // DEFAULT 10 en vez de 0
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
 
-        // Obtener inspecciones con equipos
-        let inspectionsRes;
+        // Query OPTIMIZADO: solo traer lo necesario
         let query = supabase
           .from('inspections')
-          .select(`
-            *,
-            equipment (*)
-          `, { count: 'exact' })
+          .select('id, form_code, station, inspection_date, inspection_type, inspector_name, status, created_at, updated_at, supervisor_name, supervisor_signature_url, mechanic_name, mechanic_signature_url', { count: 'exact' })
           .order('created_at', { ascending: false });
 
         // Filtros opcionales por estación y rango de fechas
@@ -84,11 +80,8 @@ export class InspectionService {
           query = query.lte('created_at', opts.end);
         }
 
-        if (typeof from === 'number' && typeof to === 'number') {
-          inspectionsRes = await query.range(from, to);
-        } else {
-          inspectionsRes = await query;
-        }
+        // SIEMPRE aplicar paginación
+        const inspectionsRes = await query.range(from, to);
 
         const { data: inspections, error: inspectionsError, count } = inspectionsRes as any;
 
@@ -97,39 +90,9 @@ export class InspectionService {
           throw inspectionsError;
         }
 
-        const ids = (inspections || []).map((i: { id?: string }) => i.id).filter(Boolean);
-        if (!ids || ids.length === 0) {
-          return { data: inspections || [], error: null, total: count ?? (inspections?.length || 0) };
-        }
-
-        // Obtener observaciones asociadas en un solo query y adjuntar
-        const { data: obs, error: obsError } = await supabase
-          .from('observations')
-          .select('id, inspection_id, obs_id, equipment_code, obs_operator, obs_maintenance, order_index, created_at, updated_at')
-          .in('inspection_id', ids);
-
-        if (obsError) {
-          console.warn('[InspectionService] Observations fetch failed, continuing without them:', obsError);
-          return { data: inspections || [], error: null };
-        }
-
-        const byInspection: Record<string, any[]> = {};
-        (obs || []).forEach((o: any) => {
-          const key = o.inspection_id;
-          if (!byInspection[key]) byInspection[key] = [];
-          byInspection[key].push(o);
-        });
-
-        const withObs = (inspections || []).map((i: Inspection) => {
-          const attached = byInspection[i.id!] || [];
-          const derived = InspectionService.deriveObservationsFromEquipment(i.equipment as Equipment[] | undefined, attached);
-          return {
-            ...i,
-            observations: attached.length > 0 ? attached : derived,
-          };
-        });
-
-        return { data: withObs, error: null, total: count ?? (inspections?.length || 0), page, pageSize };
+        // NO cargar equipment ni observations aquí - solo para listado rápido
+        // Si necesitan detalles, usar getInspectionById()
+        return { data: inspections || [], error: null, total: count ?? 0, page, pageSize };
       }, 'Get Inspections');
     } catch (error: any) {
       if (error instanceof SessionError) {
