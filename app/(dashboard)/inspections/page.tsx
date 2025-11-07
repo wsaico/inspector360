@@ -41,10 +41,10 @@ export default function InspectionsPage() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    if (profile) {
+    if (profile?.id) {
       loadInspections();
     }
-  }, [page, pageSize, profile?.id, canViewAllStations]);
+  }, [page, pageSize, profile?.id]);
 
   const loadInspections = async () => {
     setLoading(true);
