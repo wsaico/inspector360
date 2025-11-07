@@ -233,6 +233,7 @@ export default function Step4Finalize() {
           </div>
           <SignaturePad
             label="Firma del Supervisor"
+            storageKey="inspector360.signature.supervisor"
             onSave={(sig) => {
               setSupervisorSignature(sig);
               setSignatures({
@@ -287,6 +288,7 @@ export default function Step4Finalize() {
           </div>
           <SignaturePad
             label="Firma del Mecánico"
+            storageKey="inspector360.signature.mechanic"
             onSave={(sig) => {
               setMechanicSignature(sig);
               setSignatures({

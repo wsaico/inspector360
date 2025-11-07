@@ -205,6 +205,7 @@ export default function Step3Checklist() {
             ) : showSignaturePad ? (
               <SignaturePad
                 label="Firma del Inspector"
+                storageKey={`inspector360.signature.equipment.${currentEquipment.code}`}
                 required
                 onSave={handleSaveSignature}
                 onCancel={() => setShowSignaturePad(false)}
