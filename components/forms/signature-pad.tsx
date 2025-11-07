@@ -1,17 +1,17 @@
 'use client';
 
 /**
- * Componente de Firma Digital con Persistencia Profesional
- * - Usa localStorage para persistencia entre re-renders
- * - Resistente a cierre de teclado móvil y cambios de viewport
- * - Auto-sincronización con formulario padre
+ * Componente de Firma Digital - Solución Simple y Efectiva
+ * - Usa solo estado local + refs para evitar loops
+ * - Auto-persiste en localStorage SIN notificar al padre constantemente
+ * - Notifica al padre SOLO cuando el usuario presiona "Guardar"
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Eraser, Check, X, Edit2, CheckCircle } from 'lucide-react';
 
 interface SignaturePadProps {
@@ -21,7 +21,7 @@ interface SignaturePadProps {
   required?: boolean;
   onChange?: (signature: string) => void;
   initialValue?: string;
-  storageKey: string; // REQUERIDO: Identificador único para persistencia (ej: "supervisor_signature")
+  storageKey: string;
 }
 
 export default function SignaturePad({
@@ -38,39 +38,30 @@ export default function SignaturePad({
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [showCanvas, setShowCanvas] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
+  const hasInitialized = useRef(false);
 
-  // INICIALIZACIÓN: Cargar desde localStorage o initialValue
+  // SOLO cargar al montar - UNA VEZ
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     try {
       const stored = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
-      const signatureToUse = stored || initialValue || null;
+      const signatureToUse = initialValue || stored || null;
 
       if (signatureToUse) {
         setSavedSignature(signatureToUse);
         setShowCanvas(false);
         setIsEmpty(false);
-        // Notificar al padre inmediatamente
-        if (onChange) onChange(signatureToUse);
-        if (onSave) onSave(signatureToUse);
       } else {
         setShowCanvas(true);
         setIsEmpty(true);
       }
     } catch (error) {
-      console.error('Error loading signature from localStorage:', error);
+      console.error('Error loading signature:', error);
+      setShowCanvas(true);
     }
-  }, [storageKey]); // Solo ejecutar al montar o cambiar storageKey
-
-  // PERSISTENCIA AUTOMÁTICA: Guardar en localStorage cada vez que cambia savedSignature
-  useEffect(() => {
-    if (savedSignature && typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(storageKey, savedSignature);
-      } catch (error) {
-        console.error('Error saving signature to localStorage:', error);
-      }
-    }
-  }, [savedSignature, storageKey]);
+  }, []); // Sin dependencias - solo una vez
 
   const handleClear = useCallback(() => {
     sigCanvas.current?.clear();
@@ -81,24 +72,40 @@ export default function SignaturePad({
   const handleSave = useCallback(() => {
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       const dataURL = sigCanvas.current.toDataURL('image/png');
+
+      // Guardar en estado local
       setSavedSignature(dataURL);
       setShowCanvas(false);
       setIsEmpty(false);
+
+      // Persistir en localStorage
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(storageKey, dataURL);
+        }
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+      }
+
+      // AHORA SÍ notificar al padre
       onSave(dataURL);
       if (onChange) onChange(dataURL);
+
       toast.success('Firma guardada correctamente', { duration: 2000 });
     } else if (savedSignature) {
-      // Ya hay firma guardada, solo cerrar canvas
+      // Ya hay firma guardada
       setShowCanvas(false);
+      onSave(savedSignature);
+      if (onChange) onChange(savedSignature);
       toast.success('Firma guardada correctamente', { duration: 2000 });
     } else {
       toast.error('Debe firmar antes de guardar');
     }
-  }, [onSave, onChange, savedSignature]);
+  }, [savedSignature, onSave, onChange, storageKey]);
 
   const handleEdit = useCallback(() => {
     setShowCanvas(true);
-    // Restaurar firma guardada en el canvas
+    // Restaurar firma en canvas
     setTimeout(() => {
       if (savedSignature && sigCanvas.current) {
         try {
@@ -119,37 +126,41 @@ export default function SignaturePad({
     setIsDrawing(false);
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       setIsEmpty(false);
-      // AUTO-GUARDAR inmediatamente en localStorage
+
+      // AUTO-GUARDAR en localStorage SILENCIOSAMENTE (sin notificar al padre)
       try {
         const dataURL = sigCanvas.current.toDataURL('image/png');
-        setSavedSignature(dataURL); // Esto dispara el useEffect que guarda en localStorage
-        if (onChange) onChange(dataURL);
+        localStorage.setItem(storageKey, dataURL);
+        setSavedSignature(dataURL);
       } catch (error) {
         console.error('Error auto-saving signature:', error);
       }
     }
-  }, [onChange]);
+  }, [storageKey]);
 
   const handleRemove = useCallback(() => {
-    // Limpiar TODO: estado, localStorage y notificar al padre
     setSavedSignature(null);
     setShowCanvas(true);
     setIsEmpty(true);
     handleClear();
+
+    // Limpiar localStorage
     try {
       if (typeof window !== 'undefined') {
         localStorage.removeItem(storageKey);
       }
     } catch (error) {
-      console.error('Error removing signature from localStorage:', error);
+      console.error('Error removing signature:', error);
     }
+
+    // Notificar al padre que se eliminó
     onSave('');
     if (onChange) onChange('');
   }, [handleClear, onSave, onChange, storageKey]);
 
   return (
     <div className="w-full space-y-3">
-      {/* Header con indicador de estado */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700">
@@ -165,7 +176,7 @@ export default function SignaturePad({
         </div>
       </div>
 
-      {/* Vista previa de firma guardada */}
+      {/* Vista previa */}
       {savedSignature && !showCanvas && (
         <div className="space-y-3">
           <div className="relative overflow-hidden rounded-lg border-2 border-green-300 bg-white p-4">
@@ -201,11 +212,10 @@ export default function SignaturePad({
         </div>
       )}
 
-      {/* Canvas de firma (solo visible cuando no hay firma guardada o en modo edición) */}
+      {/* Canvas */}
       {(!savedSignature || showCanvas) && (
         <Card className="border-2 border-dashed">
           <CardContent className="p-4 space-y-3">
-            {/* Canvas */}
             <div className="relative overflow-hidden rounded-lg border-2 border-gray-300 bg-white">
               <SignatureCanvas
                 ref={sigCanvas}
@@ -227,7 +237,6 @@ export default function SignaturePad({
               )}
             </div>
 
-            {/* Botones de acción */}
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 type="button"
@@ -261,9 +270,8 @@ export default function SignaturePad({
               </Button>
             </div>
 
-            {/* Instrucción compacta */}
             <p className="text-xs text-center text-gray-500">
-              La firma se guarda automáticamente mientras dibuja
+              La firma se auto-guarda mientras dibuja y persiste al cerrar el teclado
             </p>
           </CardContent>
         </Card>

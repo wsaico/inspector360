@@ -278,20 +278,44 @@ export async function GET(
         }
       }
     } catch {}
-    // En Vercel, networkidle0 puede no disparar por conexiones persistentes; usar domcontentloaded + banderas propias
+    // En Vercel: usar estrategia más agresiva con timeouts cortos
     console.log('[PDF] Navigating to:', targetUrl);
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    diag['navigated'] = true;
-    console.log('[PDF] Page loaded, waiting for template ready flag');
-    await page.waitForFunction(() => (window as any).__forata057_ready === true, { timeout: 10000 }).catch(() => {
-      console.warn('[PDF] Template ready timeout, continuing anyway');
+
+    try {
+      await page.goto(targetUrl, {
+        waitUntil: 'networkidle2',
+        timeout: 25000
+      });
+      diag['navigated'] = true;
+    } catch (navError: any) {
+      console.warn('[PDF] Navigation timeout, trying with domcontentloaded:', navError?.message);
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      diag['navigated'] = 'fallback';
+    }
+
+    console.log('[PDF] Page loaded, waiting for content');
+
+    // Esperar template ready o timeout
+    await page.waitForFunction(
+      () => (window as any).__forata057_ready === true,
+      { timeout: 8000 }
+    ).catch(() => {
+      console.warn('[PDF] Template ready timeout');
+      diag['templateReadyTimeout'] = true;
     });
-    console.log('[PDF] Waiting for images to load');
-    await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0), { timeout: 15000 }).catch(() => {
-      console.warn('[PDF] Images load timeout, continuing anyway');
+
+    // Esperar imágenes o timeout
+    await page.waitForFunction(
+      () => Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0),
+      { timeout: 10000 }
+    ).catch(() => {
+      console.warn('[PDF] Images load timeout');
+      diag['imagesTimeout'] = true;
     });
-    await new Promise((res) => setTimeout(res, 500)); // Pequeño delay adicional
-    await page.evaluate(() => (document as any).fonts?.ready).catch(() => {});
+
+    // Delay mínimo para renderizado
+    await new Promise((res) => setTimeout(res, 300));
+
     console.log('[PDF] Generating PDF...');
 
     const pdf = await page.pdf({
