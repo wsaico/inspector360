@@ -43,7 +43,6 @@ import { usePermissions } from '@/hooks';
 import { withTimeout } from '@/lib/utils/async';
 import dynamic from 'next/dynamic';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/lib/supabase/client';
 const SignaturePad = dynamic(() => import('@/components/forms/signature-pad'), { ssr: false });
 
 export default function InspectionDetailPage() {
@@ -255,47 +254,13 @@ export default function InspectionDetailPage() {
     if (!inspection) return;
 
     try {
-      const toastId = toast.loading('Generando PDF (FOR-ATA-057) ...');
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
-      // Enviar Authorization: Bearer <token> para permitir validación en server
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = {};
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-      const res = await fetch(`/api/inspections/${inspection.id}/pdf`, {
-        method: 'GET',
-        headers,
-        credentials: 'include',
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!res.ok) {
-        // Detectar error de sesión
-        if (res.status === 401 || res.status === 403) {
-          toast.dismiss(toastId);
-          toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-          setTimeout(() => router.push('/login'), 1500);
-          return;
-        }
-        throw new Error(`Error ${res.status}: no se pudo generar el PDF`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const filename = `FOR-ATA-057-${inspection.form_code || inspection.id}.pdf`;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.dismiss(toastId);
+      toast.loading('Generando PDF (FOR-ATA-057) ...');
+      await downloadInspectionPDF(inspection);
+      toast.dismiss();
       toast.success('PDF descargado correctamente');
     } catch (error) {
       console.error('Error generando/descargando PDF:', error);
-      try { toast.dismiss(); } catch {}
+      toast.dismiss();
       toast.error('No se pudo generar el PDF');
     }
   };
