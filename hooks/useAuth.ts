@@ -121,7 +121,45 @@ export function useAuth() {
 
   const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<UserProfile | null> => {
     try {
-      // Cargar perfil sin timeout - confiar en RLS y Supabase
+      // ✅ OPTIMIZACIÓN CRÍTICA: Usar metadata PRIMERO (INSTANT - sin query)
+      // Esto hace que el perfil esté disponible INMEDIATAMENTE incluso en móvil con conexión lenta
+      const metaProfile = buildProfileFromMetadata(supabaseUser);
+
+      if (metaProfile) {
+        console.log('[useAuth] ⚡ Perfil cargado INSTANTÁNEAMENTE desde metadata JWT');
+        // Establecer perfil INMEDIATAMENTE sin esperar query
+        setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
+
+        // ✅ Verificar con base de datos en BACKGROUND (no bloquea UI)
+        // Solo para sincronizar cambios recientes o datos adicionales
+        supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', supabaseUser.id)
+          .single()
+          .then(({ data, error }) => {
+            if (data && !error) {
+              // Verificar si usuario está activo
+              const isActive = data.is_active === true || data.is_active === 'true';
+              if (isActive) {
+                console.log('[useAuth] ✓ Perfil verificado con base de datos');
+                setAuthState({ user: supabaseUser, profile: data as UserProfile, loading: false, error: null });
+              } else {
+                console.warn('[useAuth] ⚠ Usuario inactivo según base de datos');
+                setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Usuario inactivo' });
+              }
+            }
+          })
+          .catch((err) => {
+            console.warn('[useAuth] Error verificando perfil en background:', err);
+            // Mantener perfil de metadata si la verificación falla
+          });
+
+        return metaProfile;
+      }
+
+      // ❌ Metadata no disponible: FALLBACK a query (más lento pero necesario)
+      console.warn('[useAuth] ⚠ Metadata no disponible, consultando base de datos...');
       const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -129,28 +167,12 @@ export function useAuth() {
         .single();
 
       if (error) {
-        // Usar metadata como fallback
-        const metaProfile = buildProfileFromMetadata(supabaseUser);
-        console.warn('[useAuth] Error cargando perfil, usando metadata:', error.message);
-
-        if (metaProfile) {
-          setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
-          return metaProfile;
-        }
-
-        // Sin perfil disponible
+        console.error('[useAuth] Error consultando perfil:', error.message);
         setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Error al cargar perfil' });
         return null;
       }
 
       if (!profile) {
-        // Intentar metadata
-        const metaProfile = buildProfileFromMetadata(supabaseUser);
-        if (metaProfile) {
-          setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
-          return metaProfile;
-        }
-
         setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Perfil no encontrado' });
         return null;
       }
@@ -162,7 +184,7 @@ export function useAuth() {
         return null;
       }
 
-      // Perfil cargado exitosamente
+      // Perfil cargado desde DB
       setAuthState({
         user: supabaseUser,
         profile: profile as UserProfile,
@@ -174,7 +196,7 @@ export function useAuth() {
     } catch (error: any) {
       console.error('[useAuth] Error inesperado cargando perfil:', error);
 
-      // Intentar metadata como último recurso
+      // Último recurso: intentar metadata
       const metaProfile = buildProfileFromMetadata(supabaseUser);
       if (metaProfile) {
         setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
