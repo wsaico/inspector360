@@ -49,18 +49,29 @@ function TemplateWithData() {
     } catch {}
   }, [inspectionId, remote]);
 
-  // Auto print si viene ?print=true y los datos están listos
+  // ✅ OPTIMIZADO: Auto print SOLO cuando los datos están 100% listos
   useEffect(() => {
     const shouldPrint = searchParams.get('print') === 'true';
     if (!shouldPrint) return;
-    // Esperar que lleguen datos remotos si hay id
-    if (inspectionId && !remote) return;
-    // Pequeño delay para asegurar render antes de imprimir
+
+    // Si hay inspectionId, DEBE haber datos remotos
+    if (inspectionId && !remote) {
+      console.log('[PDF] Esperando datos de inspección ID:', inspectionId);
+      return;
+    }
+
+    console.log('[PDF] Datos listos, iniciando impresión en 1000ms...');
+
+    // Delay aumentado para asegurar que TODO el DOM esté renderizado
     const t = setTimeout(() => {
       try {
+        console.log('[PDF] Activando window.print()');
         window.print();
-      } catch {}
-    }, 300);
+      } catch (e) {
+        console.error('[PDF] Error al imprimir:', e);
+      }
+    }, 1000); // Aumentado a 1 segundo para garantizar render completo
+
     return () => clearTimeout(t);
   }, [searchParams, inspectionId, remote]);
 
@@ -210,6 +221,21 @@ function TemplateWithData() {
       footer_text: FOR_ATA_057_FOOTER_NOTE,
     };
   }, [formData, remote]);
+
+  // ✅ OPTIMIZADO: Mostrar loader mientras carga datos
+  const isLoading = inspectionId && !remote;
+  const shouldPrint = searchParams.get('print') === 'true';
+
+  if (isLoading && shouldPrint) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 20 }}>
+        <div style={{ fontSize: 48, marginBottom: 20, animation: 'spin 1s linear infinite' }}>⏳</div>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Cargando datos de la inspección...</h2>
+        <p style={{ margin: '10px 0 0', fontSize: 14, color: '#666' }}>Por favor espera mientras preparamos el documento PDF</p>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: isPdfMode ? 0 : 16 }}>
