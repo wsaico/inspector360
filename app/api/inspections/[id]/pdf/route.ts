@@ -190,9 +190,19 @@ export async function GET(
       console.log('[PDF] Running in serverless mode, using @sparticuz/chromium');
 
       try {
+        // Configuración específica para Vercel
+        const isVercel = !!process.env.VERCEL;
+        diag['isVercel'] = isVercel;
+
+        // Obtener ejecutable de Chromium
         const chromiumPath = await chromium.executablePath();
         diag['chromiumPath'] = chromiumPath;
         console.log('[PDF] Chromium path:', chromiumPath);
+
+        // Validar que el ejecutable existe
+        if (!chromiumPath) {
+          throw new Error('Chromium executable path is empty');
+        }
 
         browser = await puppeteerCore.launch({
           args: [
@@ -204,6 +214,7 @@ export async function GET(
             '--no-zygote',
             '--single-process',
             '--no-sandbox',
+            '--disable-software-rasterizer',
             '--font-render-hinting=medium',
           ],
           defaultViewport: { width: 1920, height: 1080 },
@@ -213,8 +224,9 @@ export async function GET(
         diag['browserSource'] = 'chromium-serverless';
         console.log('[PDF] Browser launched successfully in serverless mode');
       } catch (chromiumError: any) {
-        console.error('[PDF] Chromium serverless error:', chromiumError?.message);
+        console.error('[PDF] Chromium serverless error:', chromiumError);
         diag['chromiumError'] = chromiumError?.message;
+        diag['chromiumStack'] = chromiumError?.stack;
 
         // Fallback a Chrome local incluso en serverless
         const localChrome = resolveLocalChromePath();
@@ -317,25 +329,31 @@ export async function GET(
       message: error?.message || String(error),
       stack: error?.stack,
       serverless: !!(process.env.AWS_REGION || process.env.VERCEL),
+      isVercel: !!process.env.VERCEL,
       isDev: process.env.NODE_ENV === 'development',
       platform: os.platform(),
+      nodeVersion: process.version,
+      memoryUsage: process.memoryUsage(),
     };
 
-    console.error('[PDF Generation Error]', errorInfo);
+    console.error('[PDF Generation Error]', JSON.stringify(errorInfo, null, 2));
 
     // Mensajes de error más específicos
     let userMessage = 'No se pudo generar el PDF';
-    if (error?.message?.includes('Chrome') || error?.message?.includes('chromium')) {
-      userMessage = 'No se encontró Chrome/Chromium en el sistema';
-    } else if (error?.message?.includes('timeout')) {
-      userMessage = 'Tiempo de espera excedido al generar el PDF';
+    if (error?.message?.includes('Chrome') || error?.message?.includes('chromium') || error?.message?.includes('executable')) {
+      userMessage = 'Error al iniciar el navegador para generar PDF';
+    } else if (error?.message?.includes('timeout') || error?.message?.includes('Navigation')) {
+      userMessage = 'Tiempo de espera excedido al cargar la página';
     } else if (error?.message?.includes('Inspección no encontrada')) {
       userMessage = 'Inspección no encontrada';
+    } else if (error?.message?.includes('Target closed')) {
+      userMessage = 'El navegador se cerró inesperadamente';
     }
 
     const payload: any = {
       error: userMessage,
-      details: debug ? String(error?.message || error) : undefined,
+      details: String(error?.message || error),
+      hint: 'Intenta nuevamente o contacta al administrador si el problema persiste',
     };
 
     if (debug) {

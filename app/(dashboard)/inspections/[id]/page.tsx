@@ -660,6 +660,7 @@ export default function InspectionDetailPage() {
             </div>
             <SignaturePad
               label={signRole === 'mechanic' ? 'Firma del Mecánico' : 'Firma del Supervisor'}
+              storageKey={signRole === 'mechanic' ? 'inspector360.signature.modal.mechanic' : 'inspector360.signature.modal.supervisor'}
               onSave={async (sig) => {
                 if (!signRole) return;
                 if (!signName || signName.trim().length === 0) {
