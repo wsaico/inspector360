@@ -103,23 +103,33 @@ export default function DashboardPage() {
     loadStations();
   }, []);
 
+  // Mostrar loader mientras se carga la autenticación o los datos
+  if (authLoading || loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="text-center">
+          <ClipboardList className="h-12 w-12 animate-pulse text-primary mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Cargando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay usuario después de cargar, mostrar mensaje claro
+  if (!user) {
+    return (
+      <div className="flex h-96 flex-col items-center justify-center gap-4">
+        <AlertTriangle className="h-12 w-12 text-red-500" />
+        <p className="text-lg font-semibold">No hay sesión activa</p>
+        <p className="text-sm text-muted-foreground">
+          Por favor inicia sesión para acceder al dashboard
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Error message if profile failed to load */}
-      {status === 'unauthenticated' && !authLoading && !profile && (
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Sesión expirada o perfil no disponible</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{error || 'Tu sesión puede haber expirado. Inicia sesión nuevamente para ver datos de tu estación.'}</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Por favor contacta al administrador del sistema.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Welcome Section */}
       <div>
         <h2 className="text-3xl font-bold text-gray-900">

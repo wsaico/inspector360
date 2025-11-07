@@ -116,10 +116,25 @@ export default function CompliancePage() {
 
   const COLORS = ['#093071', '#8EBB37', '#F59E0B', '#EF4444'];
 
+  // Estado de carga: mostrar spinner mientras carga el perfil O los datos
   if (profileLoading || loading) {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Si no hay usuario después de cargar, el middleware debería redirigir
+  // Pero por si acaso, mostramos un mensaje claro
+  if (!user) {
+    return (
+      <div className="flex h-96 flex-col items-center justify-center gap-4">
+        <XCircle className="h-12 w-12 text-red-500" />
+        <p className="text-lg font-semibold">No hay sesión activa</p>
+        <p className="text-sm text-muted-foreground">
+          Por favor inicia sesión para ver el dashboard de cumplimiento
+        </p>
       </div>
     );
   }
@@ -132,9 +147,6 @@ export default function CompliancePage() {
         <p className="text-sm text-muted-foreground">
           Métricas y estadísticas de inspecciones
         </p>
-        {status === 'unauthenticated' && !profileLoading && (
-          <p className="mt-2 text-xs text-red-600">Sesión expirada o perfil no disponible. Inicia sesión para ver tus datos de estación.</p>
-        )}
       </div>
 
       {/* Filtros */}
