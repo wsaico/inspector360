@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, usePermissions } from '@/hooks';
@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Inspection } from '@/types';
-import { scopeInspectionsByStation } from '@/lib/utils/scope';
 import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel } from '@/lib/utils';
 
 export default function InspectionsPage() {
@@ -84,12 +83,8 @@ export default function InspectionsPage() {
     setLoading(false);
   };
 
-  const scopedInspections = useMemo(() => {
-    return scopeInspectionsByStation(inspections, {
-      station: profile?.station,
-      canViewAllStations,
-    });
-  }, [inspections, profile?.station, canViewAllStations]);
+  // NO hacer filtrado adicional - el backend YA filtró por estación en línea 52
+  const scopedInspections = inspections;
 
   const handleDelete = async (inspection: Inspection) => {
     if (!inspection?.id) return;
