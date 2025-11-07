@@ -151,11 +151,11 @@ export async function GET(
     const targetUrl = `${origin}/templates/forata057?id=${encodeURIComponent(id)}&pdf=1&print=true&logo=${logoParam}`;
     diag['targetUrl'] = targetUrl;
 
-    // Estrategia: En desarrollo local, priorizar Chrome instalado; en producción usar Chromium serverless
+    // Estrategia: En desarrollo local SIEMPRE usar Chrome local
     const isDev = process.env.NODE_ENV === 'development';
-    const isServerless = !!(process.env.AWS_REGION || process.env.VERCEL);
+    const isVercel = !!process.env.VERCEL;
 
-    if (isDev && !isServerless) {
+    if (isDev) {
       // Desarrollo local: usar Chrome local primero
       const localChrome = resolveLocalChromePath();
       diag['localChrome'] = localChrome || null;
@@ -191,7 +191,6 @@ export async function GET(
 
       try {
         // Configuración específica para Vercel
-        const isVercel = !!process.env.VERCEL;
         diag['isVercel'] = isVercel;
 
         // Obtener ejecutable de Chromium
