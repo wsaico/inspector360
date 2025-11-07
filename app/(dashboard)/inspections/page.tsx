@@ -31,7 +31,7 @@ import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel
 
 export default function InspectionsPage() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { canCreateInspections, canDeleteInspections } = usePermissions();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

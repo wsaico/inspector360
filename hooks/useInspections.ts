@@ -22,15 +22,23 @@ interface UseInspectionsOptions {
 
 export function useInspections(options: UseInspectionsOptions = {}) {
   const { page = 1, pageSize = 10, enabled = true } = options;
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { canViewAllStations } = usePermissions();
 
-  // Determinar filtro de estación
+  // ✅ FIX CRÍTICO: Determinar filtro de estación de forma ESTABLE
+  // Usar user.id para mantener queryKey consistente incluso si profile es null temporalmente
+  const userId = user?.id;
   const stationFilter = canViewAllStations ? undefined : (profile?.station || undefined);
 
   return useQuery({
-    // Query key: incluye page, pageSize y station para cache específico
-    queryKey: ['inspections', { page, pageSize, station: stationFilter }],
+    // ✅ Query key ESTABLE: usa userId en vez de station cuando no hay profile
+    // Esto evita que el cache se invalide cuando profile es null temporalmente
+    queryKey: ['inspections', {
+      page,
+      pageSize,
+      station: stationFilter,
+      userId: !canViewAllStations ? userId : undefined, // Mantiene cache estable
+    }],
 
     // Query function: llama al servicio
     queryFn: async () => {
@@ -47,13 +55,14 @@ export function useInspections(options: UseInspectionsOptions = {}) {
       return result;
     },
 
-    // Solo ejecutar si está habilitado y hay perfil
-    enabled: enabled && !!profile,
+    // ✅ FIX CRÍTICO: Solo requiere USER (no profile)
+    // Profile puede estar cargando en background, pero user ya está disponible
+    enabled: enabled && !!user,
 
     // Stale time: 2 minutos - evita re-fetches innecesarios
     staleTime: 1000 * 60 * 2,
 
-    // Keep previous data mientras carga nueva página
+    // ✅ Keep previous data mientras carga nueva página o profile
     placeholderData: (previousData) => previousData,
   });
 }
