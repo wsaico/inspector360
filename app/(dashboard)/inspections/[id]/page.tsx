@@ -35,7 +35,6 @@ import { Inspection, Observation } from '@/types';
 import { formatInspectionDate, hasPendingObservations, getMissingSignaturesLabel, isSupervisorSigned, isMechanicSigned } from '@/lib/utils';
 import { CHECKLIST_CATEGORIES } from '@/types';
 import Image from 'next/image';
-import { downloadInspectionPDF } from '@/lib/pdf/generator';
 import { getChecklistItem } from '@/lib/checklist-template';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -255,9 +254,21 @@ export default function InspectionDetailPage() {
 
     try {
       toast.loading('Generando PDF (FOR-ATA-057) ...');
-      await downloadInspectionPDF(inspection);
+
+      // Abrir la plantilla en una ventana para imprimir
+      const printWindow = window.open(
+        `/templates/forata057?id=${inspection.id}&pdf=1&print=true&logo=/logo.png`,
+        '_blank',
+        'width=1920,height=1080'
+      );
+
+      if (!printWindow) {
+        throw new Error('No se pudo abrir la ventana de impresión');
+      }
+
       toast.dismiss();
-      toast.success('PDF descargado correctamente');
+      toast.success('Abriendo vista de impresión...');
+
     } catch (error) {
       console.error('Error generando/descargando PDF:', error);
       toast.dismiss();
