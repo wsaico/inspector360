@@ -252,97 +252,19 @@ export default function InspectionDetailPage() {
   const handleDownloadPDF = async () => {
     if (!inspection) return;
 
-    const toastId = toast.loading('Generando PDF (FOR-ATA-057) ...');
-
     try {
-      // Importar html2pdf dinámicamente
-      const html2pdf = (await import('html2pdf.js')).default;
+      toast.loading('Generando PDF (FOR-ATA-057) ...');
 
-      // Crear iframe oculto para cargar la plantilla
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.top = '-10000px';
-      iframe.style.left = '-10000px';
-      iframe.style.width = '1920px';
-      iframe.style.height = '1080px';
-      document.body.appendChild(iframe);
+      // Abrir la plantilla directamente para usar window.print()
+      const url = `/templates/forata057?id=${inspection.id}&pdf=1&print=true&logo=/logo.png`;
+      window.open(url, '_blank');
 
-      // Cargar la plantilla en el iframe
-      iframe.src = `/templates/forata057?id=${inspection.id}&pdf=1&logo=/logo.png`;
-
-      // Esperar a que cargue la plantilla
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Timeout esperando plantilla'));
-        }, 15000);
-
-        iframe.onload = () => {
-          clearTimeout(timeout);
-          // Esperar a que __forata057_ready esté listo
-          const checkReady = setInterval(() => {
-            try {
-              const iframeWindow = iframe.contentWindow as any;
-              if (iframeWindow.__forata057_ready) {
-                clearInterval(checkReady);
-                resolve();
-              }
-            } catch (e) {
-              // Ignorar errores de cross-origin
-            }
-          }, 100);
-
-          // Timeout para checkReady
-          setTimeout(() => {
-            clearInterval(checkReady);
-            resolve(); // Continuar aunque no esté ready
-          }, 8000);
-        };
-
-        iframe.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error('Error cargando plantilla'));
-        };
-      });
-
-      // Obtener el contenido del iframe
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (!iframeDoc) {
-        throw new Error('No se pudo acceder al contenido de la plantilla');
-      }
-
-      const content = iframeDoc.body;
-
-      // Opciones de html2pdf
-      const opt = {
-        margin: 10,
-        filename: `FOR-ATA-057-${inspection.form_code || inspection.id}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          width: 1920,
-          height: 1080
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'landscape'
-        }
-      };
-
-      // Generar y descargar PDF
-      await html2pdf().set(opt).from(content).save();
-
-      // Limpiar
-      document.body.removeChild(iframe);
-
-      toast.dismiss(toastId);
-      toast.success('PDF descargado correctamente');
+      toast.dismiss();
+      toast.success('Abriendo PDF para descargar...');
 
     } catch (error: any) {
       console.error('Error generando/descargando PDF:', error);
-      toast.dismiss(toastId);
+      toast.dismiss();
       toast.error(`No se pudo generar el PDF: ${error.message}`);
     }
   };
