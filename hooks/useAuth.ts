@@ -56,194 +56,125 @@ export function useAuth() {
   };
 
   useEffect(() => {
-    // IMPORTANTE: Usar getUser() en lugar de getSession() para validación real
-    // getUser() valida el token con el servidor, getSession() solo lee localStorage
-    const getSession = async () => {
+    // IMPORTANTE: Confiar en el middleware para validación de sesión
+    // Solo cargar sesión inicial y escuchar cambios - sin validaciones periódicas
+    const initSession = async () => {
       try {
-        // Primero intentar validación real con el servidor
-        const userRes = await withTimeout(supabase.auth.getUser(), 10000);
+        // Intentar cargar sesión existente (sin timeout agresivo)
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-        if (!userRes) {
-          // Si tarda demasiado, marcar como no autenticado (no usar cache)
-          console.warn('[useAuth] Timeout al validar sesión con servidor');
-          clearPersisted();
-          setAuthState({ user: null, profile: null, loading: false, error: 'Tiempo de espera al validar sesión' });
-          return;
-        }
-
-        const { data: { user }, error } = userRes as { data: { user: SupabaseUser | null }, error: any };
-
-        // Error de autenticación: sesión inválida o expirada
         if (error) {
-          console.warn('[useAuth] Error de autenticación:', error.message);
+          console.warn('[useAuth] Error obteniendo sesión:', error.message);
           clearPersisted();
           setAuthState({ user: null, profile: null, loading: false, error: null });
           return;
         }
 
-        if (user) {
-          const loadedProfile = await loadUserProfile(user);
-          // Persistir para resiliencia temporal (solo como fallback de UI)
-          writePersisted(user, loadedProfile);
+        if (session?.user) {
+          // Cargar perfil en background - no bloquear UI
+          loadUserProfile(session.user).then((profile) => {
+            writePersisted(session.user, profile);
+          });
         } else {
-          // Sin usuario válido: limpiar y marcar no autenticado
+          // Sin sesión: limpiar estado
           clearPersisted();
           setAuthState({ user: null, profile: null, loading: false, error: null });
         }
       } catch (error) {
-        console.error('[useAuth] Error validando sesión:', error);
-        // NO mantener sesión en cache si hay error - seguridad primero
+        console.error('[useAuth] Error inicializando sesión:', error);
         clearPersisted();
-        setAuthState({ user: null, profile: null, loading: false, error: 'Error al cargar la sesión' });
+        setAuthState({ user: null, profile: null, loading: false, error: null });
       }
     };
 
-    getSession();
+    initSession();
 
-    // Escuchar cambios de autenticación
+    // Escuchar cambios de autenticación (login/logout/token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
+        console.log('[useAuth] Auth event:', event);
+
         if (session?.user) {
+          // Usuario autenticado - cargar perfil
           const loadedProfile = await loadUserProfile(session.user);
           writePersisted(session.user, loadedProfile);
-          return;
+        } else {
+          // Sesión terminada - limpiar
+          clearPersisted();
+          setAuthState({ user: null, profile: null, loading: false, error: null });
         }
-
-        // Sin sesión: tratar como sign out para evitar UI zombie
-        clearPersisted();
-        setAuthState({ user: null, profile: null, loading: false, error: null });
       }
     );
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
-
-  // Validación proactiva de sesión para detectar expiraciones
-  useEffect(() => {
-    const validateNow = async () => {
-      try {
-        // Usar getUser() para validación real con servidor
-        const res = await withTimeout(supabase.auth.getUser(), 8000);
-
-        if (!res) {
-          console.warn('[useAuth] Timeout en validación periódica de sesión');
-          return;
-        }
-
-        const { data: { user }, error } = res as { data: { user: SupabaseUser | null }, error: any };
-
-        if (error || !user) {
-          // Sesión expirada detectada
-          console.warn('[useAuth] Sesión expirada detectada en validación periódica');
-          clearPersisted();
-          setAuthState({ user: null, profile: null, loading: false, error: null });
-        } else if (user && authState.user) {
-          // Sesión válida: actualizar perfil si es necesario
-          const loadedProfile = await loadUserProfile(user);
-          writePersisted(user, loadedProfile);
-        }
-      } catch (error) {
-        console.error('[useAuth] Error en validación periódica:', error);
-        // No cerrar sesión por error puntual de red
-      }
-    };
-
-    const interval = setInterval(validateNow, 2 * 60 * 1000); // cada 2 minutos (más frecuente)
-
-    const onVisibleOrOnline = () => {
-      // Al volver al foco o conexión, validar inmediatamente
-      validateNow();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') onVisibleOrOnline();
-      });
-      window.addEventListener('online', onVisibleOrOnline);
-    }
-
-    return () => {
-      clearInterval(interval);
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('online', onVisibleOrOnline);
-      }
-    };
-  }, [authState.user]);
+  }, []); // Solo ejecutar una vez al montar
 
   const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<UserProfile | null> => {
     try {
-      const profileRes = await withTimeout(
-        supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', supabaseUser.id)
-          .single(),
-        15000
-      );
+      // Cargar perfil sin timeout - confiar en RLS y Supabase
+      const { data: profile, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
 
-      // Si el perfil tarda, no bloquear: usar metadata como fallback
-      if (!profileRes) {
+      if (error) {
+        // Usar metadata como fallback
         const metaProfile = buildProfileFromMetadata(supabaseUser);
+        console.warn('[useAuth] Error cargando perfil, usando metadata:', error.message);
+
         if (metaProfile) {
-          setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: 'Perfil cargado parcialmente (timeout DB)' });
-          console.warn('Perfil cargado desde metadata por timeout de DB');
+          setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
           return metaProfile;
         }
-        // Sin metadata útil, mantener usuario y error
-        setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Tiempo de espera al obtener perfil' });
+
+        // Sin perfil disponible
+        setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Error al cargar perfil' });
         return null;
       }
 
-      const { data: profile, error } = profileRes as { data: any, error: any };
-
-      if (error) {
-        const metaProfile = buildProfileFromMetadata(supabaseUser);
-        const errMsg = (error && (error.message || JSON.stringify(error))) || 'Error desconocido';
-        console.warn('Error loading user profile:', errMsg);
-        if (metaProfile) {
-          setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: `Perfil parcial: ${errMsg}` });
-          return metaProfile;
-        }
-        throw new Error(errMsg);
-      }
-
       if (!profile) {
+        // Intentar metadata
         const metaProfile = buildProfileFromMetadata(supabaseUser);
         if (metaProfile) {
-          setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: 'Perfil cargado parcialmente (no encontrado en DB)' });
-          console.warn('Perfil cargado desde metadata por ausencia en DB');
+          setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
           return metaProfile;
         }
-        throw new Error('No se encontró el perfil del usuario');
+
+        setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Perfil no encontrado' });
+        return null;
       }
 
+      // Verificar usuario activo
       const isActive = profile.is_active === true || profile.is_active === 'true';
       if (!isActive) {
-        // Usuario inactivo: mantener usuario para permitir signOut pero indicar error
         setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Usuario inactivo' });
         return null;
       }
 
+      // Perfil cargado exitosamente
       setAuthState({
         user: supabaseUser,
         profile: profile as UserProfile,
         loading: false,
         error: null,
       });
+
       return profile as UserProfile;
     } catch (error: any) {
-      console.error('Failed to load user profile:', error?.message || error);
+      console.error('[useAuth] Error inesperado cargando perfil:', error);
+
+      // Intentar metadata como último recurso
       const metaProfile = buildProfileFromMetadata(supabaseUser);
       if (metaProfile) {
-        setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: `Perfil parcial: ${error?.message || 'Error desconocido'}` });
+        setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
         return metaProfile;
-      } else {
-        // IMPORTANTE: NO cerrar sesión del usuario, solo mostrar error para evitar loop
-        setAuthState({ user: supabaseUser, profile: null, loading: false, error: `Error al cargar perfil: ${error?.message || 'Error'}` });
-        return null;
       }
+
+      setAuthState({ user: supabaseUser, profile: null, loading: false, error: 'Error al cargar perfil' });
+      return null;
     }
   };
 
@@ -251,35 +182,20 @@ export function useAuth() {
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
 
-      const signInRes = await withTimeout(
-        supabase.auth.signInWithPassword({
-          email,
-          password,
-        }),
-        5000
-      );
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (!signInRes) {
-        const errorMessage = 'Tiempo de espera al iniciar sesión';
+      if (error) {
+        const errorMessage = error.message || 'Error al iniciar sesión';
         setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }));
         return { success: false, error: errorMessage };
       }
 
-      const { data, error } = signInRes as { data: { user: SupabaseUser | null }, error: any };
-
-      if (error) throw error;
-
       if (data.user) {
-        // Fast-path: no bloquear inicio por carga de perfil
+        // onAuthStateChange se encargará de cargar el perfil
         setAuthState(prev => ({ ...prev, user: data.user, loading: false }));
-        // Carga y persistencia del perfil en background
-        loadUserProfile(data.user)
-          .then((loadedProfile) => {
-            writePersisted(data.user!, loadedProfile);
-          })
-          .catch(() => {
-            // Ignorar fallos puntuales de perfil; usuario ya quedó autenticado
-          });
       }
 
       return { success: true, error: null };

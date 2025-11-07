@@ -63,16 +63,6 @@ export default function InspectionsPage() {
     const { data, error, total: t } = result as any;
 
     if (error) {
-      // Detectar sesión expirada
-      if (error === 'SESSION_EXPIRED') {
-        console.warn('[InspectionsPage] Sesión expirada detectada');
-        toast.error('Tu sesión ha expirado. Redirigiendo al login...', { duration: 3000 });
-        setInspections([]);
-        setLoading(false);
-        setTimeout(() => router.push('/login'), 1500);
-        return;
-      }
-
       toast.error('Error al cargar inspecciones');
       console.error('[InspectionsPage] Error:', error);
       setInspections([]);

@@ -2,13 +2,12 @@
  * Servicio de Inspecciones
  * Gestiona todas las operaciones CRUD de inspecciones
  *
- * IMPORTANTE: Todas las operaciones validan la sesión antes de ejecutar
- * para prevenir operaciones fallidas con sesiones expiradas
+ * IMPORTANTE: El middleware valida la sesión en cada request.
+ * RLS policies de Supabase protegen los datos según el rol del usuario.
  */
 
 import { supabase } from '@/lib/supabase/client';
 import { Inspection, Equipment } from '@/types';
-import { withSessionValidation, SessionError } from '@/lib/supabase/session-validator';
 
 export class InspectionService {
   /**
@@ -57,48 +56,40 @@ export class InspectionService {
    */
   static async getInspections(opts?: { page?: number; pageSize?: number; station?: string; start?: string; end?: string }) {
     try {
-      return await withSessionValidation(async () => {
-        const page = opts?.page && opts.page > 0 ? opts.page : 1;
-        const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 10; // DEFAULT 10 en vez de 0
-        const from = (page - 1) * pageSize;
-        const to = from + pageSize - 1;
+      const page = opts?.page && opts.page > 0 ? opts.page : 1;
+      const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 10;
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-        // Query OPTIMIZADO: solo traer lo necesario
-        let query = supabase
-          .from('inspections')
-          .select('id, form_code, station, inspection_date, inspection_type, inspector_name, status, created_at, updated_at, supervisor_name, supervisor_signature_url, mechanic_name, mechanic_signature_url', { count: 'exact' })
-          .order('created_at', { ascending: false });
+      // Query OPTIMIZADO: solo traer lo necesario para el listado
+      let query = supabase
+        .from('inspections')
+        .select('id, form_code, station, inspection_date, inspection_type, inspector_name, status, created_at, updated_at, supervisor_name, supervisor_signature_url, mechanic_name, mechanic_signature_url', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-        // Filtros opcionales por estación y rango de fechas
-        if (opts?.station) {
-          query = query.eq('station', opts.station);
-        }
-        if (opts?.start) {
-          query = query.gte('created_at', opts.start);
-        }
-        if (opts?.end) {
-          query = query.lte('created_at', opts.end);
-        }
-
-        // SIEMPRE aplicar paginación
-        const inspectionsRes = await query.range(from, to);
-
-        const { data: inspections, error: inspectionsError, count } = inspectionsRes as any;
-
-        if (inspectionsError) {
-          console.error('[InspectionService] Error fetching inspections:', inspectionsError);
-          throw inspectionsError;
-        }
-
-        // NO cargar equipment ni observations aquí - solo para listado rápido
-        // Si necesitan detalles, usar getInspectionById()
-        return { data: inspections || [], error: null, total: count ?? 0, page, pageSize };
-      }, 'Get Inspections');
-    } catch (error: any) {
-      if (error instanceof SessionError) {
-        console.error('[InspectionService] Session error:', error.message);
-        return { data: null, error: 'SESSION_EXPIRED' };
+      // Filtros opcionales por estación y rango de fechas
+      if (opts?.station) {
+        query = query.eq('station', opts.station);
       }
+      if (opts?.start) {
+        query = query.gte('created_at', opts.start);
+      }
+      if (opts?.end) {
+        query = query.lte('created_at', opts.end);
+      }
+
+      // SIEMPRE aplicar paginación
+      const { data: inspections, error: inspectionsError, count } = await query.range(from, to);
+
+      if (inspectionsError) {
+        console.error('[InspectionService] Error fetching inspections:', inspectionsError);
+        return { data: null, error: inspectionsError.message };
+      }
+
+      // NO cargar equipment ni observations aquí - solo para listado rápido
+      // Si necesitan detalles, usar getInspectionById()
+      return { data: inspections || [], error: null, total: count ?? 0, page, pageSize };
+    } catch (error: any) {
       console.error('[InspectionService] Error fetching inspections:', error);
       return { data: null, error: error.message };
     }
