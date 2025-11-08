@@ -93,9 +93,18 @@ export default function Step1General() {
   };
 
   return (
-    <Card>
+    <Card className="border-2 border-blue-200 shadow-lg">
+      <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-600" />
       <CardHeader>
-        <CardTitle>Información General de la Inspección</CardTitle>
+        <CardTitle className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+            <FileText className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-blue-900">Información General de la Inspección</h3>
+            <p className="text-sm text-gray-600 font-normal">Complete los datos básicos de la inspección técnica</p>
+          </div>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-6 md:grid-cols-2">
@@ -217,13 +226,23 @@ export default function Step1General() {
           </div>
 
           {/* Información Importante */}
-          <div className="rounded-lg bg-blue-50 p-4">
-            <p className="text-sm text-blue-900">
-              <strong>📋 Información:</strong> Los datos ingresados aquí se
-              utilizarán para generar el código de formulario (FOR-ATA-057) y
-              aparecerán en el PDF final de la inspección.
-            </p>
-          </div>
+          <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                  <svg className="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-blue-900 mb-1">Información Importante</h4>
+                  <p className="text-sm text-blue-800">
+                    Los datos ingresados aquí se utilizarán para generar el código de formulario <span className="font-semibold">(FOR-ATA-057)</span> y aparecerán en el PDF final de la inspección.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
   );

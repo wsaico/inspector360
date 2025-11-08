@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
 import { ChecklistItem } from '@/types';
-import { CheckCircle2, XCircle, MinusCircle, Package, PenLine } from 'lucide-react';
+import { CheckCircle2, XCircle, MinusCircle, Package, PenLine, CheckSquare } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
 import { toast } from 'sonner';
@@ -85,90 +85,248 @@ export default function Step3Checklist() {
 
   return (
     <div className="space-y-6">
-      {/* Selector de Equipo */}
-      <Card>
+      {/* Selector de Equipo Moderno */}
+      <Card className="border-2 border-purple-200 shadow-lg">
+        <div className="h-1.5 bg-gradient-to-r from-purple-500 to-purple-600" />
         <CardHeader>
-          <CardTitle>Seleccionar Equipo</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-purple-900">
+            <Package className="h-5 w-5 text-purple-600" />
+            Seleccionar Equipo para Inspección
+          </CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-2 flex-wrap">
-          {formData.equipment.map((eq, index) => (
-            <Button
-              key={eq.code}
-              variant={selectedEquipment === index ? 'default' : 'outline'}
-              onClick={() => setSelectedEquipment(index)}
-            >
-              <Package className="mr-2 h-4 w-4" />
-              {eq.code}
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
+        <CardContent className="flex gap-3 flex-wrap">
+          {formData.equipment.map((eq, index) => {
+            const equipmentChecklist = formData.checklists[eq.code] || {};
+            const equipmentProgress = Math.round((Object.keys(equipmentChecklist).length / CHECKLIST_TEMPLATE.length) * 100);
+            const isSelected = selectedEquipment === index;
+            const isComplete = equipmentProgress === 100;
 
-      {/* Progreso */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Progreso del Checklist</span>
-            <span className="text-sm font-bold">{getProgress()}%</span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-gray-200">
-            <div
-              className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${getProgress()}%` }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Checklist plano (sin títulos de categoría) */}
-      <Card>
-        <CardContent className="space-y-4">
-          {CHECKLIST_TEMPLATE.map((item) => {
-            const value = currentChecklist[item.code];
             return (
-              <div key={item.code} className="space-y-3 rounded-lg border p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold">{item.code}</p>
-                    <p className="text-sm">{item.description}</p>
+              <button
+                key={eq.code}
+                onClick={() => setSelectedEquipment(index)}
+                className={`relative overflow-hidden rounded-xl p-4 transition-all duration-200 min-w-[140px] ${
+                  isSelected
+                    ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg scale-105'
+                    : 'bg-white border-2 border-purple-200 text-purple-900 hover:border-purple-400 hover:shadow-md'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
+                    isSelected ? 'bg-white/20' : 'bg-purple-100'
+                  }`}>
+                    <Package className={`h-5 w-5 ${isSelected ? 'text-white' : 'text-purple-600'}`} />
                   </div>
-                  {value?.status && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                  <span className="text-sm font-bold">{eq.code}</span>
+                  <div className="flex items-center gap-1">
+                    {isComplete ? (
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                        isSelected ? 'bg-white/20' : 'bg-green-100'
+                      }`}>
+                        <CheckCircle2 className={`h-3 w-3 ${isSelected ? 'text-white' : 'text-green-600'}`} />
+                        <span className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-green-700'}`}>
+                          100%
+                        </span>
+                      </div>
+                    ) : (
+                      <span className={`text-xs font-semibold ${isSelected ? 'text-white/90' : 'text-purple-600'}`}>
+                        {equipmentProgress}%
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    variant={value?.status === 'conforme' ? 'default' : 'outline'}
-                    onClick={() => handleStatusChange(item.code, 'conforme')}
-                  >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Conforme
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    variant={value?.status === 'no_conforme' ? 'default' : 'outline'}
-                    onClick={() => handleStatusChange(item.code, 'no_conforme')}
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    No Conforme
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    variant={value?.status === 'no_aplica' ? 'default' : 'outline'}
-                    onClick={() => handleStatusChange(item.code, 'no_aplica')}
-                  >
-                    <MinusCircle className="mr-2 h-4 w-4" />
-                    No Aplica
-                  </Button>
-                </div>
-                {/* Observación por ítem removida según requerimiento */}
-              </div>
+              </button>
             );
           })}
         </CardContent>
       </Card>
+
+      {/* Progreso Moderno con Gradiente */}
+      <Card className={`border-2 shadow-lg ${
+        getProgress() === 100
+          ? 'border-green-200 bg-gradient-to-r from-green-50/30 to-white'
+          : 'border-blue-200 bg-gradient-to-r from-blue-50/30 to-white'
+      }`}>
+        <CardContent className="pt-5 pb-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
+                getProgress() === 100
+                  ? 'bg-gradient-to-br from-green-500 to-green-600'
+                  : 'bg-gradient-to-br from-blue-500 to-blue-600'
+              }`}>
+                <CheckSquare className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">Progreso del Checklist</p>
+                <p className="text-xs text-gray-500">{currentEquipment?.code}</p>
+              </div>
+            </div>
+            <div className={`px-4 py-2 rounded-xl ${
+              getProgress() === 100
+                ? 'bg-gradient-to-br from-green-500 to-green-600'
+                : 'bg-gradient-to-br from-blue-500 to-blue-600'
+            }`}>
+              <span className="text-2xl font-bold text-white">{getProgress()}%</span>
+            </div>
+          </div>
+          <div className="relative h-3 w-full rounded-full bg-gray-200 overflow-hidden">
+            <div
+              className={`h-3 rounded-full transition-all duration-500 ${
+                getProgress() === 100
+                  ? 'bg-gradient-to-r from-green-500 to-green-600'
+                  : 'bg-gradient-to-r from-blue-500 to-blue-600'
+              }`}
+              style={{ width: `${getProgress()}%` }}
+            />
+            {getProgress() === 100 && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <CheckCircle2 className="h-4 w-4 text-white" />
+              </div>
+            )}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
+            <span>{Object.keys(currentChecklist).length} de {CHECKLIST_TEMPLATE.length} items completados</span>
+            {getProgress() === 100 && (
+              <span className="flex items-center gap-1 text-green-600 font-semibold">
+                <CheckCircle2 className="h-3 w-3" />
+                ¡Completado!
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Checklist Moderno con Iconos SVG Premium */}
+      <div className="space-y-3">
+        {CHECKLIST_TEMPLATE.map((item, index) => {
+          const value = currentChecklist[item.code];
+          const isCompleted = !!value?.status;
+
+          return (
+            <Card
+              key={item.code}
+              className={`transition-all duration-300 hover:shadow-md ${
+                isCompleted
+                  ? value?.status === 'conforme'
+                    ? 'border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/30 to-white'
+                    : value?.status === 'no_conforme'
+                    ? 'border-l-4 border-l-red-500 bg-gradient-to-r from-red-50/30 to-white'
+                    : 'border-l-4 border-l-gray-400 bg-gradient-to-r from-gray-50/30 to-white'
+                  : 'border-l-4 border-l-blue-200'
+              }`}
+            >
+              <CardContent className="pt-4 pb-4">
+                <div className="space-y-3">
+                  {/* Header del Item */}
+                  <div className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center ${
+                      isCompleted
+                        ? value?.status === 'conforme'
+                          ? 'bg-gradient-to-br from-green-500 to-green-600 shadow-md'
+                          : value?.status === 'no_conforme'
+                          ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-md'
+                          : 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-md'
+                        : 'bg-gradient-to-br from-blue-100 to-blue-200'
+                    }`}>
+                      <span className={`text-sm font-bold ${isCompleted ? 'text-white' : 'text-blue-600'}`}>
+                        {index + 1}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">{item.code}</p>
+                          <p className="text-sm text-gray-600 mt-0.5">{item.description}</p>
+                        </div>
+                        {isCompleted && (
+                          <div className="flex-shrink-0">
+                            {value?.status === 'conforme' && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-100">
+                                <svg className="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs font-semibold text-green-700">OK</span>
+                              </div>
+                            )}
+                            {value?.status === 'no_conforme' && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100">
+                                <svg className="h-4 w-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs font-semibold text-red-700">NO</span>
+                              </div>
+                            )}
+                            {value?.status === 'no_aplica' && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100">
+                                <svg className="h-4 w-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs font-semibold text-gray-700">N/A</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botones de Estado con Iconos SVG Premium */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleStatusChange(item.code, 'conforme')}
+                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${
+                        value?.status === 'conforme'
+                          ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg scale-105'
+                          : 'bg-white border-2 border-green-200 text-green-700 hover:border-green-400 hover:bg-green-50'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <svg className={`h-6 w-6 ${value?.status === 'conforme' ? 'text-white' : 'text-green-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold">Conforme</span>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => handleStatusChange(item.code, 'no_conforme')}
+                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${
+                        value?.status === 'no_conforme'
+                          ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg scale-105'
+                          : 'bg-white border-2 border-red-200 text-red-700 hover:border-red-400 hover:bg-red-50'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <svg className={`h-6 w-6 ${value?.status === 'no_conforme' ? 'text-white' : 'text-red-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold">No Conforme</span>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => handleStatusChange(item.code, 'no_aplica')}
+                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${
+                        value?.status === 'no_aplica'
+                          ? 'bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-lg scale-105'
+                          : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <svg className={`h-6 w-6 ${value?.status === 'no_aplica' ? 'text-white' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-xs font-semibold">No Aplica</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Firma del Inspector por Equipo */}
       {isChecklistComplete() && (

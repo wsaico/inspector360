@@ -24,13 +24,21 @@ export default function Step4Finalize() {
   const [mechanicSignature, setMechanicSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Estado para rastrear el nombre guardado junto con la firma
+  const [savedSupervisorName, setSavedSupervisorName] = useState<string | null>(null);
+  const [savedMechanicName, setSavedMechanicName] = useState<string | null>(null);
+
   // Prefill names from localStorage
   useEffect(() => {
     try {
       const supName = typeof window !== 'undefined' ? localStorage.getItem('inspections.supervisorName') : null;
       const mecName = typeof window !== 'undefined' ? localStorage.getItem('inspections.mechanicName') : null;
+      const supSig = typeof window !== 'undefined' ? localStorage.getItem('inspector360.signature.supervisor') : null;
+      const mecSig = typeof window !== 'undefined' ? localStorage.getItem('inspector360.signature.mechanic') : null;
+
       if (supName) {
         setSupervisorName(supName);
+        setSavedSupervisorName(supName);
         setSignatures({
           ...formData.signatures,
           supervisor_name: supName,
@@ -38,10 +46,18 @@ export default function Step4Finalize() {
       }
       if (mecName) {
         setMechanicName(mecName);
+        setSavedMechanicName(mecName);
         setSignatures({
           ...formData.signatures,
           mechanic_name: mecName,
         });
+      }
+      // Solo cargar firmas si los nombres coinciden
+      if (supSig && supName) {
+        setSupervisorSignature(supSig);
+      }
+      if (mecSig && mecName) {
+        setMechanicSignature(mecSig);
       }
     } catch {}
   }, []);
@@ -52,11 +68,54 @@ export default function Step4Finalize() {
       if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', supervisorName || '');
     } catch {}
   }, [supervisorName]);
+
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', mechanicName || '');
     } catch {}
   }, [mechanicName]);
+
+  // VALIDACIÓN: Invalidar firma del supervisor si el nombre cambia
+  useEffect(() => {
+    if (savedSupervisorName && supervisorName && savedSupervisorName !== supervisorName) {
+      // El nombre cambió, invalidar firma
+      setSupervisorSignature(null);
+      setSavedSupervisorName(supervisorName);
+      setSignatures({
+        ...formData.signatures,
+        supervisor_signature: null,
+        supervisor_name: supervisorName,
+      });
+      // Limpiar firma guardada en localStorage
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('inspector360.signature.supervisor');
+        }
+      } catch {}
+      toast.info('Firma del supervisor invalidada. Por favor firme nuevamente.', { duration: 3000 });
+    }
+  }, [supervisorName, savedSupervisorName]);
+
+  // VALIDACIÓN: Invalidar firma del mecánico si el nombre cambia
+  useEffect(() => {
+    if (savedMechanicName && mechanicName && savedMechanicName !== mechanicName) {
+      // El nombre cambió, invalidar firma
+      setMechanicSignature(null);
+      setSavedMechanicName(mechanicName);
+      setSignatures({
+        ...formData.signatures,
+        mechanic_signature: null,
+        mechanic_name: mechanicName,
+      });
+      // Limpiar firma guardada en localStorage
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('inspector360.signature.mechanic');
+        }
+      } catch {}
+      toast.info('Firma del mecánico invalidada. Por favor firme nuevamente.', { duration: 3000 });
+    }
+  }, [mechanicName, savedMechanicName]);
 
   const handleComplete = async () => {
 
