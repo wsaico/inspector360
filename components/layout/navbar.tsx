@@ -133,8 +133,8 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-3">
+        {/* Logo - Solo visible en móvil y tablet */}
+        <Link href="/dashboard" className="flex items-center gap-3 lg:hidden">
           <img src="/I360.svg" alt="Inspector 360" className="h-8 md:h-10 w-auto" />
         </Link>
         <div>
