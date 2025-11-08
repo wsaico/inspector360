@@ -28,13 +28,13 @@ ON inspections(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inspections_station_created
 ON inspections(station, created_at DESC);
 
--- Índice para búsquedas por inspector
-CREATE INDEX IF NOT EXISTS idx_inspections_inspector_id
-ON inspections(inspector_id);
-
 -- Índice para código de formulario
 CREATE INDEX IF NOT EXISTS idx_inspections_form_code
 ON inspections(form_code);
+
+-- Índice para tipo de inspección
+CREATE INDEX IF NOT EXISTS idx_inspections_type
+ON inspections(inspection_type);
 
 -- Índice para user_profiles por estación
 CREATE INDEX IF NOT EXISTS idx_user_profiles_station
