@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { inspectionGeneralSchema, InspectionGeneralFormData } from '@/lib/validations';
 import { STATIONS, INSPECTION_TYPES } from '@/types';
 import { StationsService } from '@/lib/services/stations';
+import { InspectionService } from '@/lib/services/inspections';
 // Nota: Tipamos estación usando el esquema de validación para evitar que se infiera como string
 import { Calendar, MapPin, User, FileText } from 'lucide-react';
 
@@ -25,6 +26,8 @@ export default function Step1General() {
   const { canViewAllStations } = usePermissions();
   const { formData, setGeneralInfo } = useInspectionForm();
   const [stationOptions, setStationOptions] = React.useState<{ code: string; name: string }[]>([]);
+  const [inspectorNames, setInspectorNames] = React.useState<string[]>([]);
+  const [showInspectorSuggestions, setShowInspectorSuggestions] = React.useState(false);
 
   const {
     register,
@@ -63,6 +66,18 @@ export default function Step1General() {
     };
     loadStations();
   }, []);
+
+  // Cargar nombres de inspectores cuando cambia la estación
+  React.useEffect(() => {
+    const station = (document.getElementById('station') as HTMLSelectElement)?.value;
+    if (station) {
+      const loadInspectorNames = async () => {
+        const { data } = await InspectionService.getUniqueInspectorNames(station);
+        setInspectorNames(data || []);
+      };
+      loadInspectorNames();
+    }
+  }, [formData.general?.station]);
 
   // Si el perfil llega tarde, sincronizar la estación por defecto
   // y mantenerla fija para usuarios sin permiso global
@@ -163,8 +178,8 @@ export default function Step1General() {
               )}
             </div>
 
-            {/* Nombre del Inspector */}
-            <div className="space-y-2">
+            {/* Nombre del Inspector con Autocompletado */}
+            <div className="space-y-2 relative">
               <Label htmlFor="inspector_name" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Nombre del Inspector
@@ -174,14 +189,48 @@ export default function Step1General() {
                 id="inspector_name"
                 {...register('inspector_name')}
                 placeholder="Nombre completo del inspector"
+                autoComplete="off"
+                onFocus={() => setShowInspectorSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowInspectorSuggestions(false), 200)}
                 onChange={(e) => {
                   register('inspector_name').onChange(e);
                   handleFieldChange();
                 }}
               />
+              {/* Sugerencias de autocompletado */}
+              {showInspectorSuggestions && inspectorNames.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {inspectorNames
+                    .filter(name => {
+                      const inputValue = (document.getElementById('inspector_name') as HTMLInputElement)?.value || '';
+                      return name.toLowerCase().includes(inputValue.toLowerCase());
+                    })
+                    .slice(0, 5)
+                    .map((name, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm transition-colors flex items-center gap-2"
+                        onClick={() => {
+                          setValue('inspector_name', name);
+                          handleFieldChange();
+                          setShowInspectorSuggestions(false);
+                        }}
+                      >
+                        <User className="h-4 w-4 text-gray-400" />
+                        {name}
+                      </button>
+                    ))}
+                </div>
+              )}
               {errors.inspector_name && (
                 <p className="text-sm text-red-500">
                   {errors.inspector_name.message}
+                </p>
+              )}
+              {inspectorNames.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  💡 Nombres usados previamente en esta estación
                 </p>
               )}
             </div>

@@ -28,6 +28,12 @@ export default function Step4Finalize() {
   const [savedSupervisorName, setSavedSupervisorName] = useState<string | null>(null);
   const [savedMechanicName, setSavedMechanicName] = useState<string | null>(null);
 
+  // Estados para autocompletado de nombres
+  const [supervisorNames, setSupervisorNames] = useState<string[]>([]);
+  const [mechanicNames, setMechanicNames] = useState<string[]>([]);
+  const [showSupervisorSuggestions, setShowSupervisorSuggestions] = useState(false);
+  const [showMechanicSuggestions, setShowMechanicSuggestions] = useState(false);
+
   // Prefill names from localStorage
   useEffect(() => {
     try {
@@ -116,6 +122,22 @@ export default function Step4Finalize() {
       toast.info('Firma del mecánico invalidada. Por favor firme nuevamente.', { duration: 3000 });
     }
   }, [mechanicName, savedMechanicName]);
+
+  // Cargar nombres de supervisores y mecánicos cuando se monta el componente
+  useEffect(() => {
+    const station = formData.general?.station;
+    if (station) {
+      const loadNames = async () => {
+        const [supervisorRes, mechanicRes] = await Promise.all([
+          InspectionService.getUniqueSupervisorNames(station),
+          InspectionService.getUniqueMechanicNames(station),
+        ]);
+        setSupervisorNames(supervisorRes.data || []);
+        setMechanicNames(mechanicRes.data || []);
+      };
+      loadNames();
+    }
+  }, [formData.general?.station]);
 
   const handleComplete = async () => {
 
@@ -270,11 +292,14 @@ export default function Step4Finalize() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
             <Label htmlFor="supervisor-name" className="text-sm font-medium">Nombre del Supervisor</Label>
             <Input
               id="supervisor-name"
               value={supervisorName}
+              autoComplete="off"
+              onFocus={() => setShowSupervisorSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSupervisorSuggestions(false), 200)}
               onChange={(e) => {
                 const value = e.target.value;
                 setSupervisorName(value);
@@ -286,8 +311,34 @@ export default function Step4Finalize() {
               placeholder="Ej: Juan Pérez García"
               className="bg-white"
             />
+            {/* Sugerencias de autocompletado para supervisor */}
+            {showSupervisorSuggestions && supervisorNames.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {supervisorNames
+                  .filter(name => name.toLowerCase().includes(supervisorName.toLowerCase()))
+                  .slice(0, 5)
+                  .map((name, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm transition-colors flex items-center gap-2"
+                      onClick={() => {
+                        setSupervisorName(name);
+                        setSignatures({
+                          ...formData.signatures,
+                          supervisor_name: name,
+                        });
+                        setShowSupervisorSuggestions(false);
+                      }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-gray-400" />
+                      {name}
+                    </button>
+                  ))}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              💾 Se guarda automáticamente para la próxima inspección
+              {supervisorNames.length > 0 ? '💡 Nombres usados previamente en esta estación' : '💾 Se guarda automáticamente para la próxima inspección'}
             </p>
           </div>
           <SignaturePad
@@ -325,11 +376,14 @@ export default function Step4Finalize() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
             <Label htmlFor="mechanic-name" className="text-sm font-medium">Nombre del Mecánico</Label>
             <Input
               id="mechanic-name"
               value={mechanicName}
+              autoComplete="off"
+              onFocus={() => setShowMechanicSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowMechanicSuggestions(false), 200)}
               onChange={(e) => {
                 const value = e.target.value;
                 setMechanicName(value);
@@ -341,8 +395,34 @@ export default function Step4Finalize() {
               placeholder="Ej: María López Ruiz"
               className="bg-white"
             />
+            {/* Sugerencias de autocompletado para mecánico */}
+            {showMechanicSuggestions && mechanicNames.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {mechanicNames
+                  .filter(name => name.toLowerCase().includes(mechanicName.toLowerCase()))
+                  .slice(0, 5)
+                  .map((name, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="w-full text-left px-4 py-2 hover:bg-green-50 text-sm transition-colors flex items-center gap-2"
+                      onClick={() => {
+                        setMechanicName(name);
+                        setSignatures({
+                          ...formData.signatures,
+                          mechanic_name: name,
+                        });
+                        setShowMechanicSuggestions(false);
+                      }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-gray-400" />
+                      {name}
+                    </button>
+                  ))}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              💾 Se guarda automáticamente para la próxima inspección
+              {mechanicNames.length > 0 ? '💡 Nombres usados previamente en esta estación' : '💾 Se guarda automáticamente para la próxima inspección'}
             </p>
           </div>
           <SignaturePad

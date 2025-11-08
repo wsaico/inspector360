@@ -532,6 +532,99 @@ export class InspectionService {
   }
 
   /**
+   * Obtiene nombres únicos de inspectores usados previamente en una estación
+   * Para autocompletado y reutilización
+   */
+  static async getUniqueInspectorNames(station: string) {
+    try {
+      const { data, error } = await supabase
+        .from('inspections')
+        .select('inspector_name')
+        .eq('station', station)
+        .not('inspector_name', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Eliminar duplicados y vacíos
+      const uniqueNames = Array.from(
+        new Set(
+          (data || [])
+            .map((item) => item.inspector_name?.trim())
+            .filter((name): name is string => !!name && name.length > 0)
+        )
+      );
+
+      return { data: uniqueNames, error: null };
+    } catch (error: any) {
+      console.error('Error fetching unique inspector names:', error);
+      return { data: [], error: error.message };
+    }
+  }
+
+  /**
+   * Obtiene nombres únicos de supervisores usados previamente en una estación
+   * Para autocompletado y reutilización
+   */
+  static async getUniqueSupervisorNames(station: string) {
+    try {
+      const { data, error } = await supabase
+        .from('inspections')
+        .select('supervisor_name')
+        .eq('station', station)
+        .not('supervisor_name', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Eliminar duplicados y vacíos
+      const uniqueNames = Array.from(
+        new Set(
+          (data || [])
+            .map((item) => item.supervisor_name?.trim())
+            .filter((name): name is string => !!name && name.length > 0)
+        )
+      );
+
+      return { data: uniqueNames, error: null };
+    } catch (error: any) {
+      console.error('Error fetching unique supervisor names:', error);
+      return { data: [], error: error.message };
+    }
+  }
+
+  /**
+   * Obtiene nombres únicos de mecánicos usados previamente en una estación
+   * Para autocompletado y reutilización
+   */
+  static async getUniqueMechanicNames(station: string) {
+    try {
+      const { data, error } = await supabase
+        .from('inspections')
+        .select('mechanic_name')
+        .eq('station', station)
+        .not('mechanic_name', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Eliminar duplicados y vacíos
+      const uniqueNames = Array.from(
+        new Set(
+          (data || [])
+            .map((item) => item.mechanic_name?.trim())
+            .filter((name): name is string => !!name && name.length > 0)
+        )
+      );
+
+      return { data: uniqueNames, error: null };
+    } catch (error: any) {
+      console.error('Error fetching unique mechanic names:', error);
+      return { data: [], error: error.message };
+    }
+  }
+
+  /**
    * Actualiza la respuesta del mecánico para una observación
    */
   static async updateObservationMaintenance(
