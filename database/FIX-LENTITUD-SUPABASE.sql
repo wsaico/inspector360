@@ -45,15 +45,16 @@ CREATE INDEX IF NOT EXISTS idx_equipment_inspection_id
 ON equipment(inspection_id);
 
 -- ============================================
--- PARTE 2: VACUUM Y ANALYZE (Mantenimiento)
+-- PARTE 2: ANALYZE (Optimización de estadísticas)
 -- ============================================
 
 -- Optimiza las estadísticas de la base de datos
 -- Esto ayuda al query planner a elegir los mejores índices
+-- NOTA: VACUUM no se puede ejecutar en transacciones, pero ANALYZE sí
 
-VACUUM ANALYZE inspections;
-VACUUM ANALYZE user_profiles;
-VACUUM ANALYZE equipment;
+ANALYZE inspections;
+ANALYZE user_profiles;
+ANALYZE equipment;
 
 -- ============================================
 -- PARTE 3: VERIFICACIÓN
