@@ -550,8 +550,8 @@ export class InspectionService {
       const uniqueNames = Array.from(
         new Set(
           (data || [])
-            .map((item) => item.inspector_name?.trim())
-            .filter((name): name is string => !!name && name.length > 0)
+            .map((item: any) => item.inspector_name?.trim())
+            .filter((name: any): name is string => !!name && name.length > 0)
         )
       );
 
@@ -581,8 +581,8 @@ export class InspectionService {
       const uniqueNames = Array.from(
         new Set(
           (data || [])
-            .map((item) => item.supervisor_name?.trim())
-            .filter((name): name is string => !!name && name.length > 0)
+            .map((item: any) => item.supervisor_name?.trim())
+            .filter((name: any): name is string => !!name && name.length > 0)
         )
       );
 
@@ -612,8 +612,8 @@ export class InspectionService {
       const uniqueNames = Array.from(
         new Set(
           (data || [])
-            .map((item) => item.mechanic_name?.trim())
-            .filter((name): name is string => !!name && name.length > 0)
+            .map((item: any) => item.mechanic_name?.trim())
+            .filter((name: any): name is string => !!name && name.length > 0)
         )
       );
 

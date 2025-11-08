@@ -89,7 +89,7 @@ export default function Step4Finalize() {
       setSavedSupervisorName(supervisorName);
       setSignatures({
         ...formData.signatures,
-        supervisor_signature: null,
+        supervisor_signature: undefined,
         supervisor_name: supervisorName,
       });
       // Limpiar firma guardada en localStorage
@@ -110,7 +110,7 @@ export default function Step4Finalize() {
       setSavedMechanicName(mechanicName);
       setSignatures({
         ...formData.signatures,
-        mechanic_signature: null,
+        mechanic_signature: undefined,
         mechanic_name: mechanicName,
       });
       // Limpiar firma guardada en localStorage

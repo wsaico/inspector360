@@ -255,6 +255,16 @@ export default function Step2Equipment() {
                   <Input {...register('model')} placeholder="8FG25N" />
                   {errors.model && <p className="text-sm text-red-500">{errors.model.message}</p>}
                 </div>
+                <div className="space-y-2">
+                  <Label>Año *</Label>
+                  <Input {...register('year', { valueAsNumber: true })} type="number" placeholder="2023" />
+                  {errors.year && <p className="text-sm text-red-500">{errors.year.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Número de Serie *</Label>
+                  <Input {...register('serial_number')} placeholder="SN123456789" />
+                  {errors.serial_number && <p className="text-sm text-red-500">{errors.serial_number.message}</p>}
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1" disabled={!!existingMatch || hasDuplicateInForm}>
