@@ -125,11 +125,7 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
-          <p className="text-sm text-muted-foreground">Administra usuarios y sus permisos</p>
-        </div>
+      <div className="flex items-center justify-end">
         {canManageUsers && (
           <Button onClick={handleCreateUser}>
             <Plus className="mr-2 h-4 w-4" />

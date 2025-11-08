@@ -133,11 +133,15 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
+        {/* Logo */}
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <img src="/I360.svg" alt="Inspector 360" className="h-8 md:h-10 w-auto" />
+        </Link>
         <div>
-        <h1 className="text-lg md:text-2xl font-bold text-gray-900">{title}</h1>
-        <p className="hidden sm:block text-xs md:text-sm text-gray-500">
-          Sistema de Inspección Técnica de Equipos
-        </p>
+          <h1 className="text-lg md:text-2xl font-bold text-gray-900">{title}</h1>
+          <p className="hidden sm:block text-xs md:text-sm text-gray-500">
+            Sistema de Inspección Técnica de Equipos
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-4">

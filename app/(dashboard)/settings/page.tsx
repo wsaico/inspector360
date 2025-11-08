@@ -37,11 +37,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-900">Configuración</h2>
-        <p className="mt-2 text-gray-600">Administra los ajustes del sistema</p>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Gestión de Usuarios */}
         <Link href="/settings/users">

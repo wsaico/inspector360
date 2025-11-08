@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { inspectionGeneralSchema, InspectionGeneralFormData } from '@/lib/validations';
 import { STATIONS, INSPECTION_TYPES } from '@/types';
+import { StationsService } from '@/lib/services/stations';
 // Nota: Tipamos estación usando el esquema de validación para evitar que se infiera como string
 import { Calendar, MapPin, User, FileText } from 'lucide-react';
 
@@ -23,6 +24,7 @@ export default function Step1General() {
   const { profile, user } = useAuth();
   const { canViewAllStations } = usePermissions();
   const { formData, setGeneralInfo } = useInspectionForm();
+  const [stationOptions, setStationOptions] = React.useState<{ code: string; name: string }[]>([]);
 
   const {
     register,
@@ -51,6 +53,16 @@ export default function Step1General() {
       } satisfies InspectionGeneralFormData;
     },
   });
+
+  // Cargar estaciones desde la base de datos
+  React.useEffect(() => {
+    const loadStations = async () => {
+      const res = await StationsService.listAll();
+      const active = (res.data || []).filter(s => s.is_active);
+      setStationOptions(active.map(s => ({ code: s.code, name: s.name })));
+    };
+    loadStations();
+  }, []);
 
   // Si el perfil llega tarde, sincronizar la estación por defecto
   // y mantenerla fija para usuarios sin permiso global
@@ -183,13 +195,13 @@ export default function Step1General() {
                 }}
               >
                 {(canViewAllStations
-                  ? Object.entries(STATIONS)
+                  ? stationOptions
                   : profile?.station
-                    ? [[String(profile.station), STATIONS[String(profile.station) as keyof typeof STATIONS]]]
+                    ? stationOptions.filter(s => s.code === profile.station)
                     : []
-                ).map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {code} - {name}
+                ).map((station) => (
+                  <option key={station.code} value={station.code}>
+                    {station.code} - {station.name}
                   </option>
                 ))}
               </select>
