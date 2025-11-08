@@ -58,6 +58,7 @@ export default function InspectionDetailPage() {
   const [signRole, setSignRole] = useState<'supervisor' | 'mechanic' | null>(null);
   const [signName, setSignName] = useState('');
   const [savingSignature, setSavingSignature] = useState(false);
+  const [signStep, setSignStep] = useState<'name' | 'signature'>('name'); // Paso del modal
 
   useEffect(() => {
     if (!params?.id) {
@@ -612,66 +613,138 @@ export default function InspectionDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal para firmar Supervisor/Mecánico */}
-      <Dialog open={signOpen} onOpenChange={(open) => { setSignOpen(open); if (!open) { setSignRole(null); setSignName(''); } }}>
+      {/* Modal para firmar Supervisor/Mecánico - PASOS SEPARADOS para móvil */}
+      <Dialog open={signOpen} onOpenChange={(open) => {
+        setSignOpen(open);
+        if (!open) {
+          setSignRole(null);
+          setSignName('');
+          setSignStep('name');
+          setTempSignature(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-md w-[95vw] max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>{signRole === 'mechanic' ? 'Firma del Mecánico' : 'Firma del Supervisor'}</DialogTitle>
+            <DialogTitle>
+              {signRole === 'mechanic' ? 'Firma del Mecánico' : 'Firma del Supervisor'}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({signStep === 'name' ? 'Paso 1 de 2' : 'Paso 2 de 2'})
+              </span>
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Nombre</p>
-              <Input
-                placeholder={signRole === 'mechanic' ? 'Nombre del mecánico' : 'Nombre del supervisor'}
-                value={signName}
-                onChange={(e) => setSignName(e.target.value)}
-              />
+
+          {/* PASO 1: Ingresar Nombre */}
+          {signStep === 'name' && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+                <p className="font-medium">Primero, ingrese su nombre</p>
+                <p className="text-xs text-blue-700 mt-1">Luego podrá firmar sin que el teclado interfiera</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Nombre Completo <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  autoFocus
+                  placeholder={signRole === 'mechanic' ? 'Nombre del mecánico' : 'Nombre del supervisor'}
+                  value={signName}
+                  onChange={(e) => setSignName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && signName.trim()) {
+                      setSignStep('signature');
+                    }
+                  }}
+                  className="text-base"
+                />
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSignOpen(false)}
+                  className="w-full sm:w-auto"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (!signName || signName.trim().length === 0) {
+                      toast.error('El nombre es requerido');
+                      return;
+                    }
+                    setSignStep('signature');
+                  }}
+                  disabled={!signName.trim()}
+                  className="w-full sm:w-auto"
+                >
+                  Continuar a Firma →
+                </Button>
+              </DialogFooter>
             </div>
-            <SignaturePad
-              label={signRole === 'mechanic' ? 'Firma del Mecánico' : 'Firma del Supervisor'}
-              storageKey={signRole === 'mechanic' ? 'inspector360.signature.modal.mechanic' : 'inspector360.signature.modal.supervisor'}
-              onSave={async (sig) => {
-                if (!signRole) return;
-                if (!signName || signName.trim().length === 0) {
-                  toast.error('El nombre es requerido para guardar la firma');
-                  return;
-                }
-                setSavingSignature(true);
-                try {
-                  if (signRole === 'supervisor') {
-                    const { data, error } = await InspectionService.uploadSupervisorSignature(inspection.id!, signName, sig);
-                    if (error) throw new Error(error);
-                    try { if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', signName); } catch {}
-                    const updates = { supervisor_name: signName, supervisor_signature_url: data?.supervisor_signature_url || sig, supervisor_signature_date: data?.supervisor_signature_date || new Date().toISOString(), status: 'completed' as const };
-                    setInspection((prev) => prev ? { ...prev, ...updates } : prev);
-                    toast.success('Firma del supervisor guardada');
-                    const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
-                    if (missing) toast.info(missing);
-                  } else {
-                    const { data, error } = await InspectionService.uploadMechanicSignature(inspection.id!, signName, sig);
-                    if (error) throw new Error(error);
-                    try { if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', signName); } catch {}
-                    const updates = { mechanic_name: signName, mechanic_signature_url: data?.mechanic_signature_url || sig, mechanic_signature_date: data?.mechanic_signature_date || new Date().toISOString(), status: 'completed' as const };
-                    setInspection((prev) => prev ? { ...prev, ...updates } : prev);
-                    toast.success('Firma del mecánico guardada');
-                    const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
-                    if (missing) toast.info(missing);
+          )}
+
+          {/* PASO 2: Firmar (SIN inputs que activen teclado) */}
+          {signStep === 'signature' && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-green-50 p-3 text-sm text-green-900">
+                <p className="font-medium">Firmando como: {signName}</p>
+                <p className="text-xs text-green-700 mt-1">Dibuje su firma con el dedo o mouse</p>
+              </div>
+              <SignaturePad
+                label="Firma Digital"
+                storageKey={signRole === 'mechanic' ? 'inspector360.signature.modal.mechanic' : 'inspector360.signature.modal.supervisor'}
+                onSave={async (sig) => {
+                  if (!signRole) return;
+                  setSavingSignature(true);
+                  try {
+                    if (signRole === 'supervisor') {
+                      const { data, error } = await InspectionService.uploadSupervisorSignature(inspection.id!, signName, sig);
+                      if (error) throw new Error(error);
+                      try { if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', signName); } catch {}
+                      const updates = { supervisor_name: signName, supervisor_signature_url: data?.supervisor_signature_url || sig, supervisor_signature_date: data?.supervisor_signature_date || new Date().toISOString(), status: 'completed' as const };
+                      setInspection((prev) => prev ? { ...prev, ...updates } : prev);
+                      toast.success('Firma del supervisor guardada correctamente');
+                      const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
+                      if (missing) toast.info(missing);
+                    } else {
+                      const { data, error } = await InspectionService.uploadMechanicSignature(inspection.id!, signName, sig);
+                      if (error) throw new Error(error);
+                      try { if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', signName); } catch {}
+                      const updates = { mechanic_name: signName, mechanic_signature_url: data?.mechanic_signature_url || sig, mechanic_signature_date: data?.mechanic_signature_date || new Date().toISOString(), status: 'completed' as const };
+                      setInspection((prev) => prev ? { ...prev, ...updates } : prev);
+                      toast.success('Firma del mecánico guardada correctamente');
+                      const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
+                      if (missing) toast.info(missing);
+                    }
+                    setSignOpen(false);
+                    setSignRole(null);
+                    setSignName('');
+                    setSignStep('name');
+                    setTempSignature(null);
+                  } catch (err: any) {
+                    toast.error(err?.message || 'No se pudo guardar la firma');
+                  } finally {
+                    setSavingSignature(false);
                   }
-                  setSignOpen(false);
-                  setSignRole(null);
-                  setSignName('');
-                  setTempSignature(null);
-                } catch (err: any) {
-                  toast.error(err?.message || 'No se pudo guardar la firma');
-                } finally {
-                  setSavingSignature(false);
-                }
-              }}
-              onCancel={() => setSignOpen(false)}
-              onChange={(sig) => setTempSignature(sig)}
-              initialValue={tempSignature || undefined}
-            />
-          </div>
+                }}
+                onCancel={() => setSignStep('name')}
+                onChange={(sig) => setTempSignature(sig)}
+                initialValue={tempSignature || undefined}
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSignStep('name')}
+                  className="flex-1"
+                  disabled={savingSignature}
+                >
+                  ← Volver al Nombre
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
