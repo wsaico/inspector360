@@ -20,7 +20,7 @@ import { useAuth } from '@/hooks';
 import { InspectionService } from '@/lib/services';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import React from 'react';
+import React, { Suspense } from 'react';
 
 function InspectionWizardContent() {
   const { currentStep, nextStep, prevStep, canProceed, formData, draftInspectionId, setDraftInspectionId, setGeneralInfo, addEquipment, updateChecklist, addObservation, setEquipmentDbId } = useInspectionForm();
@@ -28,8 +28,10 @@ function InspectionWizardContent() {
   const searchParams = useSearchParams();
   const [isAdvancing, setIsAdvancing] = React.useState(false);
 
+  // Wrap searchParams usage in Suspense
+  const draftId = searchParams.get('draft');
+
   React.useEffect(() => {
-    const draftId = searchParams.get('draft');
     if (!draftId) return;
     (async () => {
       const { data, error } = await InspectionService.getInspectionById(draftId);
@@ -75,7 +77,7 @@ function InspectionWizardContent() {
       });
       toast.success('Borrador cargado');
     })();
-  }, [searchParams]);
+  }, [draftId]);
 
   const handleNext = async () => {
     if (currentStep !== 1) {
@@ -347,8 +349,10 @@ function InspectionWizardContent() {
 
 export default function NewInspectionPage() {
   return (
-    <InspectionProvider>
-      <InspectionWizardContent />
-    </InspectionProvider>
+    <Suspense fallback={<div>Cargando...</div>}>
+      <InspectionProvider>
+        <InspectionWizardContent />
+      </InspectionProvider>
+    </Suspense>
   );
 }
