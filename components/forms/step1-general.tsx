@@ -73,7 +73,7 @@ export default function Step1General() {
     if (station) {
       const loadInspectorNames = async () => {
         const { data } = await InspectionService.getUniqueInspectorNames(station);
-        setInspectorNames(data || []);
+        setInspectorNames((data as string[]) || []);
       };
       loadInspectorNames();
     }

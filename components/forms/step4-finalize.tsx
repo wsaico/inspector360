@@ -132,8 +132,8 @@ export default function Step4Finalize() {
           InspectionService.getUniqueSupervisorNames(station),
           InspectionService.getUniqueMechanicNames(station),
         ]);
-        setSupervisorNames(supervisorRes.data || []);
-        setMechanicNames(mechanicRes.data || []);
+        setSupervisorNames((supervisorRes.data as string[]) || []);
+        setMechanicNames((mechanicRes.data as string[]) || []);
       };
       loadNames();
     }
