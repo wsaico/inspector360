@@ -132,35 +132,25 @@ export default function InspectionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header con acciones */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Inspecciones
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {total} {total === 1 ? 'inspección encontrada' : 'inspecciones encontradas'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className={showFilters ? 'bg-blue-50 border-blue-200' : ''}
-          >
-            <Filter className="mr-2 h-4 w-4" />
-            Filtros {hasActiveFilters && `(${[filterStation, filterStatus, filterStartDate, filterEndDate].filter(Boolean).length})`}
-          </Button>
-          {canCreateInspections && (
-            <Link href="/inspections/new">
-              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                <Plus className="mr-2 h-4 w-4" />
-                Nueva Inspección
-              </Button>
-            </Link>
-          )}
-        </div>
+      {/* Acciones */}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+          className={showFilters ? 'bg-blue-50 border-blue-200' : ''}
+        >
+          <Filter className="mr-2 h-4 w-4" />
+          Filtros {hasActiveFilters && `(${[filterStation, filterStatus, filterStartDate, filterEndDate].filter(Boolean).length})`}
+        </Button>
+        {canCreateInspections && (
+          <Link href="/inspections/new">
+            <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva Inspección
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Panel de Filtros */}

@@ -130,18 +130,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div>
-        <h2 className="text-3xl font-bold text-gray-900">
-          Bienvenido{profile?.full_name ? `, ${profile.full_name}` : ''}
-        </h2>
-        <p className="mt-2 text-gray-600">
-          {profile?.station
-            ? `Estación: ${profile.station}`
-            : 'Acceso a todas las estaciones'}
-        </p>
-      </div>
-
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {canCreateInspections && (

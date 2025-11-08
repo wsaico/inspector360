@@ -175,16 +175,6 @@ export default function CompliancePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          Dashboard de Cumplimiento
-        </h2>
-        <p className="text-sm text-muted-foreground mt-2">
-          Métricas y estadísticas de inspecciones • Meta: 1 inspección diaria por estación
-        </p>
-      </div>
-
       {/* Filtros */}
       <div className="grid gap-3 md:grid-cols-3">
         <div>
