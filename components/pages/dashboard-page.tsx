@@ -227,62 +227,80 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Statistics */}
+      {/* Statistics - Diseño moderno y colorido */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        {/* Total Inspecciones - Azul */}
+        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-white hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium text-blue-900">
               Total Inspecciones
             </CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            <div className="rounded-full bg-blue-100 p-2">
+              <ClipboardList className="h-5 w-5 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalInspections}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-3xl font-bold text-blue-700">{stats.totalInspections}</div>
+            <p className="text-xs text-blue-600 mt-1">
               {showAllStations && !station
                 ? 'Todas las estaciones'
                 : station
-                  ? `Inspecciones de la estación ${station}`
+                  ? `Estación ${station}`
                   : 'Inspecciones'}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Este Mes - Verde */}
+        <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-white hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Este Mes</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-green-900">Este Mes</CardTitle>
+            <div className="rounded-full bg-green-100 p-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl font-bold text-green-700">
               {stats.completedThisMonth}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Completadas este mes
+            <p className="text-xs text-green-600 mt-1">
+              Completadas en {month.split('-')[1]}/{month.split('-')[0]}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Pendientes - Amarillo/Naranja */}
+        <Card className="border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-white hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <CardTitle className="text-sm font-medium text-amber-900">Pendientes</CardTitle>
+            <div className="rounded-full bg-amber-100 p-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingReview}</div>
-            <p className="text-xs text-muted-foreground">En revisión</p>
+            <div className="text-3xl font-bold text-amber-700">{stats.pendingReview}</div>
+            <p className="text-xs text-amber-600 mt-1">
+              {stats.pendingReview === 0 ? '¡Todo al día!' : 'Requieren atención'}
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Cumplimiento - Púrpura */}
+        <Card className={`border-l-4 ${stats.complianceRate >= 80 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-white' : 'border-l-red-500 bg-gradient-to-br from-red-50 to-white'} hover:shadow-lg transition-all`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cumplimiento</CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-600" />
+            <CardTitle className={`text-sm font-medium ${stats.complianceRate >= 80 ? 'text-purple-900' : 'text-red-900'}`}>
+              Cumplimiento
+            </CardTitle>
+            <div className={`rounded-full ${stats.complianceRate >= 80 ? 'bg-purple-100' : 'bg-red-100'} p-2`}>
+              <TrendingUp className={`h-5 w-5 ${stats.complianceRate >= 80 ? 'text-purple-600' : 'text-red-600'}`} />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.complianceRate}%</div>
-            <p className="text-xs text-muted-foreground">
-              Meta: 1 inspección por día del mes
+            <div className={`text-3xl font-bold ${stats.complianceRate >= 80 ? 'text-purple-700' : 'text-red-700'}`}>
+              {stats.complianceRate}%
+            </div>
+            <p className={`text-xs mt-1 ${stats.complianceRate >= 80 ? 'text-purple-600' : 'text-red-600'}`}>
+              {stats.complianceRate >= 80 ? '¡Excelente!' : 'Meta: 80%'} • 1/día
             </p>
           </CardContent>
         </Card>

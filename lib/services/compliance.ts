@@ -376,6 +376,81 @@ export class ComplianceService {
   }
 
   /**
+   * Obtiene cumplimiento por estación para el mes actual
+   * Retorna qué estaciones tienen al menos 1 inspección y cuáles no
+   */
+  static async getStationComplianceStatus(filters?: { month?: string }) {
+    try {
+      // Obtener estaciones activas
+      const { data: stations, error: stationsError } = await supabase
+        .from('stations')
+        .select('code, name')
+        .eq('is_active', true);
+
+      if (stationsError) throw stationsError;
+
+      const { start, end, daysInMonth } = ComplianceService.getMonthRange(filters?.month);
+
+      // Obtener inspecciones completadas del mes
+      const { data: inspections, error: inspectionsError } = await supabase
+        .from('inspections')
+        .select('station, created_at, status')
+        .eq('status', 'completed')
+        .gte('created_at', start)
+        .lte('created_at', end);
+
+      if (inspectionsError) throw inspectionsError;
+
+      // Contar inspecciones por estación y calcular cumplimiento diario
+      const stationMap: Record<string, { count: number; daysWithInspection: number; complianceRate: number; status: 'on_track' | 'behind' | 'no_inspections' }> = {};
+
+      stations?.forEach((station: { code: string; name: string }) => {
+        const stationInspections = inspections?.filter((i: { station: string }) => i.station === station.code) || [];
+
+        // Contar días únicos con inspección
+        const uniqueDays = new Set<string>();
+        stationInspections.forEach((i: { created_at: string }) => {
+          const d = new Date(i.created_at);
+          const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString();
+          uniqueDays.add(dayKey);
+        });
+
+        const daysWithInspection = uniqueDays.size;
+        const complianceRate = daysInMonth > 0 ? Math.round((daysWithInspection / daysInMonth) * 100) : 0;
+
+        // Determinar estado
+        let status: 'on_track' | 'behind' | 'no_inspections';
+        if (stationInspections.length === 0) {
+          status = 'no_inspections';
+        } else if (complianceRate >= 80) {
+          status = 'on_track';
+        } else {
+          status = 'behind';
+        }
+
+        stationMap[station.code] = {
+          count: stationInspections.length,
+          daysWithInspection,
+          complianceRate,
+          status,
+        };
+      });
+
+      // Convertir a array para la UI
+      const stationStats = stations?.map((station: { code: string; name: string }) => ({
+        code: station.code,
+        name: station.name,
+        ...stationMap[station.code],
+      })) || [];
+
+      return { data: stationStats, error: null };
+    } catch (error: any) {
+      console.error('Error fetching station compliance status:', error);
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
    * Cumplimiento por días del mes: una inspección al día
    * Cuenta máximo una por día. Para SIG/Admin puede agregarse por todas las estaciones.
    */

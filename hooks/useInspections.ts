@@ -18,17 +18,22 @@ interface UseInspectionsOptions {
   page?: number;
   pageSize?: number;
   enabled?: boolean;
+  station?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export function useInspections(options: UseInspectionsOptions = {}) {
-  const { page = 1, pageSize = 10, enabled = true } = options;
+  const { page = 1, pageSize = 10, enabled = true, station: filterStation, status, startDate, endDate } = options;
   const { profile, user } = useAuth();
   const { canViewAllStations } = usePermissions();
 
   // ✅ FIX CRÍTICO: Determinar filtro de estación de forma ESTABLE
   // Usar user.id para mantener queryKey consistente incluso si profile es null temporalmente
   const userId = user?.id;
-  const stationFilter = canViewAllStations ? undefined : (profile?.station || undefined);
+  // Priorizar filterStation (filtro manual), sino usar estación del perfil si no puede ver todas
+  const stationFilter = filterStation || (canViewAllStations ? undefined : (profile?.station || undefined));
 
   return useQuery({
     // ✅ Query key ESTABLE: usa userId en vez de station cuando no hay profile
@@ -37,6 +42,9 @@ export function useInspections(options: UseInspectionsOptions = {}) {
       page,
       pageSize,
       station: stationFilter,
+      status,
+      startDate,
+      endDate,
       userId: !canViewAllStations ? userId : undefined, // Mantiene cache estable
     }],
 
@@ -46,6 +54,9 @@ export function useInspections(options: UseInspectionsOptions = {}) {
         page,
         pageSize,
         station: stationFilter,
+        status,
+        start: startDate,
+        end: endDate,
       });
 
       if (result.error) {
