@@ -254,18 +254,27 @@ export default function InspectionDetailPage() {
     if (!inspection) return;
 
     try {
-      toast.loading('Generando PDF (FOR-ATA-057) ...');
+      // Mostrar toast de carga y guardar el ID
+      const loadingToast = toast.loading(`Generando PDF (${inspection.form_code || 'FOR-ATA-057'})...`);
+
+      // Pequeño delay para que el usuario vea el mensaje
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Abrir la plantilla directamente para usar window.print()
       const url = `/templates/forata057?id=${inspection.id}&pdf=1&print=true&logo=/logo.png`;
       window.open(url, '_blank');
 
-      toast.dismiss();
-      toast.success('Abriendo PDF para descargar...');
+      // Dismiss el toast de carga específico
+      toast.dismiss(loadingToast);
+
+      // Mostrar mensaje de éxito
+      toast.success('PDF abierto. Use Ctrl+P o el botón de imprimir para descargar.', {
+        duration: 4000,
+      });
 
     } catch (error: any) {
       console.error('Error generando/descargando PDF:', error);
-      toast.dismiss();
+      toast.dismiss(); // Limpiar todos los toasts
       toast.error(`No se pudo generar el PDF: ${error.message}`);
     }
   };
