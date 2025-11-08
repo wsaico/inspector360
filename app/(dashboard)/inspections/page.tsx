@@ -299,127 +299,210 @@ export default function InspectionsPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50/50">
-                    <TableHead className="font-semibold">Código</TableHead>
-                    <TableHead className="font-semibold">Tipo</TableHead>
-                    <TableHead className="font-semibold">Fecha</TableHead>
-                    <TableHead className="font-semibold">Inspector</TableHead>
-                    <TableHead className="font-semibold">Estación</TableHead>
-                    <TableHead className="font-semibold">Estado</TableHead>
-                    <TableHead className="text-right font-semibold">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {scopedInspections.map((inspection: Inspection) => (
-                    <TableRow key={inspection.id} className="hover:bg-blue-50/30 transition-colors">
-                      <TableCell className="font-medium text-gray-900">
-                        {inspection.form_code || 'Sin código'}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-700">{getTypeName(inspection.inspection_type)}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center text-sm text-gray-700">
-                          <Calendar className="mr-2 h-4 w-4 text-blue-500" />
-                          {formatInspectionDate(inspection.inspection_date)}
+            <>
+              {/* Vista de Tabla Desktop */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50/50">
+                      <TableHead className="font-semibold">Código</TableHead>
+                      <TableHead className="font-semibold">Tipo</TableHead>
+                      <TableHead className="font-semibold">Fecha</TableHead>
+                      <TableHead className="font-semibold">Inspector</TableHead>
+                      <TableHead className="font-semibold">Estación</TableHead>
+                      <TableHead className="font-semibold">Estado</TableHead>
+                      <TableHead className="text-right font-semibold">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {scopedInspections.map((inspection: Inspection) => (
+                      <TableRow key={inspection.id} className="hover:bg-blue-50/30 transition-colors">
+                        <TableCell className="font-medium text-gray-900">
+                          {inspection.form_code || 'Sin código'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-700">{getTypeName(inspection.inspection_type)}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center text-sm text-gray-700">
+                            <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+                            {formatInspectionDate(inspection.inspection_date)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center text-sm text-gray-700">
+                            <User className="mr-2 h-4 w-4 text-indigo-500" />
+                            {inspection.inspector_name}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center text-sm">
+                            <MapPin className="mr-2 h-4 w-4 text-green-500" />
+                            <span className="font-medium text-gray-900">{inspection.station}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(inspection)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Link href={`/inspections/${inspection.id}`}>
+                              <Button variant="ghost" size="sm" className="hover:bg-blue-50">
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver
+                              </Button>
+                            </Link>
+                            {canDeleteInspections && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => handleDelete(inspection)}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                                Eliminar
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Vista de Cards Mobile */}
+              <div className="md:hidden space-y-3 p-4">
+                {scopedInspections.map((inspection: Inspection) => (
+                  <Card key={inspection.id} className="border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="space-y-3">
+                        {/* Header */}
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-bold text-gray-900 text-base">{inspection.form_code || 'Sin código'}</p>
+                            <p className="text-sm text-gray-600">{getTypeName(inspection.inspection_type)}</p>
+                          </div>
+                          {getStatusBadge(inspection)}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center text-sm text-gray-700">
-                          <User className="mr-2 h-4 w-4 text-indigo-500" />
-                          {inspection.inspector_name}
+
+                        {/* Detalles */}
+                        <div className="grid grid-cols-1 gap-2">
+                          <div className="flex items-center text-sm">
+                            <Calendar className="mr-2 h-4 w-4 text-blue-500 flex-shrink-0" />
+                            <span className="text-gray-700">{formatInspectionDate(inspection.inspection_date)}</span>
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <User className="mr-2 h-4 w-4 text-indigo-500 flex-shrink-0" />
+                            <span className="text-gray-700 truncate">{inspection.inspector_name}</span>
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <MapPin className="mr-2 h-4 w-4 text-green-500 flex-shrink-0" />
+                            <span className="font-medium text-gray-900">{inspection.station}</span>
+                          </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center text-sm">
-                          <MapPin className="mr-2 h-4 w-4 text-green-500" />
-                          <span className="font-medium text-gray-900">{inspection.station}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(inspection)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Link href={`/inspections/${inspection.id}`}>
-                            <Button variant="ghost" size="sm" className="hover:bg-blue-50">
+
+                        {/* Acciones */}
+                        <div className="flex gap-2 pt-2 border-t">
+                          <Link href={`/inspections/${inspection.id}`} className="flex-1">
+                            <Button variant="outline" size="sm" className="w-full hover:bg-blue-50">
                               <Eye className="mr-2 h-4 w-4" />
-                              Ver
+                              Ver Detalle
                             </Button>
                           </Link>
                           {canDeleteInspections && (
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                               onClick={() => handleDelete(inspection)}
                             >
-                              {/* lucide trash icon */}
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
-                              Eliminar
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
                             </Button>
                           )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
-        {/* Paginación */}
+        {/* Paginación Optimizada para Móvil */}
         {scopedInspections.length > 0 && (
-          <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-6 pb-6 pt-4 border-t bg-gray-50/30">
-            <div className="text-sm text-gray-600 font-medium">
-              {total > 0 ? (
-                <span>
-                  Mostrando <span className="font-bold text-gray-900">{Math.min((page - 1) * pageSize + 1, total)}–{Math.min(page * pageSize, total)}</span> de <span className="font-bold text-gray-900">{total}</span>
-                </span>
-              ) : (
-                <span>Sin resultados</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="hover:bg-blue-50"
-              >
-                Anterior
-              </Button>
-              <div className="flex items-center gap-1 px-2">
-                <span className="text-sm text-gray-600">Página</span>
-                <span className="text-sm font-bold text-gray-900">{page}</span>
-                <span className="text-sm text-gray-600">de</span>
-                <span className="text-sm font-bold text-gray-900">{Math.ceil(total / pageSize)}</span>
+          <div className="border-t bg-gradient-to-r from-gray-50 to-white">
+            {/* Información de Resultados */}
+            <div className="px-4 pt-4 pb-2">
+              <div className="text-center md:text-left text-sm text-gray-600 font-medium">
+                {total > 0 ? (
+                  <span>
+                    Mostrando <span className="font-bold text-blue-600">{Math.min((page - 1) * pageSize + 1, total)}–{Math.min(page * pageSize, total)}</span> de <span className="font-bold text-blue-600">{total}</span> inspecciones
+                  </span>
+                ) : (
+                  <span>Sin resultados</span>
+                )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page * pageSize >= total}
-                onClick={() => setPage((p) => p + 1)}
-                className="hover:bg-blue-50"
-              >
-                Siguiente
-              </Button>
-              <select
-                className="ml-2 rounded-lg border border-gray-200 px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={pageSize}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  setPage(1);
-                  setPageSize(v);
-                }}
-              >
-                <option value={10}>10 / página</option>
-                <option value={20}>20 / página</option>
-                <option value={50}>50 / página</option>
-                <option value={100}>100 / página</option>
-              </select>
+            </div>
+
+            {/* Controles de Paginación */}
+            <div className="px-4 pb-4 pt-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                {/* Selector de Items por Página */}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <label className="text-xs text-gray-600 whitespace-nowrap">Items por página:</label>
+                  <select
+                    className="flex-1 sm:flex-none rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+                    value={pageSize}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setPage(1);
+                      setPageSize(v);
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                {/* Botones de Navegación */}
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="hover:bg-blue-50 disabled:opacity-50 flex-1 sm:flex-none h-10"
+                  >
+                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span className="hidden sm:inline">Anterior</span>
+                    <span className="sm:hidden">Ant</span>
+                  </Button>
+
+                  {/* Indicador de Página */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-100 border border-blue-200">
+                    <span className="text-sm font-bold text-blue-900">{page}</span>
+                    <span className="text-sm text-blue-700">/</span>
+                    <span className="text-sm font-bold text-blue-900">{Math.ceil(total / pageSize)}</span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page * pageSize >= total}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="hover:bg-blue-50 disabled:opacity-50 flex-1 sm:flex-none h-10"
+                  >
+                    <span className="hidden sm:inline">Siguiente</span>
+                    <span className="sm:hidden">Sig</span>
+                    <svg className="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
