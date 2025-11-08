@@ -137,10 +137,10 @@ export function useAuth() {
           .select('*')
           .eq('id', supabaseUser.id)
           .single()
-          .then(({ data, error }) => {
+          .then(({ data, error }: { data: UserProfile | null; error: any }) => {
             if (data && !error) {
               // Verificar si usuario está activo
-              const isActive = data.is_active === true || data.is_active === 'true';
+              const isActive = data.is_active === true;
               if (isActive) {
                 console.log('[useAuth] ✓ Perfil verificado con base de datos');
                 setAuthState({ user: supabaseUser, profile: data as UserProfile, loading: false, error: null });
@@ -150,7 +150,7 @@ export function useAuth() {
               }
             }
           })
-          .catch((err) => {
+          .catch((err: any) => {
             console.warn('[useAuth] Error verificando perfil en background:', err);
             // Mantener perfil de metadata si la verificación falla
           });

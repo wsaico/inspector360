@@ -35,9 +35,6 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
             refetchOnWindowFocus: true,
             refetchOnMount: false, // No refetch si hay datos en cache
             refetchOnReconnect: false, // No refetch automático al reconectar
-
-            // Suspense: Deshabilitado para mejor control de loading
-            suspense: false,
           },
           mutations: {
             // Mutations: Sin retry para evitar duplicados

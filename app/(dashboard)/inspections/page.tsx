@@ -144,7 +144,7 @@ export default function InspectionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scopedInspections.map((inspection) => (
+                {scopedInspections.map((inspection: Inspection) => (
                   <TableRow key={inspection.id}>
                     <TableCell className="font-medium">
                       {inspection.form_code || 'Sin código'}
