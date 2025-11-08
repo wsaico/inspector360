@@ -12,9 +12,6 @@ export const equipmentSchema = z.object({
   type: z.string().min(1, 'Tipo de equipo requerido'),
   brand: z.string().min(1, 'Marca requerida'),
   model: z.string().min(1, 'Modelo requerido'),
-  year: z.number().min(1900, 'Año inválido').max(new Date().getFullYear() + 1, 'Año inválido'),
-  serial_number: z.string().min(1, 'Número de serie requerido'),
-  motor_serial: z.string().optional(),
 });
 
 export const observationSchema = z.object({

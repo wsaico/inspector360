@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 import { InspectionProvider, useInspectionForm } from '@/context/inspection-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ClipboardList, Package, CheckSquare, MessageSquare, FileCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Step1General from '@/components/forms/step1-general';
 import Step2Equipment from '@/components/forms/step2-equipment';
@@ -113,11 +113,56 @@ function InspectionWizardContent() {
   };
 
   const steps = [
-    { number: 1, title: 'Informacion General', description: 'Datos basicos de la inspeccion' },
-    { number: 2, title: 'Equipos', description: 'Agregar equipos a inspeccionar' },
-    { number: 3, title: 'Checklist', description: 'Completar 15 items por equipo' },
-    { number: 4, title: 'Observaciones', description: 'Agregar observaciones de equipos' },
-    { number: 5, title: 'Finalizar', description: 'Firmas y completar' },
+    {
+      number: 1,
+      title: 'Información General',
+      description: 'Datos básicos de la inspección',
+      icon: ClipboardList,
+      color: 'from-blue-500 to-blue-600',
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-600',
+      borderColor: 'border-blue-500'
+    },
+    {
+      number: 2,
+      title: 'Equipos',
+      description: 'Agregar equipos a inspeccionar',
+      icon: Package,
+      color: 'from-purple-500 to-purple-600',
+      bgColor: 'bg-purple-50',
+      textColor: 'text-purple-600',
+      borderColor: 'border-purple-500'
+    },
+    {
+      number: 3,
+      title: 'Checklist',
+      description: 'Completar 15 items por equipo',
+      icon: CheckSquare,
+      color: 'from-green-500 to-green-600',
+      bgColor: 'bg-green-50',
+      textColor: 'text-green-600',
+      borderColor: 'border-green-500'
+    },
+    {
+      number: 4,
+      title: 'Observaciones',
+      description: 'Agregar observaciones de equipos',
+      icon: MessageSquare,
+      color: 'from-orange-500 to-orange-600',
+      bgColor: 'bg-orange-50',
+      textColor: 'text-orange-600',
+      borderColor: 'border-orange-500'
+    },
+    {
+      number: 5,
+      title: 'Finalizar',
+      description: 'Firmas y completar',
+      icon: FileCheck,
+      color: 'from-teal-500 to-teal-600',
+      bgColor: 'bg-teal-50',
+      textColor: 'text-teal-600',
+      borderColor: 'border-teal-500'
+    },
   ];
 
   return (
@@ -130,55 +175,100 @@ function InspectionWizardContent() {
         </p>
       </div>
 
-      {/* Step Indicator (Mobile) */}
-      <Card className="md:hidden">
-        <CardContent className="pt-6 pb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold truncate max-w-[60%]">{steps[currentStep - 1].title}</span>
-            <span className="text-xs text-muted-foreground">Paso {currentStep}/5</span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-gray-200">
-            <div
-              className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${(currentStep / 5) * 100}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-2 truncate">
-            {steps[currentStep - 1].description}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Step Indicator (Desktop) */}
-      <Card className="hidden md:block">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            {steps.map((step, index) => (
-              <div key={step.number} className="flex items-center flex-1">
-                <div className="flex flex-col items-center flex-1">
-                  {/* Step Circle */}
-                  <div
-                    className={cn(
-                      'flex h-12 w-12 items-center justify-center rounded-full border-2 font-bold transition-all',
-                      currentStep === step.number && 'border-primary bg-primary text-white',
-                      currentStep > step.number && 'border-green-500 bg-green-500 text-white',
-                      currentStep < step.number && 'border-gray-300 bg-white text-gray-400'
-                    )}
-                  >
-                    {currentStep > step.number ? <Check className="h-6 w-6" /> : step.number}
-                  </div>
-                  {/* Step Info */}
-                  <div className="mt-2 text-center">
-                    <p className="text-sm font-semibold">{step.title}</p>
-                    <p className="text-xs text-muted-foreground">{step.description}</p>
-                  </div>
-                </div>
-                {/* Connector Line */}
-                {index < steps.length - 1 && (
-                  <div className={cn('h-1 flex-1 transition-all', currentStep > step.number ? 'bg-green-500' : 'bg-gray-200')} />
-                )}
+      {/* Step Indicator (Mobile) - Modern App Design */}
+      <div className="md:hidden">
+        <Card className={`border-2 ${steps[currentStep - 1].borderColor} shadow-lg overflow-hidden`}>
+          <div className={`h-1.5 bg-gradient-to-r ${steps[currentStep - 1].color} transition-all`} />
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <div className={`flex-shrink-0 h-12 w-12 rounded-xl bg-gradient-to-br ${steps[currentStep - 1].color} flex items-center justify-center shadow-md`}>
+                {React.createElement(steps[currentStep - 1].icon, { className: 'h-6 w-6 text-white' })}
               </div>
-            ))}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-base font-bold truncate">{steps[currentStep - 1].title}</h3>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${steps[currentStep - 1].bgColor} ${steps[currentStep - 1].textColor}`}>
+                    {currentStep}/5
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground truncate">
+                  {steps[currentStep - 1].description}
+                </p>
+                <div className="mt-3 flex gap-1">
+                  {steps.map((step, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "h-1.5 flex-1 rounded-full transition-all",
+                        idx < currentStep ? `bg-gradient-to-r ${step.color}` : "bg-gray-200"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Step Indicator (Desktop) - Modern App Design */}
+      <Card className="hidden md:block shadow-md">
+        <CardContent className="pt-6 pb-6">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => {
+              const StepIcon = step.icon;
+              const isActive = currentStep === step.number;
+              const isCompleted = currentStep > step.number;
+              const isPending = currentStep < step.number;
+
+              return (
+                <div key={step.number} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center flex-1">
+                    {/* Step Icon with Gradient */}
+                    <div className="relative">
+                      <div
+                        className={cn(
+                          'flex h-16 w-16 items-center justify-center rounded-2xl transition-all duration-300 shadow-lg',
+                          isActive && `bg-gradient-to-br ${step.color} scale-110`,
+                          isCompleted && 'bg-gradient-to-br from-green-500 to-green-600',
+                          isPending && 'bg-gray-100 border-2 border-gray-300'
+                        )}
+                      >
+                        {isCompleted ? (
+                          <Check className="h-8 w-8 text-white" />
+                        ) : (
+                          <StepIcon className={cn('h-8 w-8', isActive ? 'text-white' : isPending ? 'text-gray-400' : 'text-white')} />
+                        )}
+                      </div>
+                      {isActive && (
+                        <div className={`absolute -inset-1 bg-gradient-to-br ${step.color} rounded-2xl blur-md opacity-50 -z-10 animate-pulse`} />
+                      )}
+                    </div>
+                    {/* Step Info */}
+                    <div className="mt-3 text-center">
+                      <p className={cn('text-sm font-bold', isActive ? step.textColor : isCompleted ? 'text-green-600' : 'text-gray-500')}>
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-[120px]">{step.description}</p>
+                      {isActive && (
+                        <span className={`inline-block mt-2 text-xs font-semibold px-3 py-1 rounded-full ${step.bgColor} ${step.textColor}`}>
+                          Paso {step.number}/5
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Connector Line with Gradient */}
+                  {index < steps.length - 1 && (
+                    <div className="flex-1 px-2">
+                      <div className={cn(
+                        'h-2 rounded-full transition-all duration-300',
+                        isCompleted ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gray-200'
+                      )} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -192,35 +282,65 @@ function InspectionWizardContent() {
         {currentStep === 5 && <Step4Finalize />}
       </div>
 
-      {/* Navigation Buttons */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Button
-              className="w-full sm:w-auto"
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
-
-            <div className="text-sm text-muted-foreground text-center sm:text-left">
-              Paso {currentStep} de 5
-            </div>
-
-            {currentStep < 5 ? (
-              <Button className="w-full sm:w-auto" onClick={handleNext} disabled={!canProceed() || isAdvancing}>
-                Siguiente
-                <ArrowRight className="ml-2 h-4 w-4" />
+      {/* Navigation Buttons - Modern Mobile-First Design */}
+      <div className="sticky bottom-0 left-0 right-0 z-10">
+        <Card className="shadow-xl border-t-4 border-t-primary">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                className="w-full sm:w-auto h-12 shadow-md hover:shadow-lg transition-shadow"
+                variant="outline"
+                onClick={prevStep}
+                disabled={currentStep === 1}
+                size="lg"
+              >
+                <ArrowLeft className="mr-2 h-5 w-5" />
+                Anterior
               </Button>
-            ) : (
-              <div className="w-full sm:w-[140px]" />
-            )}
-          </div>
-        </CardContent>
-      </Card>
+
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100">
+                <span className="text-sm font-semibold text-gray-700">
+                  Paso {currentStep} de 5
+                </span>
+                <div className="flex gap-1">
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "h-2 w-2 rounded-full transition-all",
+                        idx < currentStep ? "bg-primary" : "bg-gray-300"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {currentStep < 5 ? (
+                <Button
+                  className={`w-full sm:w-auto h-12 shadow-md hover:shadow-lg transition-all bg-gradient-to-r ${steps[currentStep - 1].color} hover:opacity-90`}
+                  onClick={handleNext}
+                  disabled={!canProceed() || isAdvancing}
+                  size="lg"
+                >
+                  {isAdvancing ? (
+                    <>
+                      <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      Siguiente
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <div className="w-full sm:w-[140px]" />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

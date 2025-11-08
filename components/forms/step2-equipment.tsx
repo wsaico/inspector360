@@ -42,8 +42,6 @@ export default function Step2Equipment() {
             eq.type,
             eq.brand,
             eq.model,
-            eq.serial_number,
-            String(eq.year || ''),
           ]
             .filter(Boolean)
             .join(' ')
@@ -257,24 +255,6 @@ export default function Step2Equipment() {
                   <Input {...register('model')} placeholder="8FG25N" />
                   {errors.model && <p className="text-sm text-red-500">{errors.model.message}</p>}
                 </div>
-                <div className="space-y-2">
-                  <Label>Año *</Label>
-                  <Input
-                    {...register('year', { valueAsNumber: true })}
-                    type="number"
-                    placeholder="2024"
-                  />
-                  {errors.year && <p className="text-sm text-red-500">{errors.year.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label>Número de Serie *</Label>
-                  <Input {...register('serial_number')} placeholder="ABC123456" />
-                  {errors.serial_number && <p className="text-sm text-red-500">{errors.serial_number.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label>Serie del Motor (Opcional)</Label>
-                  <Input {...register('motor_serial')} placeholder="4Y-123456" />
-                </div>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1" disabled={!!existingMatch || hasDuplicateInForm}>
@@ -318,7 +298,7 @@ export default function Step2Equipment() {
                     <Input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar por código, tipo, marca, modelo o serie"
+                      placeholder="Buscar por código, tipo, marca o modelo"
                       className="pl-8"
                     />
                   </div>
@@ -345,9 +325,8 @@ export default function Step2Equipment() {
                           <div>
                           <p className="font-semibold">{eq.code}</p>
                           <p className="text-sm text-muted-foreground">
-                            {eq.type} - {eq.brand} {eq.model} ({eq.year})
+                            {eq.type} - {eq.brand} {eq.model}
                           </p>
-                          <p className="text-xs text-muted-foreground">Serie: {eq.serial_number}</p>
                           </div>
                           <Button size="sm" onClick={() => handleSelectExisting(eq)}>
                             <Plus className="mr-2 h-4 w-4" />
@@ -404,9 +383,8 @@ export default function Step2Equipment() {
                 <div>
                   <p className="font-semibold">{eq.code}</p>
                   <p className="text-sm text-muted-foreground">
-                    {eq.type} - {eq.brand} {eq.model} ({eq.year})
+                    {eq.type} - {eq.brand} {eq.model}
                   </p>
-                  <p className="text-xs text-muted-foreground">Serie: {eq.serial_number}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => handleEdit(index)}>
