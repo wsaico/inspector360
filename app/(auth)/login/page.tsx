@@ -43,23 +43,56 @@ export default function LoginPage() {
       return;
     }
 
-    // Buscar el nombre del usuario por email
+    setIsSubmitting(true);
+
+    // Verificar si el usuario existe en la base de datos
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('user_profiles')
-        .select('full_name')
+        .select('full_name, is_active')
         .eq('email', email.trim().toLowerCase())
         .single();
 
-      if (profile?.full_name) {
+      if (error || !profile) {
+        // Usuario no encontrado
+        setIsSubmitting(false);
+        toast.error(
+          <div className="flex flex-col gap-2">
+            <p className="font-semibold">Usuario no encontrado</p>
+            <p className="text-sm">Este correo no está registrado en el sistema.</p>
+            <p className="text-sm">Contacta al administrador por WhatsApp: <strong>+51 930 289 521</strong></p>
+          </div>,
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      // Verificar si el usuario está activo
+      if (!profile.is_active) {
+        setIsSubmitting(false);
+        toast.error(
+          <div className="flex flex-col gap-2">
+            <p className="font-semibold">Usuario inactivo</p>
+            <p className="text-sm">Tu cuenta está desactivada.</p>
+            <p className="text-sm">Contacta al administrador por WhatsApp: <strong>+51 930 289 521</strong></p>
+          </div>,
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      // Usuario encontrado y activo
+      if (profile.full_name) {
         setUserName(profile.full_name);
       }
-    } catch (error) {
-      // Si no se encuentra, no pasa nada - continuar sin nombre
-      console.log('Usuario no encontrado en perfiles');
-    }
 
-    setStep('password');
+      setIsSubmitting(false);
+      setStep('password');
+    } catch (error) {
+      setIsSubmitting(false);
+      toast.error('Error al verificar el correo electrónico');
+      console.error('Error verificando usuario:', error);
+    }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -186,9 +219,17 @@ export default function LoginPage() {
                     <div className="flex items-center justify-end">
                       <Button
                         type="submit"
+                        disabled={isSubmitting}
                         className="bg-[#1C398A] hover:bg-[#152d6f] text-white px-6 h-10 rounded-full font-medium shadow-sm"
                       >
-                        Siguiente
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Verificando...
+                          </>
+                        ) : (
+                          'Siguiente'
+                        )}
                       </Button>
                     </div>
                   </form>
