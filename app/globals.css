@@ -71,3 +71,51 @@
     color-adjust: exact !important;
   }
 }
+
+/* Animación sutil para el logo en el login */
+@keyframes i360FadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Fade básico para overlays o contenedores */
+@keyframes i360Fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .logo-animate {
+    animation: i360FadeInUp 500ms ease-out both;
+  }
+  .login-overlay-animate {
+    animation: i360Fade 650ms ease-out both;
+  }
+  .login-content-animate {
+    animation: i360FadeInUp 600ms ease-out both;
+  }
+  .login-page-animate {
+    animation: i360Fade 500ms ease-out both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-animate {
+    animation: none !important;
+  }
+  .login-overlay-animate,
+  .login-content-animate,
+  .login-page-animate {
+    animation: none !important;
+  }
+}

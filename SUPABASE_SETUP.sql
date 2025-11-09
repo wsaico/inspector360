@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'supervisor', 'sig')),
+  role TEXT NOT NULL CHECK (role IN ('admin', 'supervisor', 'inspector', 'sig', 'operador', 'mecanico')),
   station TEXT CHECK (station IN ('AQP', 'CUZ', 'CIX', 'TRU', 'CJA', 'TPP', 'PIU')),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),

@@ -39,7 +39,7 @@ export default function LoginPage() {
     e.preventDefault();
 
     if (!email) {
-      toast.error('Por favor ingresa tu correo electrónico');
+      toast.error('Ingrese su correo para continuar');
       return;
     }
 
@@ -160,7 +160,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-4">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-4 login-page-animate">
       {/* Video de fondo de Vimeo */}
       <div className="absolute inset-0 w-full h-full">
         <iframe
@@ -178,20 +178,20 @@ export default function LoginPage() {
       </div>
 
       {/* Overlay oscuro suave para mejorar legibilidad */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 via-purple-900/60 to-slate-900/70 backdrop-blur-[2px]"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 via-purple-900/60 to-slate-900/70 backdrop-blur-[2px] login-overlay-animate"></div>
 
       {/* Contenido principal */}
       <div className="relative z-10 w-full max-w-[840px]">
-        <Card className="bg-white shadow-none border-0 rounded-[28px] min-h-[384px]">
-          <CardContent className="px-9 pt-[108px] pb-9">
-            <div className="flex gap-12">
+        <Card className="bg-white shadow-none border-0 rounded-[28px] min-h-[384px] login-content-animate">
+          <CardContent className="px-4 sm:px-6 md:px-9 pt-10 sm:pt-16 md:pt-[108px] pb-6 sm:pb-8 md:pb-9">
+            <div className="flex flex-col md:flex-row gap-6 md:gap-12">
               {/* Columna izquierda - Logo y título */}
-              <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
                 <div className="mb-3">
                   <img
                     src="/I360.svg"
                     alt="Inspector 360°"
-                    className="h-12 w-auto"
+                    className="h-10 sm:h-12 w-auto logo-animate transition-transform duration-300 hover:scale-[1.03]"
                   />
                 </div>
 
@@ -205,7 +205,7 @@ export default function LoginPage() {
               </div>
 
               {/* Columna derecha - Formulario */}
-              <div className="flex-1">
+              <div className="flex-1 mt-6 md:mt-0">
                 {step === 'email' ? (
                   <form onSubmit={handleEmailSubmit} className="space-y-6">
                     <div>
@@ -216,7 +216,7 @@ export default function LoginPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         autoFocus
-                        required
+                        aria-required="true"
                         className="h-14 px-4 text-base border-gray-300 rounded-lg hover:border-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
                       />
                     </div>
@@ -273,7 +273,7 @@ export default function LoginPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={isSubmitting}
                         autoFocus
-                        required
+                        aria-required="true"
                         className="h-14 px-4 text-base border-gray-300 rounded-lg hover:border-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
                       />
                     </div>

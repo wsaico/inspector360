@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { UserService } from '@/lib/services';
-import { User, STATIONS, UserProfile, ROLE_LABELS, UserRole } from '@/types';
+import { StationsService, StationConfig } from '@/lib/services/stations';
+import { User, UserProfile, ROLE_LABELS, UserRole } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,8 @@ interface UserFormDialogProps {
 
 export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
   const isEditing = !!user;
+  const [stations, setStations] = useState<StationConfig[]>([]);
+  const [loadingStations, setLoadingStations] = useState(true);
 
   const {
     register,
@@ -63,6 +66,17 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
   });
 
   const selectedRole = watch('role');
+
+  // Cargar estaciones dinámicamente
+  useEffect(() => {
+    async function loadStations() {
+      setLoadingStations(true);
+      const { data } = await StationsService.listActive();
+      setStations(data);
+      setLoadingStations(false);
+    }
+    loadStations();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -196,14 +210,15 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
               <Select
                 onValueChange={(value) => setValue('station', value)}
                 defaultValue={user?.station || ''}
+                disabled={loadingStations}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar estación" />
+                  <SelectValue placeholder={loadingStations ? "Cargando estaciones..." : "Seleccionar estación"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.keys(STATIONS).map((station) => (
-                    <SelectItem key={station} value={station}>
-                      {station}
+                  {stations.map((station) => (
+                    <SelectItem key={station.code} value={station.code}>
+                      {station.name} ({station.code})
                     </SelectItem>
                   ))}
                 </SelectContent>

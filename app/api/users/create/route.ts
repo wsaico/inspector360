@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Validar rol
-  if (!['admin', 'supervisor', 'inspector'].includes(role)) {
+  // Validar rol (admite todos los roles configurados en el sistema)
+  if (!['admin', 'supervisor', 'inspector', 'sig', 'operador', 'mecanico'].includes(role)) {
     return NextResponse.json({ error: 'Rol inválido' }, { status: 400 });
   }
 
