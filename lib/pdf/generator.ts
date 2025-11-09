@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Inspection, Equipment } from '@/types';
 import { format } from 'date-fns';
-import { utcToZonedTime } from 'date-fns-tz';
+import { toZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
 
@@ -465,7 +465,7 @@ export class PDFGenerator {
 
       if (inspection.supervisor_signature_date) {
         const utcDate = new Date(inspection.supervisor_signature_date);
-        const peruDate = utcToZonedTime(utcDate, 'America/Lima');
+        const peruDate = toZonedTime(utcDate, 'America/Lima');
         const signDate = format(peruDate, 'dd/MM/yyyy HH:mm', { locale: es });
         this.doc.text(`Fecha: ${signDate}`, this.margin + 5, this.currentY);
         this.currentY += 8;
@@ -510,7 +510,7 @@ export class PDFGenerator {
 
       if (inspection.mechanic_signature_date) {
         const utcDate = new Date(inspection.mechanic_signature_date);
-        const peruDate = utcToZonedTime(utcDate, 'America/Lima');
+        const peruDate = toZonedTime(utcDate, 'America/Lima');
         const mechDate = format(peruDate, 'dd/MM/yyyy HH:mm', { locale: es });
         this.doc.text(`Fecha: ${mechDate}`, this.margin + 5, this.currentY);
         this.currentY += 8;
