@@ -184,4 +184,33 @@ export class UserService {
       return { data: null, error: error.message };
     }
   }
+
+  /**
+   * Cambia la contraseña de un usuario
+   * Si se proporciona currentPassword, valida la contraseña actual
+   */
+  static async changePassword(
+    userId: string,
+    newPassword: string,
+    currentPassword?: string
+  ) {
+    try {
+      const response = await fetch(`/api/users/${userId}/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword, currentPassword }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error cambiando contraseña');
+      }
+
+      return { data: result, error: null };
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      return { data: null, error: error.message };
+    }
+  }
 }

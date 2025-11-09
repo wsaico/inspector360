@@ -14,10 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Loader2, UserPlus, MapPin } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, UserPlus, MapPin, Key } from "lucide-react";
 import { toast } from "sonner";
 import { User } from "@/types";
 import { UserFormDialog } from "@/components/settings/user-form-dialog";
+import { ChangePasswordDialog } from "@/components/settings/change-password-dialog";
 
 export default function UsersPage() {
   const { canManageUsers, canAccessSettings } = usePermissions();
@@ -25,6 +26,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (!canManageUsers && !canAccessSettings) {
@@ -93,16 +96,32 @@ export default function UsersPage() {
     }
   };
 
+  const handleChangePassword = (user: User) => {
+    setPasswordUser(user);
+    setPasswordDialogOpen(true);
+  };
+
+  const handlePasswordDialogClose = () => {
+    setPasswordDialogOpen(false);
+    setPasswordUser(null);
+  };
+
   const getRoleBadge = (role: string) => {
     const variants: Record<string, "default" | "secondary" | "success"> = {
       admin: "default",
       supervisor: "secondary",
       sig: "success",
+      operador: "secondary",
+      mecanico: "secondary",
+      inspector: "default",
     };
     const labels: Record<string, string> = {
       admin: "Administrador",
       supervisor: "Supervisor",
       sig: "SIG",
+      operador: "Operador",
+      mecanico: "Mecánico",
+      inspector: "Inspector",
     };
     return <Badge variant={variants[role] || "default"}>{labels[role] || role}</Badge>;
   };
@@ -191,6 +210,9 @@ export default function UsersPage() {
                             <Button size="sm" variant="outline" onClick={() => handleEditUser(user)}>
                               <Edit className="h-4 w-4" />
                             </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleChangePassword(user)}>
+                              <Key className="h-4 w-4" />
+                            </Button>
                             <Button
                               size="sm"
                               variant={user.is_active ? "outline" : "default"}
@@ -216,6 +238,16 @@ export default function UsersPage() {
       </Card>
 
       <UserFormDialog open={dialogOpen} user={editingUser} onClose={handleDialogClose} />
+
+      {passwordUser && (
+        <ChangePasswordDialog
+          open={passwordDialogOpen}
+          onClose={handlePasswordDialogClose}
+          userId={passwordUser.id!}
+          userName={passwordUser.full_name}
+          isOwnProfile={false}
+        />
+      )}
     </div>
   );
 }

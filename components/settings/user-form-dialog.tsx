@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { UserService } from '@/lib/services';
@@ -54,6 +54,7 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
     reset,
     setValue,
     watch,
+    control,
   } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
     defaultValues: {
@@ -91,7 +92,15 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
 
   const onSubmit = async (data: UserFormData) => {
     try {
+      console.log('Form submitted:', { isEditing, data, user });
+
       if (isEditing) {
+        if (!user?.id) {
+          toast.error('Error: ID de usuario no encontrado');
+          console.error('User ID is missing:', user);
+          return;
+        }
+
         // Actualizar usuario
         const updates: Partial<UserProfile> = {
           full_name: data.full_name,
@@ -99,9 +108,13 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
           station: data.station ? (data.station as any) : undefined,
         };
 
-        const { error } = await UserService.updateUser(user!.id!, updates);
+        console.log('Updating user:', user.id, updates);
+        const { error } = await UserService.updateUser(user.id, updates);
 
-        if (error) throw new Error(error);
+        if (error) {
+          console.error('Update error:', error);
+          throw new Error(error);
+        }
 
         toast.success('Usuario actualizado exitosamente');
       } else {
@@ -184,21 +197,27 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
 
           <div className="space-y-2">
             <Label htmlFor="role">Rol *</Label>
-            <Select
-              onValueChange={(value) => setValue('role', value as any)}
-              defaultValue={user?.role || 'supervisor'}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar rol" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Controller
+              name="role"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.role && (
               <p className="text-sm text-red-500">{errors.role.message}</p>
             )}
@@ -207,22 +226,28 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
           {(selectedRole === 'supervisor' || selectedRole === 'operador' || selectedRole === 'mecanico') && (
             <div className="space-y-2">
               <Label htmlFor="station">Estación *</Label>
-              <Select
-                onValueChange={(value) => setValue('station', value)}
-                defaultValue={user?.station || ''}
-                disabled={loadingStations}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingStations ? "Cargando estaciones..." : "Seleccionar estación"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {stations.map((station) => (
-                    <SelectItem key={station.code} value={station.code}>
-                      {station.name} ({station.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                name="station"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || ''}
+                    disabled={loadingStations}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingStations ? "Cargando estaciones..." : "Seleccionar estación"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stations.map((station) => (
+                        <SelectItem key={station.code} value={station.code}>
+                          {station.name} ({station.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
               {errors.station && (
                 <p className="text-sm text-red-500">{errors.station.message}</p>
               )}
