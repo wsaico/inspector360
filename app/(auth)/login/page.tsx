@@ -47,14 +47,13 @@ export default function LoginPage() {
 
     // Verificar si el usuario existe en la base de datos
     try {
-      const { data: profile, error } = await supabase
+      const { data: profiles, error } = await supabase
         .from('user_profiles')
         .select('full_name, is_active')
-        .eq('email', email.trim().toLowerCase())
-        .single();
+        .eq('email', email.trim().toLowerCase());
 
-      if (error || !profile) {
-        // Usuario no encontrado
+      // Usuario no encontrado
+      if (error || !profiles || profiles.length === 0) {
         setIsSubmitting(false);
         toast.error(
           <div className="flex flex-col gap-2">
@@ -66,6 +65,8 @@ export default function LoginPage() {
         );
         return;
       }
+
+      const profile = profiles[0];
 
       // Verificar si el usuario está activo
       if (!profile.is_active) {
