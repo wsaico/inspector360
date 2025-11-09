@@ -3,6 +3,7 @@
 import { useAuth, usePermissions } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import {
   ClipboardList,
@@ -11,14 +12,24 @@ import {
   TrendingUp,
   Plus,
   FileText,
+  Lock,
+  ArrowRight,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ComplianceService } from '@/lib/services/compliance';
-import { InspectionService } from '@/lib/services';
+import { InspectionService, InspectionTypeService } from '@/lib/services';
 import { hasPendingObservations, getMissingSignaturesLabel } from '@/lib/utils';
 import { STATIONS } from '@/types/roles';
 import { StationsService } from '@/lib/services/stations';
 import { toast } from 'sonner';
+import { InspectionSystemType } from '@/types/inspection';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function DashboardPage() {
   const { profile, error, user, status, loading: authLoading } = useAuth();
@@ -36,6 +47,9 @@ export default function DashboardPage() {
     pendingReview: 0,
     complianceRate: 0,
   });
+  const [inspectionTypes, setInspectionTypes] = useState<InspectionSystemType[]>([]);
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
+  const [selectedType, setSelectedType] = useState<InspectionSystemType | null>(null);
 
   // No elevar a global por "estación vacía"; solo admin/SIG o estación explícita "todas"
   const showAllStations = canViewAllStations || String(profile?.station || '').toLowerCase() === 'todas';
@@ -101,6 +115,19 @@ export default function DashboardPage() {
       setStationOptions(active.map(s => ({ value: s.code, label: s.name })));
     };
     loadStations();
+  }, []);
+
+  // Cargar tipos de inspección
+  useEffect(() => {
+    const loadInspectionTypes = async () => {
+      const { data, error } = await InspectionTypeService.getAll();
+      if (data) {
+        setInspectionTypes(data);
+      } else if (error) {
+        console.error('Error loading inspection types:', error);
+      }
+    };
+    loadInspectionTypes();
   }, []);
 
   // Mostrar loader mientras se carga la autenticación o los datos
@@ -293,6 +320,132 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tipos de Inspección */}
+      {inspectionTypes.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight">Tipos de Inspección</h2>
+            <p className="text-sm text-muted-foreground">
+              Módulos disponibles en el sistema
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {inspectionTypes.map((type) => {
+              const isActive = type.is_active;
+              const cardClasses = isActive
+                ? 'cursor-pointer transition-all hover:shadow-lg hover:border-primary hover:scale-105 bg-white'
+                : 'cursor-not-allowed bg-gray-50 opacity-75';
+
+              const handleClick = () => {
+                if (isActive) {
+                  // Redirigir a la ruta correspondiente
+                  if (type.code === 'technical') {
+                    window.location.href = '/inspections/new';
+                  }
+                } else {
+                  // Mostrar modal "Próximamente"
+                  setSelectedType(type);
+                  setShowComingSoonModal(true);
+                }
+              };
+
+              return (
+                <Card
+                  key={type.id}
+                  className={cardClasses}
+                  onClick={handleClick}
+                >
+                  <CardHeader className="space-y-3 pb-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`text-4xl ${isActive ? '' : 'grayscale'}`}>
+                          {type.icon}
+                        </div>
+                        <div className="flex-1">
+                          <CardTitle className="text-base leading-tight">
+                            {type.name}
+                          </CardTitle>
+                        </div>
+                      </div>
+                      {isActive ? (
+                        <ArrowRight className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Lock className="h-4 w-4 text-gray-400" />
+                      )}
+                    </div>
+                    {!isActive && (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800 w-fit">
+                        Próximamente
+                      </Badge>
+                    )}
+                  </CardHeader>
+                  <CardContent className="pb-6">
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {type.description}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Código: {type.form_prefix}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Modal "Próximamente" */}
+      <Dialog open={showComingSoonModal} onOpenChange={setShowComingSoonModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="text-5xl">{selectedType?.icon}</div>
+              <DialogTitle className="text-xl">
+                {selectedType?.name}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-base pt-2">
+              Esta funcionalidad estará disponible próximamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
+              <p className="text-sm text-blue-900 font-medium mb-2">
+                ¿Qué incluirá este módulo?
+              </p>
+              <p className="text-sm text-blue-700">
+                {selectedType?.description}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Formularios personalizados</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Reportes en PDF</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Firmas digitales</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Seguimiento de cumplimiento</span>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowComingSoonModal(false)}
+              className="w-full"
+            >
+              Entendido
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Recent Activity */}
       <Card>

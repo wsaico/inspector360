@@ -11,9 +11,14 @@ import {
   Settings,
   Users,
   LogOut,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
+import { InspectionTypeService } from '@/lib/services';
+import { InspectionSystemType } from '@/types/inspection';
 
 const navigation = [
   {
@@ -53,6 +58,26 @@ export function Sidebar() {
   const router = useRouter();
   const { profile, loading, signOut } = useAuth();
   const permissions = usePermissions();
+  const [inspectionTypes, setInspectionTypes] = useState<InspectionSystemType[]>([]);
+  const [inspectionsExpanded, setInspectionsExpanded] = useState(false);
+
+  // Cargar tipos de inspección
+  useEffect(() => {
+    const loadTypes = async () => {
+      const { data } = await InspectionTypeService.getAll();
+      if (data) {
+        setInspectionTypes(data);
+      }
+    };
+    loadTypes();
+  }, []);
+
+  // Auto-expandir si estamos en una ruta de inspecciones
+  useEffect(() => {
+    if (pathname.startsWith('/inspections')) {
+      setInspectionsExpanded(true);
+    }
+  }, [pathname]);
 
   const handleSignOut = async () => {
     const result = await signOut();
@@ -82,7 +107,7 @@ export function Sidebar() {
           <span className="text-sm font-semibold text-white">
             Inspector 360°
           </span>
-          <span className="text-xs text-white/70">FOR-ATA-057</span>
+          <span className="text-xs text-white/70">Sistema de Inspecciones</span>
         </div>
       </div>
 
@@ -109,8 +134,76 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
         {filteredNavigation.map((item) => {
+          // Manejo especial para "Inspecciones" con submenu
+          if (item.name === 'Inspecciones') {
+            const isInspectionRoute = pathname.startsWith('/inspections');
+            return (
+              <div key={item.name} className="space-y-1">
+                <button
+                  onClick={() => setInspectionsExpanded(!inspectionsExpanded)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    isInspectionRoute
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className="h-5 w-5" />
+                    {item.name}
+                  </div>
+                  {inspectionsExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+                {inspectionsExpanded && (
+                  <div className="ml-6 space-y-1 mt-1">
+                    {inspectionTypes.map((type) => {
+                      const typeHref = type.code === 'technical' ? '/inspections' : `/inspections/${type.code}`;
+                      const isTypeActive = pathname === typeHref || (type.code === 'technical' && pathname.startsWith('/inspections'));
+
+                      return (
+                        <Link
+                          key={type.id}
+                          href={type.is_active ? typeHref : '#'}
+                          onClick={(e) => {
+                            if (!type.is_active) {
+                              e.preventDefault();
+                              toast.info(`${type.name} estará disponible próximamente`);
+                            }
+                          }}
+                          className={cn(
+                            'flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors',
+                            isTypeActive
+                              ? 'bg-white/10 text-white'
+                              : type.is_active
+                                ? 'text-white/60 hover:bg-white/5 hover:text-white'
+                                : 'text-white/40 cursor-not-allowed'
+                          )}
+                        >
+                          <span className={type.is_active ? '' : 'grayscale opacity-50'}>
+                            {type.icon}
+                          </span>
+                          <span className="flex-1">{type.name}</span>
+                          {!type.is_active && (
+                            <span className="text-[10px] bg-amber-500/20 text-amber-200 px-1.5 py-0.5 rounded">
+                              Pronto
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // Navegación normal para otros items
           const isActive = pathname === item.href;
           return (
             <Link

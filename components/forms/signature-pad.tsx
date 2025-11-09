@@ -192,6 +192,14 @@ export default function SignaturePad({
           <div className="flex flex-col sm:flex-row gap-2">
             <Button
               type="button"
+              onClick={handleSave}
+              className="flex-1 bg-primary"
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Confirmar Firma
+            </Button>
+            <Button
+              type="button"
               variant="outline"
               onClick={handleEdit}
               className="flex-1"
@@ -237,37 +245,38 @@ export default function SignaturePad({
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClear}
-                disabled={isEmpty}
-                className="flex-1"
-              >
-                <Eraser className="mr-2 h-4 w-4" />
-                Limpiar
-              </Button>
-              {savedSignature && (
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowCanvas(false)}
+                  onClick={handleClear}
+                  disabled={isEmpty}
                   className="flex-1"
                 >
-                  <X className="mr-2 h-4 w-4" />
-                  Cancelar
+                  <Eraser className="mr-2 h-4 w-4" />
+                  Limpiar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isEmpty}
+                  className="flex-1 bg-primary"
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Guardar
+                </Button>
+              </div>
+              {onCancel && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onCancel}
+                  className="w-full"
+                >
+                  ← Volver al Nombre
                 </Button>
               )}
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={isEmpty}
-                className="flex-1 bg-primary"
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Guardar
-              </Button>
             </div>
 
             <p className="text-xs text-center text-gray-500">

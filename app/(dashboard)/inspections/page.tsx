@@ -88,17 +88,17 @@ export default function InspectionsPage() {
   };
 
   const getStatusBadge = (inspection: Inspection) => {
-    const missingSig = getMissingSignaturesLabel(inspection);
-    if (hasPendingObservations(inspection)) {
-      return <Badge className="bg-amber-500 hover:bg-amber-600">Pendiente</Badge>;
-    }
-    if (missingSig) {
-      // Mostrar 'Pendiente' cuando faltan firmas, con tooltip informativo
-      return <Badge className="bg-amber-500 hover:bg-amber-600" title={missingSig}>Pendiente</Badge>;
-    }
+    // Usar el estado de la base de datos directamente
+    // El backend ya calcula el estado correcto basándose en las firmas
     if (inspection.status === 'completed') {
       return <Badge className="bg-green-500 hover:bg-green-600">Completada</Badge>;
     }
+    if (inspection.status === 'pending') {
+      // Mostrar información adicional si faltan firmas
+      const missingSig = getMissingSignaturesLabel(inspection);
+      return <Badge className="bg-amber-500 hover:bg-amber-600" title={missingSig || 'Pendiente de firmas'}>Pendiente</Badge>;
+    }
+    // draft
     return <Badge className="bg-gray-500 hover:bg-gray-600">Borrador</Badge>;
   };
 
@@ -216,8 +216,8 @@ export default function InspectionsPage() {
                 >
                   <option value="">Todos los estados</option>
                   <option value="draft">Borrador</option>
-                  <option value="completed">Completada</option>
                   <option value="pending">Pendiente</option>
+                  <option value="completed">Completada</option>
                 </select>
               </div>
 

@@ -202,7 +202,16 @@ export default function Step4Finalize() {
 
         // 2.1 Guardar firma del inspector por equipo si existe
         if (equipmentSignature && equipmentRowId) {
-          await InspectionService.uploadInspectorSignature(equipmentRowId, equipmentSignature);
+          // Validar que la firma sea una data URL válida
+          if (typeof equipmentSignature === 'string' && equipmentSignature.startsWith('data:image')) {
+            const { error: signatureError } = await InspectionService.uploadInspectorSignature(equipmentRowId, equipmentSignature);
+            if (signatureError) {
+              console.error(`Error guardando firma del inspector para equipo ${eq.code}:`, signatureError);
+              toast.error(`No se pudo guardar la firma del inspector para ${eq.code}`);
+            }
+          } else {
+            console.warn(`Firma inválida para equipo ${eq.code}:`, equipmentSignature);
+          }
         }
       }
 

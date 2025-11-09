@@ -70,8 +70,11 @@ export function useInspections(options: UseInspectionsOptions = {}) {
     // Profile puede estar cargando en background, pero user ya está disponible
     enabled: enabled && !!user,
 
-    // Stale time: 2 minutos - evita re-fetches innecesarios
-    staleTime: 1000 * 60 * 2,
+    // Cache por 30 segundos para mejor rendimiento
+    staleTime: 30000,
+
+    // Refetch automático cuando la ventana recupera el foco
+    refetchOnWindowFocus: true,
 
     // ✅ Keep previous data mientras carga nueva página o profile
     placeholderData: (previousData) => previousData,

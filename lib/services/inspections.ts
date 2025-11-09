@@ -225,10 +225,37 @@ export class InspectionService {
         mechanicUrl = publicUrl;
       }
 
-      // 5. Determinar estado: 'completed' solo si ambas firmas y nombres
-      // Cuando solo faltan firmas, no consideramos 'borrador' a nivel de UI/flujo.
-      // Marcamos como 'completed' y la UI mostrará 'Pendiente' por firmas faltantes.
-      const finalStatus: 'completed' | 'draft' = 'completed';
+      // 5. Verificar si hay observaciones pendientes de respuesta del mecánico
+      const { data: observations } = await supabase
+        .from('observations')
+        .select('obs_operator, obs_maintenance')
+        .eq('inspection_id', inspectionId);
+
+      const hasPendingObservations = observations &&
+        Array.isArray(observations) &&
+        observations.some(
+          (obs) => obs.obs_operator && obs.obs_operator.trim().length > 0 &&
+            (!obs.obs_maintenance || obs.obs_maintenance.trim().length === 0)
+        );
+
+      // 6. Determinar estado:
+      const hasSupervisorSignature = supervisorUrl !== null;
+      const hasMechanicSignature = mechanicUrl !== null;
+
+      let finalStatus: 'draft' | 'pending' | 'completed';
+
+      // Si hay observaciones pendientes, SIEMPRE es 'pending'
+      if (hasPendingObservations) {
+        finalStatus = 'pending';
+      }
+      // Si tiene ambas firmas Y no hay observaciones pendientes, es 'completed'
+      else if (hasSupervisorSignature && hasMechanicSignature) {
+        finalStatus = 'completed';
+      }
+      // Si falta alguna firma, es 'pending'
+      else {
+        finalStatus = 'pending';
+      }
 
       // 6. Actualizar inspección con datos presentes (firmas opcionales)
       const { data, error } = await supabase
@@ -275,21 +302,32 @@ export class InspectionService {
         data: { publicUrl },
       } = supabase.storage.from('signatures').getPublicUrl(fileName);
 
-      const { data, error } = await supabase
+      // Actualizar firma del supervisor
+      const { error } = await supabase
         .from('inspections')
         .update({
           supervisor_name: name,
           supervisor_signature_url: publicUrl,
           supervisor_signature_date: new Date().toISOString(),
-          status: 'completed',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', inspectionId)
-        .select()
-        .single();
+        .eq('id', inspectionId);
 
       if (error) throw error;
-      return { data, error: null };
+
+      // ✅ RE-CALCULAR el estado después de subir firma
+      await this.recalculateInspectionStatus(inspectionId);
+
+      // ✅ Obtener inspección actualizada con el nuevo estado
+      const { data: updatedInspection, error: fetchError } = await supabase
+        .from('inspections')
+        .select('*')
+        .eq('id', inspectionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      return { data: updatedInspection, error: null };
     } catch (error: any) {
       console.error('Error uploading supervisor signature:', error);
       return { data: null, error: error.message };
@@ -316,21 +354,32 @@ export class InspectionService {
         data: { publicUrl },
       } = supabase.storage.from('signatures').getPublicUrl(fileName);
 
-      const { data, error } = await supabase
+      // Actualizar firma del mecánico
+      const { error } = await supabase
         .from('inspections')
         .update({
           mechanic_name: name,
           mechanic_signature_url: publicUrl,
           mechanic_signature_date: new Date().toISOString(),
-          status: 'completed',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', inspectionId)
-        .select()
-        .single();
+        .eq('id', inspectionId);
 
       if (error) throw error;
-      return { data, error: null };
+
+      // ✅ RE-CALCULAR el estado después de subir firma
+      await this.recalculateInspectionStatus(inspectionId);
+
+      // ✅ Obtener inspección actualizada con el nuevo estado
+      const { data: updatedInspection, error: fetchError } = await supabase
+        .from('inspections')
+        .select('*')
+        .eq('id', inspectionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      return { data: updatedInspection, error: null };
     } catch (error: any) {
       console.error('Error uploading mechanic signature:', error);
       return { data: null, error: error.message };
@@ -424,6 +473,10 @@ export class InspectionService {
     signature: string
   ) {
     try {
+      if (!signature || !signature.startsWith('data:image')) {
+        throw new Error('Firma inválida: debe ser una data URL de imagen');
+      }
+
       const signatureBlob = await fetch(signature).then((r) => r.blob());
       const fileName = `signatures/equipment/${equipmentId}/inspector-${Date.now()}.png`;
 
@@ -431,7 +484,10 @@ export class InspectionService {
         .from('signatures')
         .upload(fileName, signatureBlob, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Error subiendo firma a storage:', uploadError);
+        throw uploadError;
+      }
 
       const {
         data: { publicUrl },
@@ -439,16 +495,23 @@ export class InspectionService {
 
       const { data, error } = await supabase
         .from('equipment')
-        .update({ inspector_signature_url: publicUrl })
+        .update({
+          inspector_signature_url: publicUrl,
+          inspector_signature_date: new Date().toISOString(),
+        })
         .eq('id', equipmentId)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error actualizando equipo con firma:', error);
+        throw error;
+      }
+
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error uploading signature:', error);
-      return { data: null, error: error.message };
+      console.error('Error uploading inspector signature:', error);
+      return { data: null, error: error.message || error.msg || 'Error desconocido guardando firma' };
     }
   }
 
@@ -625,6 +688,63 @@ export class InspectionService {
   }
 
   /**
+   * Re-calcula y actualiza el estado de una inspección basándose en firmas y observaciones
+   */
+  static async recalculateInspectionStatus(inspectionId: string) {
+    try {
+      // Obtener inspección actual
+      const { data: inspection } = await supabase
+        .from('inspections')
+        .select('supervisor_signature_url, mechanic_signature_url')
+        .eq('id', inspectionId)
+        .single();
+
+      if (!inspection) {
+        throw new Error('Inspección no encontrada');
+      }
+
+      // Verificar observaciones pendientes
+      const { data: observations } = await supabase
+        .from('observations')
+        .select('obs_operator, obs_maintenance')
+        .eq('inspection_id', inspectionId);
+
+      const hasPendingObservations = observations &&
+        Array.isArray(observations) &&
+        observations.some(
+          (obs) => obs.obs_operator && obs.obs_operator.trim().length > 0 &&
+            (!obs.obs_maintenance || obs.obs_maintenance.trim().length === 0)
+        );
+
+      // Determinar estado correcto
+      let correctStatus: 'draft' | 'pending' | 'completed';
+
+      if (hasPendingObservations) {
+        correctStatus = 'pending';
+      } else if (inspection.supervisor_signature_url && inspection.mechanic_signature_url) {
+        correctStatus = 'completed';
+      } else {
+        correctStatus = 'pending';
+      }
+
+      // Actualizar estado
+      const { error } = await supabase
+        .from('inspections')
+        .update({
+          status: correctStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', inspectionId);
+
+      if (error) throw error;
+      return { data: correctStatus, error: null };
+    } catch (error: any) {
+      console.error('Error recalculating inspection status:', error);
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
    * Actualiza la respuesta del mecánico para una observación
    */
   static async updateObservationMaintenance(
@@ -643,6 +763,12 @@ export class InspectionService {
         .single();
 
       if (error) throw error;
+
+      // ✅ RE-CALCULAR el estado de la inspección después de actualizar observación
+      if (data?.inspection_id) {
+        await this.recalculateInspectionStatus(data.inspection_id);
+      }
+
       return { data, error: null };
     } catch (error: any) {
       console.error('Error updating observation maintenance:', error);

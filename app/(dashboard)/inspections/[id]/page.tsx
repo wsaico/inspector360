@@ -59,6 +59,9 @@ export default function InspectionDetailPage() {
   const [signName, setSignName] = useState('');
   const [savingSignature, setSavingSignature] = useState(false);
   const [signStep, setSignStep] = useState<'name' | 'signature'>('name'); // Paso del modal
+  const [supervisorNames, setSupervisorNames] = useState<string[]>([]);
+  const [mechanicNames, setMechanicNames] = useState<string[]>([]);
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
 
   useEffect(() => {
     if (!params?.id) {
@@ -67,6 +70,22 @@ export default function InspectionDetailPage() {
     }
     loadInspection();
   }, [params.id]);
+
+  // Cargar nombres de supervisores y mecánicos cuando se abre el modal
+  useEffect(() => {
+    if (signOpen && inspection?.station) {
+      const loadNames = async () => {
+        if (signRole === 'supervisor') {
+          const { data } = await InspectionService.getUniqueSupervisorNames(inspection.station);
+          setSupervisorNames((data as string[]) || []);
+        } else if (signRole === 'mechanic') {
+          const { data } = await InspectionService.getUniqueMechanicNames(inspection.station);
+          setMechanicNames((data as string[]) || []);
+        }
+      };
+      loadNames();
+    }
+  }, [signOpen, signRole, inspection?.station]);
 
   const loadInspection = async () => {
     setLoading(true);
@@ -152,14 +171,8 @@ export default function InspectionDetailPage() {
         );
         if (error) throw new Error(error);
         toast.success('Observación actualizada');
-        // Actualizar en memoria sin recargar todo
-        setInspection((prev) => {
-          if (!prev) return prev;
-          const updated = (prev.observations || []).map((o) =>
-            o.id === selectedObservation.id ? { ...o, obs_maintenance: trimmed } : o
-          );
-          return { ...prev, observations: updated };
-        });
+        // Recargar inspección para obtener estado actualizado
+        await loadInspection();
       }
       setReplyOpen(false);
     } catch (e) {
@@ -195,7 +208,10 @@ export default function InspectionDetailPage() {
     if (status === 'completed') {
       return <Badge variant="success">Completada</Badge>;
     }
-    return <Badge variant="warning">Borrador</Badge>;
+    if (status === 'pending') {
+      return <Badge variant="warning">Pendiente</Badge>;
+    }
+    return <Badge className="bg-gray-500 hover:bg-gray-600">Borrador</Badge>;
   };
 
   const getTypeName = (type: string) => {
@@ -632,7 +648,7 @@ export default function InspectionDetailPage() {
           setTempSignature(null);
         }
       }}>
-        <DialogContent className="sm:max-w-md w-[95vw] max-w-[480px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {signRole === 'mechanic' ? 'Firma del Mecánico' : 'Firma del Supervisor'}
@@ -649,15 +665,18 @@ export default function InspectionDetailPage() {
                 <p className="font-medium">Primero, ingrese su nombre</p>
                 <p className="text-xs text-blue-700 mt-1">Luego podrá firmar sin que el teclado interfiera</p>
               </div>
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium mb-2">
                   Nombre Completo <span className="text-red-500">*</span>
                 </label>
                 <Input
                   autoFocus
+                  autoComplete="off"
                   placeholder={signRole === 'mechanic' ? 'Nombre del mecánico' : 'Nombre del supervisor'}
                   value={signName}
                   onChange={(e) => setSignName(e.target.value)}
+                  onFocus={() => setShowNameSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowNameSuggestions(false), 200)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && signName.trim()) {
                       setSignStep('signature');
@@ -665,6 +684,35 @@ export default function InspectionDetailPage() {
                   }}
                   className="text-base"
                 />
+                {/* Sugerencias de autocompletado */}
+                {showNameSuggestions && signRole && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {(signRole === 'supervisor' ? supervisorNames : mechanicNames)
+                      .filter(name => name.toLowerCase().includes(signName.toLowerCase()))
+                      .slice(0, 5)
+                      .map((name, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm transition-colors flex items-center gap-2"
+                          onClick={() => {
+                            setSignName(name);
+                            setShowNameSuggestions(false);
+                          }}
+                        >
+                          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+                {(signRole === 'supervisor' ? supervisorNames : mechanicNames).length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Nombres usados previamente en esta estación
+                  </p>
+                )}
               </div>
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button
@@ -711,20 +759,16 @@ export default function InspectionDetailPage() {
                       const { data, error } = await InspectionService.uploadSupervisorSignature(inspection.id!, signName, sig);
                       if (error) throw new Error(error);
                       try { if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', signName); } catch {}
-                      const updates = { supervisor_name: signName, supervisor_signature_url: data?.supervisor_signature_url || sig, supervisor_signature_date: data?.supervisor_signature_date || new Date().toISOString(), status: 'completed' as const };
-                      setInspection((prev) => prev ? { ...prev, ...updates } : prev);
                       toast.success('Firma del supervisor guardada correctamente');
-                      const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
-                      if (missing) toast.info(missing);
+                      // Recargar inspección para obtener estado actualizado
+                      await loadInspection();
                     } else {
                       const { data, error } = await InspectionService.uploadMechanicSignature(inspection.id!, signName, sig);
                       if (error) throw new Error(error);
                       try { if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', signName); } catch {}
-                      const updates = { mechanic_name: signName, mechanic_signature_url: data?.mechanic_signature_url || sig, mechanic_signature_date: data?.mechanic_signature_date || new Date().toISOString(), status: 'completed' as const };
-                      setInspection((prev) => prev ? { ...prev, ...updates } : prev);
                       toast.success('Firma del mecánico guardada correctamente');
-                      const missing = getMissingSignaturesLabel({ ...inspection, ...updates });
-                      if (missing) toast.info(missing);
+                      // Recargar inspección para obtener estado actualizado
+                      await loadInspection();
                     }
                     setSignOpen(false);
                     setSignRole(null);
@@ -741,17 +785,6 @@ export default function InspectionDetailPage() {
                 onChange={(sig) => setTempSignature(sig)}
                 initialValue={tempSignature || undefined}
               />
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSignStep('name')}
-                  className="flex-1"
-                  disabled={savingSignature}
-                >
-                  ← Volver al Nombre
-                </Button>
-              </div>
             </div>
           )}
         </DialogContent>

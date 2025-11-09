@@ -4,9 +4,24 @@
 
 import { Station } from './roles';
 
+// Tipo de inspección (categoria de inspección técnica)
 export type InspectionType = 'inicial' | 'periodica' | 'post_mantenimiento';
 
-export type InspectionStatus = 'draft' | 'completed';
+// Tipo de sistema de inspección (diferentes módulos del sistema)
+export interface InspectionSystemType {
+  id: string;
+  code: 'technical' | 'extinguisher' | 'first_aid' | 'internal';
+  name: string;
+  icon: string;
+  description: string;
+  form_prefix: string;
+  is_active: boolean;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type InspectionStatus = 'draft' | 'pending' | 'completed';
 
 export type ChecklistStatus = 'conforme' | 'no_conforme' | 'no_aplica';
 

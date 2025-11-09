@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Inspection, Equipment } from '@/types';
 import { format } from 'date-fns';
+import { utcToZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
 
@@ -45,7 +46,7 @@ export class PDFGenerator {
     await this.addHeader(inspection);
     this.addTopMeta(inspection);
     this.addLegend();
-    this.addChecklistMatrix(inspection);
+    await this.addChecklistMatrix(inspection);
     this.addNoteParagraph();
     this.addObservationsTable(inspection);
 
@@ -303,7 +304,7 @@ export class PDFGenerator {
   }
 
   // Matriz de checklist (filas: equipos, columnas: ítems) en horizontal
-  private addChecklistMatrix(inspection: Inspection) {
+  private async addChecklistMatrix(inspection: Inspection) {
     // Encabezados exactos del HTML (12 ítems)
     const headerItems = [
       'Extintor vigente: verificar presencia, fecha de vencimiento y de ultima inspección. El manómetro en zona verde.',
@@ -335,7 +336,7 @@ export class PDFGenerator {
         if (st === 'no_aplica') return 'N/A';
         return '';
       });
-      return [eq.code || '-', hourStr, ...values, eq.inspector_signature_url ? 'Firmado' : ''];
+      return [eq.code || '-', hourStr, ...values, ''];
     });
 
     const usableW = this.pageWidth - this.margin * 2;
@@ -348,6 +349,19 @@ export class PDFGenerator {
     for (let i = 2; i < 2 + items.length; i++) columnStyles[i] = { cellWidth: perItem };
     columnStyles[2 + items.length] = { cellWidth: 22 };
 
+    // Pre-cargar todas las imágenes de firmas de inspector
+    const signatureImages: { [key: number]: string } = {};
+    for (let i = 0; i < (inspection.equipment || []).length; i++) {
+      const eq = inspection.equipment![i];
+      if (eq.inspector_signature_url) {
+        try {
+          signatureImages[i] = await this.loadImage(eq.inspector_signature_url);
+        } catch (error) {
+          console.error(`Error cargando firma del inspector para equipo ${eq.code}:`, error);
+        }
+      }
+    }
+
     autoTable(this.doc, {
       startY: this.currentY,
       head: [head],
@@ -356,6 +370,29 @@ export class PDFGenerator {
       headStyles: { fillColor: [9, 48, 113], textColor: 255, fontStyle: 'bold' },
       columnStyles,
       margin: { left: this.margin, right: this.margin },
+      didDrawCell: (data: any) => {
+        // Dibujar imagen de firma en la última columna (FIRMA)
+        if (data.section === 'body' && data.column.index === head.length - 1) {
+          const rowIndex = data.row.index;
+          const img = signatureImages[rowIndex];
+          if (img) {
+            const cellX = data.cell.x;
+            const cellY = data.cell.y;
+            const cellW = data.cell.width;
+            const cellH = data.cell.height;
+            // Dibujar imagen centrada en la celda con padding
+            const imgW = cellW - 4;
+            const imgH = cellH - 2;
+            const imgX = cellX + 2;
+            const imgY = cellY + 1;
+            try {
+              this.doc.addImage(img, 'PNG', imgX, imgY, imgW, imgH);
+            } catch (error) {
+              console.error('Error al agregar firma a PDF:', error);
+            }
+          }
+        }
+      },
     });
 
     // @ts-ignore
@@ -427,11 +464,9 @@ export class PDFGenerator {
       this.currentY += 6;
 
       if (inspection.supervisor_signature_date) {
-        const signDate = format(
-          new Date(inspection.supervisor_signature_date),
-          'dd/MM/yyyy HH:mm',
-          { locale: es }
-        );
+        const utcDate = new Date(inspection.supervisor_signature_date);
+        const peruDate = utcToZonedTime(utcDate, 'America/Lima');
+        const signDate = format(peruDate, 'dd/MM/yyyy HH:mm', { locale: es });
         this.doc.text(`Fecha: ${signDate}`, this.margin + 5, this.currentY);
         this.currentY += 8;
       }
@@ -474,11 +509,9 @@ export class PDFGenerator {
       this.currentY += 6;
 
       if (inspection.mechanic_signature_date) {
-        const mechDate = format(
-          new Date(inspection.mechanic_signature_date),
-          'dd/MM/yyyy HH:mm',
-          { locale: es }
-        );
+        const utcDate = new Date(inspection.mechanic_signature_date);
+        const peruDate = utcToZonedTime(utcDate, 'America/Lima');
+        const mechDate = format(peruDate, 'dd/MM/yyyy HH:mm', { locale: es });
         this.doc.text(`Fecha: ${mechDate}`, this.margin + 5, this.currentY);
         this.currentY += 8;
       }
