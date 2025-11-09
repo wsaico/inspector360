@@ -52,6 +52,10 @@ export default function LoginPage() {
         .select('full_name, is_active')
         .eq('email', email.trim().toLowerCase());
 
+      console.log('Email buscado:', email.trim().toLowerCase());
+      console.log('Profiles encontrados:', profiles);
+      console.log('Error:', error);
+
       // Usuario no encontrado
       if (error || !profiles || profiles.length === 0) {
         setIsSubmitting(false);
