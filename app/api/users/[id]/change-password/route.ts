@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -32,7 +32,7 @@ export async function POST(
 
     const body = await request.json();
     const { newPassword, currentPassword } = body;
-    const userId = params.id;
+    const { id: userId } = await params;
 
     // Validaciones
     if (!newPassword) {
