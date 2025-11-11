@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
+import { optimizeSignature } from '@/lib/utils/signature';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -69,9 +70,29 @@ export default function SignaturePad({
     setIsDrawing(false);
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
-      const dataURL = sigCanvas.current.toDataURL('image/png');
+      // Intentar usar el lienzo recortado si la librería lo expone
+      const rawCanvas: HTMLCanvasElement | undefined =
+        (sigCanvas.current as any).getTrimmedCanvas?.() || (sigCanvas.current as any).getCanvas?.();
+
+      // Optimizar en el navegador para tamaño ~3–4 KB
+      let dataURL: string;
+      if (rawCanvas) {
+        dataURL = await optimizeSignature(rawCanvas);
+      } else {
+        // Fallback: optimizar a partir del DataURL si no podemos acceder al canvas
+        const pngDataURL = sigCanvas.current.toDataURL('image/png');
+        const img = new Image();
+        img.src = pngDataURL;
+        await new Promise((res) => (img.onload = res));
+        const tmp = document.createElement('canvas');
+        tmp.width = img.width;
+        tmp.height = img.height;
+        const ctx = tmp.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        dataURL = await optimizeSignature(tmp);
+      }
 
       // Guardar en estado local
       setSavedSignature(dataURL);
@@ -122,14 +143,30 @@ export default function SignaturePad({
     setIsDrawing(true);
   }, []);
 
-  const handleEnd = useCallback(() => {
+  const handleEnd = useCallback(async () => {
     setIsDrawing(false);
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       setIsEmpty(false);
 
       // AUTO-GUARDAR en localStorage SILENCIOSAMENTE (sin notificar al padre)
       try {
-        const dataURL = sigCanvas.current.toDataURL('image/png');
+        const rawCanvas: HTMLCanvasElement | undefined =
+          (sigCanvas.current as any).getTrimmedCanvas?.() || (sigCanvas.current as any).getCanvas?.();
+        let dataURL: string;
+        if (rawCanvas) {
+          dataURL = await optimizeSignature(rawCanvas);
+        } else {
+          const pngDataURL = sigCanvas.current.toDataURL('image/png');
+          const img = new Image();
+          img.src = pngDataURL;
+          await new Promise((res) => (img.onload = res));
+          const tmp = document.createElement('canvas');
+          tmp.width = img.width;
+          tmp.height = img.height;
+          const ctx = tmp.getContext('2d')!;
+          ctx.drawImage(img, 0, 0);
+          dataURL = await optimizeSignature(tmp);
+        }
         localStorage.setItem(storageKey, dataURL);
         setSavedSignature(dataURL);
       } catch (error) {

@@ -104,20 +104,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Actualizar con campos adicionales si es necesario
-    if (phone) {
+    // Actualizar con campos adicionales si es necesario (station, phone)
+    const updates: Record<string, any> = {};
+    if (station) updates.station = station;
+    if (phone) updates.phone = phone;
+
+    if (Object.keys(updates).length > 0) {
       const { data: updatedProfile, error: updateError } = await supabaseAdmin
         .from('user_profiles')
-        .update({ phone })
+        .update(updates)
         .eq('id', authData.user.id)
         .select()
         .single();
 
       if (updateError) {
-        console.error('Error actualizando teléfono:', updateError);
-      } else {
-        return NextResponse.json({ data: updatedProfile }, { status: 201 });
+        console.error('Error actualizando perfil:', updateError);
+        return NextResponse.json({ error: 'Error actualizando perfil' }, { status: 500 });
       }
+      return NextResponse.json({ data: updatedProfile }, { status: 201 });
     }
 
     return NextResponse.json({ data: profile }, { status: 201 });

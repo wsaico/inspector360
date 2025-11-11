@@ -49,7 +49,7 @@ function TemplateWithData() {
     } catch {}
   }, [inspectionId, remote]);
 
-  // ✅ OPTIMIZADO: Auto print SOLO cuando los datos están 100% listos
+  // ✅ Auto print cuando DOM y recursos (imágenes) están listos
   useEffect(() => {
     const shouldPrint = searchParams.get('print') === 'true';
     if (!shouldPrint) return;
@@ -60,19 +60,74 @@ function TemplateWithData() {
       return;
     }
 
-    console.log('[PDF] Datos listos, iniciando impresión en 1000ms...');
+    let cancelled = false;
+    const timeoutMs = 8000; // tiempo máximo de espera por imágenes
 
-    // Delay aumentado para asegurar que TODO el DOM esté renderizado
-    const t = setTimeout(() => {
+    const waitForImagesReady = (): Promise<void> => {
+      const imgs = Array.from(document.querySelectorAll('img'));
+      if (imgs.length === 0) return Promise.resolve();
+
+      const allReady = imgs.every((img) => img.complete && img.naturalWidth > 0);
+      if (allReady) return Promise.resolve();
+
+      return new Promise<void>((resolve) => {
+        let done = false;
+        const cleanup: Array<() => void> = [];
+        const tryResolve = () => {
+          if (done) return;
+          const ok = imgs.every((img) => img.complete && img.naturalWidth > 0);
+          if (ok) {
+            done = true;
+            cleanup.forEach((fn) => fn());
+            resolve();
+          }
+        };
+        imgs.forEach((img) => {
+          const onLoad = () => tryResolve();
+          const onError = () => tryResolve(); // si falla, continuar para no bloquear
+          img.addEventListener('load', onLoad);
+          img.addEventListener('error', onError);
+          cleanup.push(() => {
+            img.removeEventListener('load', onLoad);
+            img.removeEventListener('error', onError);
+          });
+        });
+        // Chequeo periódico por si algunos eventos no disparan
+        const interval = setInterval(tryResolve, 200);
+        cleanup.push(() => clearInterval(interval));
+        // Fallback por timeout
+        const t = setTimeout(() => {
+          if (done) return;
+          done = true;
+          cleanup.forEach((fn) => fn());
+          resolve();
+        }, timeoutMs);
+        cleanup.push(() => clearTimeout(t));
+      });
+    };
+
+    const run = async () => {
       try {
-        console.log('[PDF] Activando window.print()');
-        window.print();
+        await waitForImagesReady();
+        if (cancelled) return;
+        // Pequeño respiro para layout final antes de imprimir
+        setTimeout(() => {
+          try {
+            console.log('[PDF] Imprimiendo con recursos listos');
+            window.print();
+          } catch (e) {
+            console.error('[PDF] Error al imprimir:', e);
+            window.print(); // fallback
+          }
+        }, 100);
       } catch (e) {
-        console.error('[PDF] Error al imprimir:', e);
+        console.error('[PDF] Error esperando imágenes:', e);
+        window.print();
       }
-    }, 1000); // Aumentado a 1 segundo para garantizar render completo
+    };
 
-    return () => clearTimeout(t);
+    run();
+    return () => { cancelled = true; };
   }, [searchParams, inspectionId, remote]);
 
   const data = useMemo(() => {
@@ -106,13 +161,9 @@ function TemplateWithData() {
     };
     const getHour = (val: any): string => {
       if (!val) return '';
-      if (typeof val === 'string') {
-        const m = val.match(/T(\d{2}):(\d{2})/);
-        if (m) return `${m[1]}:${m[2]}`;
-        return '';
-      }
       try {
-        const d = new Date(val);
+        const d = typeof val === 'string' ? new Date(val) : new Date(val);
+        if (isNaN(d.getTime())) return '';
         const hh = String(d.getHours()).padStart(2, '0');
         const mi = String(d.getMinutes()).padStart(2, '0');
         return `${hh}:${mi}`;
