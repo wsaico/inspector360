@@ -387,21 +387,27 @@ export class InspectionService {
     equipmentData: Partial<Equipment>
   ) {
     try {
+      // Construir el objeto solo con los campos que tienen valores
+      const equipmentToInsert: any = {
+        inspection_id: inspectionId,
+        code: equipmentData.code,
+        type: equipmentData.type,
+        station: equipmentData.station,
+        checklist_data: equipmentData.checklist_data || {},
+        order_index: equipmentData.order_index || 0,
+      };
+
+      // Agregar campos opcionales solo si tienen valores
+      if (equipmentData.brand) equipmentToInsert.brand = equipmentData.brand;
+      if (equipmentData.model) equipmentToInsert.model = equipmentData.model;
+      if (equipmentData.year) equipmentToInsert.year = equipmentData.year;
+      if (equipmentData.serial_number) equipmentToInsert.serial_number = equipmentData.serial_number;
+      if (equipmentData.motor_serial) equipmentToInsert.motor_serial = equipmentData.motor_serial;
+      if (equipmentData.description) equipmentToInsert.description = equipmentData.description;
+
       const { data, error } = await supabase
         .from('equipment')
-        .insert({
-          inspection_id: inspectionId,
-          code: equipmentData.code,
-          type: equipmentData.type,
-          brand: equipmentData.brand,
-          model: equipmentData.model,
-          year: equipmentData.year,
-          serial_number: equipmentData.serial_number,
-          motor_serial: equipmentData.motor_serial,
-          station: equipmentData.station,
-          checklist_data: equipmentData.checklist_data || {},
-          order_index: equipmentData.order_index || 0,
-        })
+        .insert(equipmentToInsert)
         .select()
         .single();
 
