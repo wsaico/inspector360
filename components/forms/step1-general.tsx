@@ -8,7 +8,7 @@
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuth, usePermissions } from '@/hooks';
+import { useAuth, usePermissions, useActiveStations, useInspectorNames } from '@/hooks';
 import { useInspectionForm } from '@/context/inspection-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -16,8 +16,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { inspectionGeneralSchema, InspectionGeneralFormData } from '@/lib/validations';
 import { STATIONS, INSPECTION_TYPES } from '@/types';
-import { StationsService } from '@/lib/services/stations';
-import { InspectionService } from '@/lib/services/inspections';
 // Nota: Tipamos estación usando el esquema de validación para evitar que se infiera como string
 import { Calendar, MapPin, User, FileText } from 'lucide-react';
 
@@ -25,9 +23,14 @@ export default function Step1General() {
   const { profile, user } = useAuth();
   const { canViewAllStations } = usePermissions();
   const { formData, setGeneralInfo } = useInspectionForm();
-  const [stationOptions, setStationOptions] = React.useState<{ code: string; name: string }[]>([]);
-  const [inspectorNames, setInspectorNames] = React.useState<string[]>([]);
   const [showInspectorSuggestions, setShowInspectorSuggestions] = React.useState(false);
+  const [selectedStation, setSelectedStation] = React.useState<string | undefined>(profile?.station);
+
+  // OPTIMIZADO: React Query hooks con caché automático
+  const { data: stations = [] } = useActiveStations();
+  const stationOptions = stations.map(s => ({ code: s.code, name: s.name }));
+
+  const { data: inspectorNames = [] } = useInspectorNames(selectedStation);
 
   const {
     register,
@@ -57,27 +60,11 @@ export default function Step1General() {
     },
   });
 
-  // Cargar estaciones desde la base de datos
+  // Actualizar estación seleccionada cuando cambia en el formulario
   React.useEffect(() => {
-    const loadStations = async () => {
-      const res = await StationsService.listAll();
-      const active = (res.data || []).filter(s => s.is_active);
-      setStationOptions(active.map(s => ({ code: s.code, name: s.name })));
-    };
-    loadStations();
-  }, []);
-
-  // Cargar nombres de inspectores cuando cambia la estación
-  React.useEffect(() => {
-    const station = (document.getElementById('station') as HTMLSelectElement)?.value;
-    if (station) {
-      const loadInspectorNames = async () => {
-        const { data } = await InspectionService.getUniqueInspectorNames(station);
-        setInspectorNames((data as string[]) || []);
-      };
-      loadInspectorNames();
-    }
-  }, [formData.general?.station]);
+    const station = formData.general?.station || profile?.station;
+    setSelectedStation(station);
+  }, [formData.general?.station, profile?.station]);
 
   // Si el perfil llega tarde, sincronizar la estación por defecto
   // y mantenerla fija para usuarios sin permiso global

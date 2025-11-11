@@ -38,7 +38,7 @@ import Image from 'next/image';
 import { getChecklistItem } from '@/lib/checklist-template';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { usePermissions } from '@/hooks';
+import { usePermissions, useSupervisorNames, useMechanicNames } from '@/hooks';
 import { withTimeout } from '@/lib/utils/async';
 import dynamic from 'next/dynamic';
 import { Input } from '@/components/ui/input';
@@ -59,9 +59,21 @@ export default function InspectionDetailPage() {
   const [signName, setSignName] = useState('');
   const [savingSignature, setSavingSignature] = useState(false);
   const [signStep, setSignStep] = useState<'name' | 'signature'>('name'); // Paso del modal
-  const [supervisorNames, setSupervisorNames] = useState<string[]>([]);
-  const [mechanicNames, setMechanicNames] = useState<string[]>([]);
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+
+  // OPTIMIZADO: React Query hooks con caché automático
+  // Solo cargar cuando el modal está abierto y hay estación
+  const shouldLoadSupervisors = signOpen && signRole === 'supervisor' && !!inspection?.station;
+  const shouldLoadMechanics = signOpen && signRole === 'mechanic' && !!inspection?.station;
+
+  const { data: supervisorNames = [] } = useSupervisorNames(
+    inspection?.station,
+    shouldLoadSupervisors
+  );
+  const { data: mechanicNames = [] } = useMechanicNames(
+    inspection?.station,
+    shouldLoadMechanics
+  );
 
   useEffect(() => {
     if (!params?.id) {
@@ -70,22 +82,6 @@ export default function InspectionDetailPage() {
     }
     loadInspection();
   }, [params.id]);
-
-  // Cargar nombres de supervisores y mecánicos cuando se abre el modal
-  useEffect(() => {
-    if (signOpen && inspection?.station) {
-      const loadNames = async () => {
-        if (signRole === 'supervisor') {
-          const { data } = await InspectionService.getUniqueSupervisorNames(inspection.station);
-          setSupervisorNames((data as string[]) || []);
-        } else if (signRole === 'mechanic') {
-          const { data } = await InspectionService.getUniqueMechanicNames(inspection.station);
-          setMechanicNames((data as string[]) || []);
-        }
-      };
-      loadNames();
-    }
-  }, [signOpen, signRole, inspection?.station]);
 
   const loadInspection = async () => {
     setLoading(true);

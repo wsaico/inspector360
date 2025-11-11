@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth, usePermissions, useComplianceDashboard } from '@/hooks';
+import { useAuth, usePermissions, useComplianceDashboard, useStationOptions } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { STATIONS } from '@/types/roles';
-import { StationsService } from '@/lib/services/stations';
 
 export default function CompliancePage() {
   const { profile, loading: profileLoading, user, error, status } = useAuth();
@@ -45,7 +44,9 @@ export default function CompliancePage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [station, setStation] = useState<string | undefined>(undefined);
-  const [stationOptions, setStationOptions] = useState<{ value: string; label: string }[]>([]);
+
+  // OPTIMIZADO: React Query hook con caché automático para estaciones
+  const { data: stationOptions = [] } = useStationOptions();
 
   // Solo permitir "todas" si realmente tiene permiso o su estación es "todas"
   // Fuerza tipo boolean para evitar uniones con string/undefined que rompen el build
@@ -60,16 +61,6 @@ export default function CompliancePage() {
       setStation(s);
     }
   }, [profile?.station, canViewAllStations]);
-
-  // Cargar opciones de estaciones
-  useEffect(() => {
-    const loadStations = async () => {
-      const res = await StationsService.listAll();
-      const active = (res.data || []).filter(s => s.is_active);
-      setStationOptions(active.map(s => ({ value: s.code, label: s.name })));
-    };
-    loadStations();
-  }, []);
 
   // NUEVA LÓGICA: Usar React Query hooks con caché automático
   // Solo cargar datos si el usuario está autenticado y tiene permisos correctos
