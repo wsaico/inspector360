@@ -246,24 +246,14 @@ export default function Step2Equipment() {
                   {errors.type && <p className="text-sm text-red-500">{errors.type.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Marca *</Label>
+                  <Label>Marca</Label>
                   <Input {...register('brand')} placeholder="Toyota" />
                   {errors.brand && <p className="text-sm text-red-500">{errors.brand.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Modelo *</Label>
+                  <Label>Modelo</Label>
                   <Input {...register('model')} placeholder="8FG25N" />
                   {errors.model && <p className="text-sm text-red-500">{errors.model.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label>Año *</Label>
-                  <Input {...register('year', { valueAsNumber: true })} type="number" placeholder="2023" />
-                  {errors.year && <p className="text-sm text-red-500">{errors.year.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label>Número de Serie *</Label>
-                  <Input {...register('serial_number')} placeholder="SN123456789" />
-                  {errors.serial_number && <p className="text-sm text-red-500">{errors.serial_number.message}</p>}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -335,7 +325,7 @@ export default function Step2Equipment() {
                           <div>
                           <p className="font-semibold">{eq.code}</p>
                           <p className="text-sm text-muted-foreground">
-                            {eq.type} - {eq.brand} {eq.model}
+                            {eq.type}{eq.brand || eq.model ? ' - ' : ''}{eq.brand || ''} {eq.model || ''}
                           </p>
                           </div>
                           <Button size="sm" onClick={() => handleSelectExisting(eq)}>
@@ -393,7 +383,7 @@ export default function Step2Equipment() {
                 <div>
                   <p className="font-semibold">{eq.code}</p>
                   <p className="text-sm text-muted-foreground">
-                    {eq.type} - {eq.brand} {eq.model}
+                    {eq.type}{eq.brand || eq.model ? ' - ' : ''}{eq.brand || ''} {eq.model || ''}
                   </p>
                 </div>
                 <div className="flex gap-2">

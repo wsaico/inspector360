@@ -125,7 +125,7 @@ export default function Step2_5Observations() {
                 <option value="">Seleccione un equipo</option>
                 {formData.equipment.map((eq, index) => (
                   <option key={index} value={eq.code}>
-                    {eq.code} - {eq.type} ({eq.brand} {eq.model})
+                    {eq.code} - {eq.type}{eq.brand || eq.model ? ` (${eq.brand || ''} ${eq.model || ''})` : ''}
                   </option>
                 ))}
               </select>

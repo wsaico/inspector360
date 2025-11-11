@@ -83,8 +83,44 @@ export default function Step3Checklist() {
     return baseComplete && !hasPendingObservation;
   };
 
+  // Verificar cuántos equipos tienen checklist completo y firma
+  const equiposConChecklistCompleto = formData.equipment.filter(eq => {
+    const checklist = formData.checklists[eq.code] || {};
+    return Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
+  }).length;
+
+  const equiposConFirma = formData.equipment.filter(eq => {
+    return !!formData.equipmentSignatures[eq.code];
+  }).length;
+
+  const todoCompleto = equiposConChecklistCompleto === formData.equipment.length &&
+                       equiposConFirma === formData.equipment.length;
+
   return (
     <div className="space-y-6">
+      {/* Alerta de progreso general */}
+      {formData.equipment.length > 0 && !todoCompleto && (
+        <Card className="border-2 border-yellow-300 bg-yellow-50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-yellow-500 flex items-center justify-center">
+                <Package className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-yellow-900 mb-2">Progreso de Inspección</h3>
+                <div className="space-y-1 text-sm text-yellow-800">
+                  <p>✓ Checklists completados: {equiposConChecklistCompleto}/{formData.equipment.length} equipos</p>
+                  <p>✓ Firmas del inspector: {equiposConFirma}/{formData.equipment.length} equipos</p>
+                  {equiposConChecklistCompleto === formData.equipment.length && equiposConFirma < formData.equipment.length && (
+                    <p className="font-semibold mt-2">⚠️ Falta firmar {formData.equipment.length - equiposConFirma} equipo(s)</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Selector de Equipo Moderno */}
       <Card className="border-2 border-purple-200 shadow-lg">
         <div className="h-1.5 bg-gradient-to-r from-purple-500 to-purple-600" />
@@ -100,6 +136,8 @@ export default function Step3Checklist() {
             const equipmentProgress = Math.round((Object.keys(equipmentChecklist).length / CHECKLIST_TEMPLATE.length) * 100);
             const isSelected = selectedEquipment === index;
             const isComplete = equipmentProgress === 100;
+            const tieneFirma = !!formData.equipmentSignatures[eq.code];
+            const todoListo = isComplete && tieneFirma;
 
             return (
               <button
@@ -108,17 +146,19 @@ export default function Step3Checklist() {
                 className={`relative overflow-hidden rounded-xl p-4 transition-all duration-200 min-w-[140px] ${
                   isSelected
                     ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg scale-105'
+                    : todoListo
+                    ? 'bg-white border-2 border-green-400 text-purple-900 hover:border-green-500 hover:shadow-md'
                     : 'bg-white border-2 border-purple-200 text-purple-900 hover:border-purple-400 hover:shadow-md'
                 }`}
               >
                 <div className="flex flex-col items-center gap-2">
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                    isSelected ? 'bg-white/20' : 'bg-purple-100'
+                    isSelected ? 'bg-white/20' : todoListo ? 'bg-green-100' : 'bg-purple-100'
                   }`}>
-                    <Package className={`h-5 w-5 ${isSelected ? 'text-white' : 'text-purple-600'}`} />
+                    <Package className={`h-5 w-5 ${isSelected ? 'text-white' : todoListo ? 'text-green-600' : 'text-purple-600'}`} />
                   </div>
                   <span className="text-sm font-bold">{eq.code}</span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-col items-center gap-1">
                     {isComplete ? (
                       <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
                         isSelected ? 'bg-white/20' : 'bg-green-100'
@@ -132,6 +172,26 @@ export default function Step3Checklist() {
                       <span className={`text-xs font-semibold ${isSelected ? 'text-white/90' : 'text-purple-600'}`}>
                         {equipmentProgress}%
                       </span>
+                    )}
+                    {isComplete && (
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                        tieneFirma
+                          ? isSelected ? 'bg-white/20' : 'bg-green-100'
+                          : isSelected ? 'bg-white/20' : 'bg-red-100'
+                      }`}>
+                        <PenLine className={`h-3 w-3 ${
+                          tieneFirma
+                            ? isSelected ? 'text-white' : 'text-green-600'
+                            : isSelected ? 'text-white' : 'text-red-600'
+                        }`} />
+                        <span className={`text-xs font-semibold ${
+                          tieneFirma
+                            ? isSelected ? 'text-white' : 'text-green-700'
+                            : isSelected ? 'text-white' : 'text-red-700'
+                        }`}>
+                          {tieneFirma ? 'Firmado' : 'Sin firma'}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -57,10 +57,10 @@ export interface Equipment {
   inspection_id?: string;
   code: string;
   type: string;
-  brand: string;
-  model: string;
-  year: number;
-  serial_number: string;
+  brand?: string;
+  model?: string;
+  year?: number;
+  serial_number?: string;
   motor_serial?: string;
   station: Station;
   inspector_signature_url?: string;

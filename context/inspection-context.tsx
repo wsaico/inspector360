@@ -214,11 +214,12 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
       case 2:
         return formData.equipment.length > 0;
       case 3:
-        // Checklist antes de observaciones: exigir que todos los equipos tengan checklist completo
+        // Checklist: exigir que todos los equipos tengan checklist completo Y firma del inspector
         return formData.equipment.every(eq => {
           const checklist = formData.checklists[eq.code];
           const checklistCompleto = checklist && Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
-          return !!checklistCompleto;
+          const tieneFirmaInspector = !!formData.equipmentSignatures[eq.code];
+          return checklistCompleto && tieneFirmaInspector;
         });
       case 4:
         // Observaciones despues del checklist: si hay No Conformes, exigir observacion del operador por equipo

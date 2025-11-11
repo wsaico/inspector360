@@ -208,14 +208,22 @@ export class PDFGenerator {
     this.currentY += 12;
 
     // Tabla de información del equipo
-    const equipmentData = [
+    const equipmentData: [string, string][] = [
       ['Tipo', equipment.type],
-      ['Marca', equipment.brand],
-      ['Modelo', equipment.model],
-      ['Año', equipment.year.toString()],
-      ['Serie', equipment.serial_number],
     ];
 
+    if (equipment.brand) {
+      equipmentData.push(['Marca', equipment.brand]);
+    }
+    if (equipment.model) {
+      equipmentData.push(['Modelo', equipment.model]);
+    }
+    if (equipment.year) {
+      equipmentData.push(['Año', equipment.year.toString()]);
+    }
+    if (equipment.serial_number) {
+      equipmentData.push(['Serie', equipment.serial_number]);
+    }
     if (equipment.motor_serial) {
       equipmentData.push(['Serie Motor', equipment.motor_serial]);
     }
