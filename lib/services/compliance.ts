@@ -31,43 +31,37 @@ export class ComplianceService {
   }
   /**
    * Obtiene estadísticas generales
+   * OPTIMIZADO: Eliminada query duplicada (totalQuery y monthQuery eran idénticos)
    */
   static async getOverallStats(filters?: { station?: string; month?: string }) {
     try {
       const { start, end } = ComplianceService.getMonthRange(filters?.month);
-      // Base query por rango de mes y estado completado
-      const baseInspections = supabase
+
+      // Query consolidada: Una sola consulta para inspecciones del mes
+      // (antes había 2 queries idénticas: totalQuery y monthQuery)
+      let inspectionsQuery = supabase
         .from('inspections')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact' })
         .eq('status', 'completed')
         .gte('created_at', start)
         .lte('created_at', end);
 
-      // Total de inspecciones completadas (aplicando filtro de estación si corresponde)
-      const totalQuery = filters?.station ? baseInspections.eq('station', filters.station) : baseInspections;
-      const { count: totalInspections, error: totalError } = await totalQuery;
+      // Aplicar filtro de estación si corresponde
+      if (filters?.station) {
+        inspectionsQuery = inspectionsQuery.eq('station', filters.station);
+      }
 
-      if (totalError) throw totalError;
+      const { data: inspections, count: inspectionCount, error: inspectionsError } = await inspectionsQuery;
 
-      // Inspecciones completadas este mes (mismo rango, mismo filtro)
-      const monthQuery = filters?.station ? baseInspections.eq('station', filters.station) : baseInspections;
-      const { count: completedThisMonth, error: monthError } = await monthQuery;
+      if (inspectionsError) throw inspectionsError;
 
-      if (monthError) throw monthError;
+      // Usar el mismo count para ambos valores (son idénticos)
+      const totalInspections = inspectionCount || 0;
+      const completedThisMonth = inspectionCount || 0;
 
-      // Total de equipos inspeccionados (vinculados a inspecciones COMPLETADAS del mes y filtrados por estación)
-      // 1) Obtener IDs de inspecciones dentro del rango y estado completado
-      const baseIdsQuery = supabase
-        .from('inspections')
-        .select('id')
-        .eq('status', 'completed')
-        .gte('created_at', start)
-        .lte('created_at', end);
-      const idsQuery = filters?.station ? baseIdsQuery.eq('station', filters.station) : baseIdsQuery;
-      const { data: inspectionsForMonth, error: idsError } = await idsQuery;
-      if (idsError) throw idsError;
-
-      const ids = (inspectionsForMonth || [])
+      // Total de equipos inspeccionados
+      // OPTIMIZADO: Reusar IDs de la primera query (ya los tenemos)
+      const ids = (inspections || [])
         .map((i: { id?: string | null }) => i?.id || null)
         .filter((v: string | null): v is string => typeof v === 'string' && v.length > 0);
 

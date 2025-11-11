@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth, usePermissions } from '@/hooks';
+import { useAuth, usePermissions, useComplianceDashboard } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -31,7 +31,6 @@ import {
   MapPin,
   Activity,
 } from 'lucide-react';
-import { ComplianceService } from '@/lib/services/compliance';
 import { toast } from 'sonner';
 import { STATIONS } from '@/types/roles';
 import { StationsService } from '@/lib/services/stations';
@@ -39,39 +38,30 @@ import { StationsService } from '@/lib/services/stations';
 export default function CompliancePage() {
   const { profile, loading: profileLoading, user, error, status } = useAuth();
   const { canViewAllStations } = usePermissions();
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({
-    totalInspections: 0,
-    completedThisMonth: 0,
-    complianceRate: 0,
-    equipmentInspected: 0,
-  });
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [complianceData, setComplianceData] = useState<any[]>([]);
-  const [topIssues, setTopIssues] = useState<any[]>([]);
+
+  // Estados para filtros
   const [month, setMonth] = useState<string>(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [station, setStation] = useState<string | undefined>(undefined);
-  const [dailyCompliance, setDailyCompliance] = useState<{ daysWithInspection: number; daysInMonth: number; rate: number }>({ daysWithInspection: 0, daysInMonth: 0, rate: 0 });
-  const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
-  const [stationComplianceStatus, setStationComplianceStatus] = useState<any[]>([]);
+  const [stationOptions, setStationOptions] = useState<{ value: string; label: string }[]>([]);
 
   // Solo permitir "todas" si realmente tiene permiso o su estación es "todas"
   // Fuerza tipo boolean para evitar uniones con string/undefined que rompen el build
   const showAllStations: boolean = Boolean(
     canViewAllStations || (profile?.station && String(profile?.station).toLowerCase() === 'todas')
   );
-  const [stationOptions, setStationOptions] = useState<{ value: string; label: string }[]>([]);
+
+  // Forzar filtro por estación si el usuario no puede ver todas
   useEffect(() => {
-    // Forzar filtro por estación si el usuario no puede ver todas
     if (!canViewAllStations) {
       const s = profile?.station ? String(profile.station) : undefined;
       setStation(s);
     }
   }, [profile?.station, canViewAllStations]);
 
+  // Cargar opciones de estaciones
   useEffect(() => {
     const loadStations = async () => {
       const res = await StationsService.listAll();
@@ -81,46 +71,46 @@ export default function CompliancePage() {
     loadStations();
   }, []);
 
-  useEffect(() => {
-    if (profileLoading) return;
-    // Evitar cargar si la sesión no está activa
-    if (!user) return;
-    // Evitar cargar datos globales por un primer render sin estación cuando no tiene permiso.
-    if (!showAllStations && !station) return;
+  // NUEVA LÓGICA: Usar React Query hooks con caché automático
+  // Solo cargar datos si el usuario está autenticado y tiene permisos correctos
+  const shouldLoadData = !profileLoading && !!user && (showAllStations || !!station);
 
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [statsData, trendsData, complianceResult, issuesData, daily, stationStatus] = await Promise.all([
-          ComplianceService.getOverallStats({ station, month }),
-          ComplianceService.getMonthlyTrends({ station, month }),
-          ComplianceService.getComplianceBreakdown({ station }),
-          ComplianceService.getTopIssues(10, { station }),
-          ComplianceService.getDailyCompliance({ station, month, aggregateAll: showAllStations && !station }),
-          showAllStations && !station ? ComplianceService.getStationComplianceStatus({ month }) : Promise.resolve({ data: null, error: null }),
-        ]);
+  const dashboard = useComplianceDashboard({
+    station,
+    month,
+    showAllStations,
+  });
 
-        if (statsData.data) setStats(statsData.data);
-        if (trendsData.data) setMonthlyData(trendsData.data);
-        if (complianceResult.data) setComplianceData(complianceResult.data);
-        if (issuesData.data) setTopIssues(issuesData.data);
-        if (daily.data) {
-          setDailyCompliance({ daysWithInspection: daily.data.daysWithInspection, daysInMonth: daily.data.daysInMonth, rate: daily.data.rate });
-          setDailyBreakdown(daily.data.breakdown || []);
-        }
-        if (stationStatus.data) {
-          setStationComplianceStatus(stationStatus.data);
-        }
-      } catch (error) {
-        console.error('Error loading dashboard:', error);
-        toast.error('Error al cargar el dashboard');
-      } finally {
-        setLoading(false);
+  // Extraer datos de los hooks (mantener nombres originales para no romper el JSX)
+  const stats = dashboard.overallStats.data?.data || {
+    totalInspections: 0,
+    completedThisMonth: 0,
+    complianceRate: 0,
+    equipmentInspected: 0,
+  };
+  const monthlyData = dashboard.monthlyTrends.data?.data || [];
+  const complianceData = dashboard.complianceBreakdown.data?.data || [];
+  const topIssues = dashboard.topIssues.data?.data || [];
+  const dailyComplianceData = dashboard.dailyCompliance.data?.data;
+  const dailyCompliance = dailyComplianceData
+    ? {
+        daysWithInspection: dailyComplianceData.daysWithInspection,
+        daysInMonth: dailyComplianceData.daysInMonth,
+        rate: dailyComplianceData.rate,
       }
-    };
+    : { daysWithInspection: 0, daysInMonth: 0, rate: 0 };
+  const dailyBreakdown = dailyComplianceData?.breakdown || [];
+  const stationComplianceStatus = dashboard.stationStatus.data?.data || [];
 
-    fetchData();
-  }, [profileLoading, station, month, showAllStations]);
+  // Estado de carga combinado
+  const loading = dashboard.isLoading;
+
+  // Mostrar errores si los hay (mantener comportamiento original)
+  useEffect(() => {
+    if (dashboard.hasError) {
+      toast.error('Error al cargar el dashboard');
+    }
+  }, [dashboard.hasError]);
 
   const COLORS = ['#10B981', '#F59E0B', '#6366F1', '#EF4444'];
 
