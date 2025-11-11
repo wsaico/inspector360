@@ -19,6 +19,7 @@ import {
 import {
   Plus,
   Eye,
+  Edit,
   FileText,
   Loader2,
   Calendar,
@@ -344,12 +345,24 @@ export default function InspectionsPage() {
                         <TableCell>{getStatusBadge(inspection)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            {/* Si es borrador, mostrar botón "Continuar" destacado */}
+                            {inspection.status === 'draft' && canCreateInspections && (
+                              <Link href={`/inspections/new?draft=${inspection.id}`}>
+                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Continuar
+                                </Button>
+                              </Link>
+                            )}
+
+                            {/* Botón "Ver" siempre disponible */}
                             <Link href={`/inspections/${inspection.id}`}>
                               <Button variant="ghost" size="sm" className="hover:bg-blue-50">
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver
                               </Button>
                             </Link>
+
                             {canDeleteInspections && (
                               <Button
                                 variant="ghost"
@@ -402,12 +415,30 @@ export default function InspectionsPage() {
 
                         {/* Acciones */}
                         <div className="flex gap-2 pt-2 border-t">
-                          <Link href={`/inspections/${inspection.id}`} className="flex-1">
-                            <Button variant="outline" size="sm" className="w-full hover:bg-blue-50">
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver Detalle
-                            </Button>
-                          </Link>
+                          {/* Si es borrador, mostrar botón "Continuar" destacado */}
+                          {inspection.status === 'draft' && canCreateInspections ? (
+                            <>
+                              <Link href={`/inspections/new?draft=${inspection.id}`} className="flex-1">
+                                <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Continuar Borrador
+                                </Button>
+                              </Link>
+                              <Link href={`/inspections/${inspection.id}`}>
+                                <Button variant="outline" size="sm" className="hover:bg-blue-50">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </>
+                          ) : (
+                            <Link href={`/inspections/${inspection.id}`} className="flex-1">
+                              <Button variant="outline" size="sm" className="w-full hover:bg-blue-50">
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver Detalle
+                              </Button>
+                            </Link>
+                          )}
+
                           {canDeleteInspections && (
                             <Button
                               variant="outline"
