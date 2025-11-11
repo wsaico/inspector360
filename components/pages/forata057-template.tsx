@@ -397,7 +397,9 @@ const FORATA057Template: React.FC<{
           {/* Observation Rows */}
           {observationRows.map((obs, idx) => (
             <tr key={idx} style={{ height: rowHeight(28) }}>
-              <td className="text-left" style={{ paddingLeft: '4px' }}>{obs.equipment_code || obs.obs_id || 'TLM-'}</td>
+              <td className="text-left" style={{ paddingLeft: '4px' }}>
+                {obs.equipment_code && obs.obs_id ? `${obs.equipment_code} - ${obs.obs_id}` : (obs.equipment_code || obs.obs_id || 'TLM-')}
+              </td>
               <td colSpan={7} className="text-center">{obs.obs_operator || ''}</td>
               <td colSpan={7} className="text-center">{obs.obs_maintenance || ''}</td>
             </tr>

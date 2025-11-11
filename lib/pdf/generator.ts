@@ -428,8 +428,12 @@ export class PDFGenerator {
     this.doc.text('OBSERVACIONES', this.margin, this.currentY);
     this.currentY += 6;
 
-    const head = ['CÓDIGO', 'OBSERVACIONES OPERADOR', 'OBSERVACIONES MANTENIMIENTO'];
-    const rows = obs.map((o) => [o.equipment_code || o.obs_id || '-', o.obs_operator || '', o.obs_maintenance || '']);
+    const head = ['EQUIPO - ITEM', 'OBSERVACIONES OPERADOR', 'OBSERVACIONES MANTENIMIENTO'];
+    const rows = obs.map((o) => [
+      `${o.equipment_code || '-'} - ${o.obs_id || '-'}`,
+      o.obs_operator || '',
+      o.obs_maintenance || ''
+    ]);
 
     autoTable(this.doc, {
       startY: this.currentY,
@@ -439,9 +443,9 @@ export class PDFGenerator {
       headStyles: { fillColor: [9, 48, 113], textColor: 255, fontStyle: 'bold' },
       margin: { left: this.margin, right: this.margin },
       columnStyles: {
-        0: { cellWidth: 22 },
-        1: { cellWidth: (this.pageWidth - this.margin * 2 - 22) * 0.5 },
-        2: { cellWidth: (this.pageWidth - this.margin * 2 - 22) * 0.5 },
+        0: { cellWidth: 40 },
+        1: { cellWidth: (this.pageWidth - this.margin * 2 - 40) * 0.5 },
+        2: { cellWidth: (this.pageWidth - this.margin * 2 - 40) * 0.5 },
       },
     });
 

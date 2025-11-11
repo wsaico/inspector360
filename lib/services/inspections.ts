@@ -774,4 +774,40 @@ export class InspectionService {
       return { data: null, error: error.message };
     }
   }
+
+  /**
+   * Actualiza una observación existente (operador y/o mecánico)
+   */
+  static async updateObservation(
+    observationId: string,
+    updates: {
+      obs_operator?: string;
+      obs_maintenance?: string | null;
+      order_index?: number;
+    }
+  ) {
+    try {
+      const { data, error } = await supabase
+        .from('observations')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', observationId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // ✅ RE-CALCULAR el estado de la inspección después de actualizar observación
+      if (data?.inspection_id) {
+        await this.recalculateInspectionStatus(data.inspection_id);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error updating observation:', error);
+      return { data: null, error: error.message };
+    }
+  }
 }

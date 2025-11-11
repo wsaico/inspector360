@@ -336,10 +336,7 @@ export default function InspectionDetailPage() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          {canEditInspections && inspection.status === 'draft' && (() => {
-            const onlyMissingSignatures = !hasPendingObservations(inspection) && !!getMissingSignaturesLabel(inspection);
-            return !onlyMissingSignatures;
-          })() && (
+          {canEditInspections && inspection.status === 'draft' && (
             <Button
               onClick={() => router.push(`/inspections/new?draft=${inspection.id}`)}
               variant="outline"

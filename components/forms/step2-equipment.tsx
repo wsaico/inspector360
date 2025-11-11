@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { InspectionService } from '@/lib/services';
 
 export default function Step2Equipment() {
-  const { formData, addEquipment, removeEquipment, updateEquipment } = useInspectionForm();
+  const { formData, addEquipment, removeEquipment, updateEquipment, draftInspectionId, setEquipmentDbId } = useInspectionForm();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showExisting, setShowExisting] = useState(true);
   const [existingEquipment, setExistingEquipment] = useState<Equipment[]>([]);
@@ -109,7 +109,7 @@ export default function Step2Equipment() {
     setLoadingExisting(false);
   };
 
-  const onSubmit = (data: EquipmentFormData) => {
+  const onSubmit = async (data: EquipmentFormData) => {
     if (!formData.general?.station) {
       toast.error('Debe completar la información general primero');
       return;
@@ -146,8 +146,28 @@ export default function Step2Equipment() {
       toast.success('Equipo actualizado');
       setEditingIndex(null);
     } else {
+      // Agregar al contexto local
       addEquipment(equipment);
-      toast.success('Equipo agregado');
+
+      // Persistir en base de datos si existe un borrador
+      if (draftInspectionId) {
+        try {
+          const { data: savedEquipment, error } = await InspectionService.addEquipment(draftInspectionId, equipment);
+          if (error || !savedEquipment) {
+            console.error('Error guardando equipo:', error);
+            toast.error('No se pudo guardar el equipo en la base de datos');
+          } else {
+            // Guardar el ID del equipo en BD para futuras actualizaciones
+            setEquipmentDbId(equipment.code, savedEquipment.id!);
+            toast.success('Equipo agregado y guardado');
+          }
+        } catch (err: any) {
+          console.error('Error al persistir equipo:', err);
+          toast.error('No se pudo guardar el equipo');
+        }
+      } else {
+        toast.success('Equipo agregado localmente');
+      }
     }
     reset();
   };
@@ -159,7 +179,7 @@ export default function Step2Equipment() {
     setShowExisting(false);
   };
 
-  const handleSelectExisting = (eq: Equipment) => {
+  const handleSelectExisting = async (eq: Equipment) => {
     if (!formData.general?.station) {
       toast.error('Debe completar la información general primero');
       return;
@@ -168,14 +188,36 @@ export default function Step2Equipment() {
     // Limpiar datos de base de datos antes de agregar
     const { id, inspection_id, created_at, updated_at, inspector_signature_url, ...cleanEquipment } = eq as any;
 
-    addEquipment({
+    const newEquipment: Equipment = {
       ...cleanEquipment,
       station: formData.general.station,
       checklist_data: {},
       order_index: formData.equipment.length,
-    });
+    };
 
-    toast.success(`Equipo ${eq.code} agregado`);
+    // Agregar al contexto local
+    addEquipment(newEquipment);
+
+    // Persistir en base de datos si existe un borrador
+    if (draftInspectionId) {
+      try {
+        const { data: savedEquipment, error } = await InspectionService.addEquipment(draftInspectionId, newEquipment);
+        if (error || !savedEquipment) {
+          console.error('Error guardando equipo:', error);
+          toast.error('No se pudo guardar el equipo en la base de datos');
+        } else {
+          // Guardar el ID del equipo en BD para futuras actualizaciones
+          setEquipmentDbId(newEquipment.code, savedEquipment.id!);
+          toast.success(`Equipo ${eq.code} agregado y guardado`);
+        }
+      } catch (err: any) {
+        console.error('Error al persistir equipo:', err);
+        toast.error('No se pudo guardar el equipo');
+      }
+    } else {
+      toast.success(`Equipo ${eq.code} agregado localmente`);
+    }
+
     // Mantener visible la lista de "Equipos Existentes" al reutilizar
     setShowExisting(true);
   };

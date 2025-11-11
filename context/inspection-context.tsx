@@ -188,7 +188,7 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const nextStep = useCallback(() => {
-    setCurrentStep(prev => Math.min(prev + 1, 5));
+    setCurrentStep(prev => Math.min(prev + 1, 4));
   }, []);
 
   const prevStep = useCallback(() => {
@@ -196,7 +196,7 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const goToStep = useCallback((step: number) => {
-    setCurrentStep(Math.max(1, Math.min(step, 5)));
+    setCurrentStep(Math.max(1, Math.min(step, 4)));
   }, []);
 
   const resetForm = useCallback(() => {
@@ -214,25 +214,29 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
       case 2:
         return formData.equipment.length > 0;
       case 3:
-        // Checklist: exigir que todos los equipos tengan checklist completo Y firma del inspector
+        // Checklist: exigir checklist completo + observaciones para No Conformes + firma del inspector
         return formData.equipment.every(eq => {
           const checklist = formData.checklists[eq.code];
           const checklistCompleto = checklist && Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
+
+          // Validar que todos los items No Conformes tengan observación
+          const itemsNoConformes = Object.entries(checklist || {})
+            .filter(([_, item]) => item?.status === 'no_conforme')
+            .map(([code, _]) => code);
+
+          const todasLasObservacionesCompletas = itemsNoConformes.every(itemCode =>
+            formData.observations.some(obs =>
+              obs.equipment_code === eq.code &&
+              obs.obs_id === itemCode &&
+              obs.obs_operator?.trim().length > 0
+            )
+          );
+
           const tieneFirmaInspector = !!formData.equipmentSignatures[eq.code];
-          return checklistCompleto && tieneFirmaInspector;
+
+          return checklistCompleto && todasLasObservacionesCompletas && tieneFirmaInspector;
         });
       case 4:
-        // Observaciones despues del checklist: si hay No Conformes, exigir observacion del operador por equipo
-        return formData.equipment.every(eq => {
-          const checklist = formData.checklists[eq.code];
-          const tieneNoConformes = Object.values(checklist || {}).some((item) => item?.status === 'no_conforme');
-          if (!tieneNoConformes) return true; // si todo es conforme, observaci�n opcional
-          const tieneObsOperador = formData.observations.some(
-            (obs) => obs.equipment_code === eq.code && !!obs.obs_operator && obs.obs_operator.trim().length > 0
-          );
-          return tieneObsOperador;
-        });
-      case 5:
         // Firmas finales son opcionales: permitir avanzar/completar
         return true;
       default:

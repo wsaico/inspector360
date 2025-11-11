@@ -6,17 +6,19 @@ import { InspectionService } from '@/lib/services/inspections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
-import { ChecklistItem } from '@/types';
-import { CheckCircle2, XCircle, MinusCircle, Package, PenLine, CheckSquare } from 'lucide-react';
+import { ChecklistItem, Observation } from '@/types';
+import { CheckCircle2, XCircle, MinusCircle, Package, PenLine, CheckSquare, AlertCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
 import { toast } from 'sonner';
 
 export default function Step3Checklist() {
-  const { formData, updateChecklist, setEquipmentSignature, draftInspectionId, equipmentDbIds } = useInspectionForm();
+  const { formData, updateChecklist, setEquipmentSignature, draftInspectionId, equipmentDbIds, addObservation, updateObservation } = useInspectionForm();
   const [selectedEquipment, setSelectedEquipment] = useState(0);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [observationTexts, setObservationTexts] = useState<Record<string, string>>({});
   // Iteramos directamente sobre el template para evitar contenedores vacíos por categoría
 
   const currentEquipment = formData.equipment[selectedEquipment];
@@ -29,6 +31,25 @@ export default function Step3Checklist() {
       status,
       observations: '',
     });
+
+    // Si cambia de no_conforme a otro estado, eliminar la observación asociada
+    if (status !== 'no_conforme') {
+      const obsKey = `${currentEquipment.code}::${itemCode}`;
+      const obsIndex = formData.observations.findIndex(
+        obs => obs.equipment_code === currentEquipment.code && obs.obs_id === itemCode
+      );
+      if (obsIndex !== -1) {
+        const updatedObs = [...formData.observations];
+        updatedObs.splice(obsIndex, 1);
+        // Actualizar contexto removiendo observación
+      }
+      // Limpiar texto local
+      setObservationTexts(prev => {
+        const updated = { ...prev };
+        delete updated[obsKey];
+        return updated;
+      });
+    }
 
     // Persistencia contra borrador si existe equipment_id
     try {
@@ -45,6 +66,84 @@ export default function Step3Checklist() {
     } catch (err: any) {
       console.error('Error al persistir checklist:', err);
       toast.error('No se pudo guardar el checklist en el borrador');
+    }
+  };
+
+  const handleObservationChange = (itemCode: string, text: string) => {
+    const obsKey = `${currentEquipment.code}::${itemCode}`;
+    setObservationTexts(prev => ({ ...prev, [obsKey]: text }));
+  };
+
+  const handleSaveObservation = async (itemCode: string) => {
+    const obsKey = `${currentEquipment.code}::${itemCode}`;
+    const observationText = observationTexts[obsKey]?.trim();
+
+    if (!observationText) {
+      toast.error('Debe ingresar una observación para items No Conformes');
+      return;
+    }
+
+    // Buscar si ya existe una observación para este item
+    const existingObsIndex = formData.observations.findIndex(
+      obs => obs.equipment_code === currentEquipment.code && obs.obs_id === itemCode
+    );
+
+    const observation: Observation = {
+      obs_id: itemCode,
+      equipment_code: currentEquipment.code,
+      obs_operator: observationText,
+      obs_maintenance: null,
+      order_index: existingObsIndex !== -1 ? existingObsIndex : formData.observations.length,
+    };
+
+    // Actualizar estado local primero
+    if (existingObsIndex !== -1) {
+      updateObservation(existingObsIndex, observation);
+    } else {
+      addObservation(observation);
+    }
+
+    // Persistir en base de datos si existe un borrador
+    try {
+      if (draftInspectionId) {
+        // Buscar si la observación ya existe en la BD
+        const { data: existingInspection } = await InspectionService.getInspectionById(draftInspectionId);
+        const existingObservations = existingInspection?.observations || [];
+        const existingDbObs = existingObservations.find(
+          (obs: any) => obs.equipment_code === currentEquipment.code && obs.obs_id === itemCode
+        );
+
+        if (existingDbObs && existingDbObs.id) {
+          // Actualizar observación existente en BD
+          await InspectionService.updateObservation(existingDbObs.id, {
+            obs_operator: observationText,
+            order_index: observation.order_index,
+          });
+          toast.success('Observación actualizada y guardada');
+        } else {
+          // Crear nueva observación en BD
+          const { data, error } = await InspectionService.createObservation({
+            inspection_id: draftInspectionId,
+            obs_id: itemCode,
+            equipment_code: currentEquipment.code,
+            obs_operator: observationText,
+            obs_maintenance: null,
+            order_index: observation.order_index,
+          });
+          if (error) {
+            console.error('Error creando observación:', error);
+            toast.error('No se pudo guardar la observación en la base de datos');
+          } else {
+            toast.success('Observación agregada y guardada');
+          }
+        }
+      } else {
+        // Si no hay borrador, solo mostrar mensaje de que se agregó localmente
+        toast.success(existingObsIndex !== -1 ? 'Observación actualizada' : 'Observación agregada');
+      }
+    } catch (err: any) {
+      console.error('Error al persistir observación:', err);
+      toast.error('No se pudo guardar la observación en la base de datos');
     }
   };
 
@@ -76,11 +175,21 @@ export default function Step3Checklist() {
 
   const isChecklistComplete = () => {
     const baseComplete = Object.keys(currentChecklist).length === CHECKLIST_TEMPLATE.length;
-    // Si hay observaciones del inspector sin respuesta de mecánico para este equipo, queda pendiente
-    const hasPendingObservation = formData.observations.some(
-      (obs) => obs.equipment_code === currentEquipment.code && !!obs.obs_operator && !obs.obs_maintenance
+
+    // Verificar que todos los items No Conformes tengan observación
+    const itemsNoConformes = Object.entries(currentChecklist)
+      .filter(([_, item]) => item?.status === 'no_conforme')
+      .map(([code, _]) => code);
+
+    const todasLasObservacionesCompletas = itemsNoConformes.every(itemCode =>
+      formData.observations.some(obs =>
+        obs.equipment_code === currentEquipment.code &&
+        obs.obs_id === itemCode &&
+        obs.obs_operator?.trim().length > 0
+      )
     );
-    return baseComplete && !hasPendingObservation;
+
+    return baseComplete && todasLasObservacionesCompletas;
   };
 
   // Verificar cuántos equipos tienen checklist completo y firma
@@ -381,6 +490,42 @@ export default function Step3Checklist() {
                       </div>
                     </button>
                   </div>
+
+                  {/* Campo de Observación para No Conforme */}
+                  {value?.status === 'no_conforme' && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg border border-red-200">
+                        <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                        <p className="text-xs font-semibold text-red-900">
+                          Item No Conforme - Debe agregar observación del operador
+                        </p>
+                      </div>
+                      <Textarea
+                        placeholder="Describa el problema o anomalía encontrada..."
+                        value={observationTexts[`${currentEquipment.code}::${item.code}`] || formData.observations.find(obs => obs.equipment_code === currentEquipment.code && obs.obs_id === item.code)?.obs_operator || ''}
+                        onChange={(e) => handleObservationChange(item.code, e.target.value)}
+                        className="min-h-[80px] text-sm"
+                        rows={3}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveObservation(item.code)}
+                        className="w-full bg-red-600 hover:bg-red-700"
+                        disabled={!observationTexts[`${currentEquipment.code}::${item.code}`]?.trim() && !formData.observations.find(obs => obs.equipment_code === currentEquipment.code && obs.obs_id === item.code)?.obs_operator}
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Guardar Observación
+                      </Button>
+                      {formData.observations.find(obs => obs.equipment_code === currentEquipment.code && obs.obs_id === item.code)?.obs_operator && (
+                        <div className="px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-xs font-semibold text-green-900 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Observación guardada correctamente
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -435,23 +580,13 @@ export default function Step3Checklist() {
               />
             ) : (
               <div className="text-center py-8">
-                {formData.observations.some((obs) => obs.equipment_code === currentEquipment.code && !!obs.obs_operator && !obs.obs_maintenance) ? (
-                  <>
-                    <p className="text-muted-foreground mb-4">
-                      Checklist completo pero con observaciones del inspector. Pendiente respuesta del mecánico.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-muted-foreground mb-4">
-                      El checklist de este equipo está completo. Firme para confirmar la inspección.
-                    </p>
-                    <Button onClick={() => setShowSignaturePad(true)}>
-                      <PenLine className="mr-2 h-4 w-4" />
-                      Firmar Checklist
-                    </Button>
-                  </>
-                )}
+                <p className="text-muted-foreground mb-4">
+                  El checklist de este equipo está completo. Firme para confirmar la inspección.
+                </p>
+                <Button onClick={() => setShowSignaturePad(true)}>
+                  <PenLine className="mr-2 h-4 w-4" />
+                  Firmar Checklist
+                </Button>
               </div>
             )}
           </CardContent>

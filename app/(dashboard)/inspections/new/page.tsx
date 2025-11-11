@@ -137,8 +137,8 @@ function InspectionWizardContent() {
     },
     {
       number: 3,
-      title: 'Checklist',
-      description: 'Completar 15 items por equipo',
+      title: 'Checklist y Observaciones',
+      description: 'Completar items y observaciones',
       icon: CheckSquare,
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
@@ -147,16 +147,6 @@ function InspectionWizardContent() {
     },
     {
       number: 4,
-      title: 'Observaciones',
-      description: 'Agregar observaciones de equipos',
-      icon: MessageSquare,
-      color: 'from-orange-500 to-orange-600',
-      bgColor: 'bg-orange-50',
-      textColor: 'text-orange-600',
-      borderColor: 'border-orange-500'
-    },
-    {
-      number: 5,
       title: 'Finalizar',
       description: 'Firmas y completar',
       icon: FileCheck,
@@ -190,7 +180,7 @@ function InspectionWizardContent() {
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="text-base font-bold truncate">{steps[currentStep - 1].title}</h3>
                   <span className={`text-xs font-semibold px-2 py-1 rounded-full ${steps[currentStep - 1].bgColor} ${steps[currentStep - 1].textColor}`}>
-                    {currentStep}/5
+                    {currentStep}/4
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground truncate">
@@ -280,8 +270,7 @@ function InspectionWizardContent() {
         {currentStep === 1 && <Step1General />}
         {currentStep === 2 && <Step2Equipment />}
         {currentStep === 3 && <Step3Checklist />}
-        {currentStep === 4 && <Step2_5Observations />}
-        {currentStep === 5 && <Step4Finalize />}
+        {currentStep === 4 && <Step4Finalize />}
       </div>
 
       {/* Navigation Buttons - Modern Mobile-First Design */}
@@ -302,10 +291,10 @@ function InspectionWizardContent() {
 
               <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100">
                 <span className="text-sm font-semibold text-gray-700">
-                  Paso {currentStep} de 5
+                  Paso {currentStep} de 4
                 </span>
                 <div className="flex gap-1">
-                  {Array.from({ length: 5 }).map((_, idx) => (
+                  {Array.from({ length: 4 }).map((_, idx) => (
                     <div
                       key={idx}
                       className={cn(
@@ -317,7 +306,7 @@ function InspectionWizardContent() {
                 </div>
               </div>
 
-              {currentStep < 5 ? (
+              {currentStep < 4 ? (
                 <Button
                   className={`w-full sm:w-auto h-12 shadow-md hover:shadow-lg transition-all bg-gradient-to-r ${steps[currentStep - 1].color} hover:opacity-90`}
                   onClick={handleNext}

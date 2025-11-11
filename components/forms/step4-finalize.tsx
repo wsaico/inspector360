@@ -9,20 +9,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import dynamic from 'next/dynamic';
 const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Step4Finalize() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { formData, setSignatures, resetForm, draftInspectionId, equipmentDbIds } = useInspectionForm();
+  const { formData, setSignatures, resetForm, draftInspectionId, equipmentDbIds, updateObservation } = useInspectionForm();
   const [supervisorName, setSupervisorName] = useState('');
   const [supervisorSignature, setSupervisorSignature] = useState<string | null>(null);
   const [mechanicName, setMechanicName] = useState('');
   const [mechanicSignature, setMechanicSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mechanicResponses, setMechanicResponses] = useState<Record<string, string>>({});
 
   // Estado para rastrear el nombre guardado junto con la firma
   const [savedSupervisorName, setSavedSupervisorName] = useState<string | null>(null);
@@ -139,6 +141,73 @@ export default function Step4Finalize() {
     }
   }, [formData.general?.station]);
 
+  // Cargar respuestas del mecánico existentes
+  useEffect(() => {
+    const responses: Record<string, string> = {};
+    formData.observations.forEach(obs => {
+      const key = `${obs.equipment_code}::${obs.obs_id}`;
+      if (obs.obs_maintenance) {
+        responses[key] = obs.obs_maintenance;
+      }
+    });
+    setMechanicResponses(responses);
+  }, [formData.observations]);
+
+  const handleMechanicResponseChange = (obsIndex: number, equipmentCode: string, obsId: string, response: string) => {
+    const key = `${equipmentCode}::${obsId}`;
+    setMechanicResponses(prev => ({ ...prev, [key]: response }));
+  };
+
+  const handleSaveMechanicResponse = async (obsIndex: number, equipmentCode: string, obsId: string) => {
+    const key = `${equipmentCode}::${obsId}`;
+    const response = mechanicResponses[key]?.trim();
+
+    if (!response) {
+      toast.error('Debe ingresar una respuesta del mecánico');
+      return;
+    }
+
+    const observation = formData.observations[obsIndex];
+
+    // Actualizar estado local
+    updateObservation(obsIndex, {
+      ...observation,
+      obs_maintenance: response,
+    });
+
+    // Persistir en base de datos si existe la inspección
+    try {
+      if (draftInspectionId) {
+        // Buscar la observación en la BD
+        const { data: existingInspection } = await InspectionService.getInspectionById(draftInspectionId);
+        const existingObservations = existingInspection?.observations || [];
+        const existingDbObs = existingObservations.find(
+          (obs: any) => obs.equipment_code === equipmentCode && obs.obs_id === obsId
+        );
+
+        if (existingDbObs && existingDbObs.id) {
+          // Actualizar observación en BD
+          const { error } = await InspectionService.updateObservation(existingDbObs.id, {
+            obs_maintenance: response,
+          });
+          if (error) {
+            console.error('Error actualizando respuesta del mecánico:', error);
+            toast.error('No se pudo guardar la respuesta en la base de datos');
+          } else {
+            toast.success('Respuesta del mecánico guardada y el estado actualizado');
+          }
+        } else {
+          toast.error('No se encontró la observación en la base de datos');
+        }
+      } else {
+        toast.success('Respuesta del mecánico guardada localmente');
+      }
+    } catch (err: any) {
+      console.error('Error al persistir respuesta del mecánico:', err);
+      toast.error('No se pudo guardar la respuesta en la base de datos');
+    }
+  };
+
   const handleComplete = async () => {
 
     if (!profile?.id) {
@@ -215,27 +284,42 @@ export default function Step4Finalize() {
         }
       }
 
-      // 2.5 Guardar observaciones agregadas en el formulario (si existen)
+      // 2.5 Guardar/Actualizar observaciones agregadas en el formulario (si existen)
       if (formData.observations && formData.observations.length > 0) {
-        // Evitar duplicados consultando existentes
-        let existingKeys = new Set<string>();
+        // Obtener observaciones existentes para actualizar en lugar de duplicar
+        let existingObsMap = new Map<string, any>();
         if (inspectionId) {
           const { data: existingInspection } = await InspectionService.getInspectionById(inspectionId);
           const existingObs = (existingInspection?.observations || []) as any[];
-          existingKeys = new Set(existingObs.map(o => `${o.equipment_code}::${o.obs_id}`));
+          existingObs.forEach(o => {
+            const key = `${o.equipment_code}::${o.obs_id}`;
+            existingObsMap.set(key, o);
+          });
         }
+
         for (let i = 0; i < formData.observations.length; i++) {
           const o = formData.observations[i];
           const key = `${o.equipment_code}::${o.obs_id}`;
-          if (existingKeys.has(key)) continue; // omitir duplicados
-          await InspectionService.createObservation({
-            inspection_id: inspectionId!,
-            obs_id: o.obs_id,
-            equipment_code: o.equipment_code,
-            obs_operator: o.obs_operator,
-            obs_maintenance: o.obs_maintenance ?? null,
-            order_index: i,
-          });
+          const existing = existingObsMap.get(key);
+
+          if (existing) {
+            // Actualizar observación existente
+            await InspectionService.updateObservation(existing.id, {
+              obs_operator: o.obs_operator,
+              obs_maintenance: o.obs_maintenance ?? null,
+              order_index: i,
+            });
+          } else {
+            // Crear nueva observación
+            await InspectionService.createObservation({
+              inspection_id: inspectionId!,
+              obs_id: o.obs_id,
+              equipment_code: o.equipment_code,
+              obs_operator: o.obs_operator,
+              obs_maintenance: o.obs_maintenance ?? null,
+              order_index: i,
+            });
+          }
         }
       }
 
@@ -289,6 +373,80 @@ export default function Step4Finalize() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Sección de Respuestas del Mecánico a Observaciones */}
+      {formData.observations.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">
+                <Wrench className="h-4 w-4 text-orange-700" />
+              </div>
+              Respuestas del Mecánico a Observaciones
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.observations.map((obs, index) => {
+              const key = `${obs.equipment_code}::${obs.obs_id}`;
+              const hasResponse = !!obs.obs_maintenance;
+
+              return (
+                <Card key={index} className="border-orange-200">
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2 py-1 rounded bg-orange-100 text-orange-900">
+                            {obs.equipment_code}
+                          </span>
+                          <span className="text-xs font-semibold px-2 py-1 rounded bg-orange-100 text-orange-900">
+                            {obs.obs_id}
+                          </span>
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <Label className="text-xs text-red-700 font-semibold">Observación del Inspector:</Label>
+                          <p className="text-sm text-red-900 mt-1">{obs.obs_operator}</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Respuesta del Mecánico:</Label>
+                          <Textarea
+                            placeholder="Describa la acción correctiva tomada o el plan de reparación..."
+                            value={mechanicResponses[key] || ''}
+                            onChange={(e) => handleMechanicResponseChange(index, obs.equipment_code, obs.obs_id, e.target.value)}
+                            className="min-h-[80px] text-sm"
+                            rows={3}
+                            disabled={hasResponse}
+                          />
+                          {hasResponse ? (
+                            <div className="px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                              <p className="text-xs font-semibold text-green-900 flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Respuesta guardada correctamente
+                              </p>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => handleSaveMechanicResponse(index, obs.equipment_code, obs.obs_id)}
+                              className="w-full bg-orange-600 hover:bg-orange-700"
+                              disabled={!mechanicResponses[key]?.trim()}
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Guardar Respuesta
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sección Supervisor - Mejorada para móvil */}
       <Card className="border-blue-200 bg-blue-50/50">
