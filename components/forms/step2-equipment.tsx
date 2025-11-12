@@ -272,7 +272,7 @@ export default function Step2Equipment() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Código del Equipo *</Label>
-                  <Input {...register('code')} placeholder="TLM-01-001" />
+            <Input {...register('code')} placeholder="AAA-BB-123" />
                   {errors.code && <p className="text-sm text-red-500">{errors.code.message}</p>}
                   {watchedCode && existingMatch && (
                     <div className="mt-2 rounded-md border border-yellow-300 bg-yellow-50 p-2 text-xs">

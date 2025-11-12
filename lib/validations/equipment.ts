@@ -7,8 +7,9 @@ import { z } from 'zod';
 export const equipmentSchema = z.object({
   code: z
     .string()
-    .regex(/^TLM-[A-Z]{2}-\d{3}$/, 'Formato inválido. Use: TLM-AR-001')
-    .min(1, 'Código requerido'),
+    .regex(/^[A-Z]{3}-[A-Z]{2}-\d{3}$/i, 'Formato inválido. Use: AAA-BB-123')
+    .min(1, 'Código requerido')
+    .transform((v) => v.toUpperCase()),
   type: z.string().min(1, 'Tipo de equipo requerido'),
   brand: z.string().optional(),
   model: z.string().optional(),
