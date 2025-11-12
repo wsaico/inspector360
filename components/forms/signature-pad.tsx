@@ -22,7 +22,7 @@ interface SignaturePadProps {
   required?: boolean;
   onChange?: (signature: string) => void;
   initialValue?: string;
-  storageKey: string;
+  storageKey?: string;
 }
 
 export default function SignaturePad({
@@ -41,13 +41,18 @@ export default function SignaturePad({
   const [isDrawing, setIsDrawing] = useState(false);
   const hasInitialized = useRef(false);
 
+  // Configuración: deshabilitar persistencia local para exigir firma cada vez
+  const enableLocalStorage = false;
+
   // SOLO cargar al montar - UNA VEZ
   useEffect(() => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
     try {
-      const stored = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
+      const stored = enableLocalStorage && storageKey && typeof window !== 'undefined'
+        ? localStorage.getItem(storageKey)
+        : null;
       const signatureToUse = initialValue || stored || null;
 
       if (signatureToUse) {
@@ -99,13 +104,15 @@ export default function SignaturePad({
       setShowCanvas(false);
       setIsEmpty(false);
 
-      // Persistir en localStorage
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(storageKey, dataURL);
+      // Persistencia deshabilitada intencionalmente para forzar firma cada vez
+      if (enableLocalStorage && storageKey) {
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(storageKey, dataURL);
+          }
+        } catch (error) {
+          console.error('Error saving to localStorage:', error);
         }
-      } catch (error) {
-        console.error('Error saving to localStorage:', error);
       }
 
       // AHORA SÍ notificar al padre
@@ -148,7 +155,7 @@ export default function SignaturePad({
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       setIsEmpty(false);
 
-      // AUTO-GUARDAR en localStorage SILENCIOSAMENTE (sin notificar al padre)
+      // AUTO-GUARDAR local deshabilitado (sin localStorage)
       try {
         const rawCanvas: HTMLCanvasElement | undefined =
           (sigCanvas.current as any).getTrimmedCanvas?.() || (sigCanvas.current as any).getCanvas?.();
@@ -167,12 +174,12 @@ export default function SignaturePad({
           ctx.drawImage(img, 0, 0);
           dataURL = await optimizeSignature(tmp);
         }
-        localStorage.setItem(storageKey, dataURL);
+        // mantener en estado local para vista previa
         setSavedSignature(dataURL);
       } catch (error) {
         console.error('Error auto-saving signature:', error);
       }
-    }
+  }
   }, [storageKey]);
 
   const handleRemove = useCallback(() => {
@@ -181,14 +188,7 @@ export default function SignaturePad({
     setIsEmpty(true);
     handleClear();
 
-    // Limpiar localStorage
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(storageKey);
-      }
-    } catch (error) {
-      console.error('Error removing signature:', error);
-    }
+    // Persistencia en localStorage está deshabilitada
 
     // Notificar al padre que se eliminó
     onSave('');

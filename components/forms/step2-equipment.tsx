@@ -185,6 +185,15 @@ export default function Step2Equipment() {
       return;
     }
 
+    // Evitar duplicar equipo por código ya agregado en la inspección actual
+    const alreadyAdded = formData.equipment.some(
+      (e) => e.code.trim().toUpperCase() === (eq.code || '').trim().toUpperCase()
+    );
+    if (alreadyAdded) {
+      toast.warning(`El equipo ${eq.code} ya fue agregado en esta inspección`);
+      return;
+    }
+
     // Limpiar datos de base de datos antes de agregar
     const { id, inspection_id, created_at, updated_at, inspector_signature_url, ...cleanEquipment } = eq as any;
 
@@ -370,7 +379,11 @@ export default function Step2Equipment() {
                             {eq.type}{eq.brand || eq.model ? ' - ' : ''}{eq.brand || ''} {eq.model || ''}
                           </p>
                           </div>
-                          <Button size="sm" onClick={() => handleSelectExisting(eq)}>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSelectExisting(eq)}
+                            disabled={formData.equipment.some((e) => e.code.trim().toUpperCase() === (eq.code || '').trim().toUpperCase())}
+                          >
                             <Plus className="mr-2 h-4 w-4" />
                             Agregar
                           </Button>

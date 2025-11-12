@@ -387,6 +387,23 @@ export class InspectionService {
     equipmentData: Partial<Equipment>
   ) {
     try {
+      // Validar duplicado por código dentro de la misma inspección
+      if (equipmentData.code) {
+        const { data: existingByCode, error: existingError } = await supabase
+          .from('equipment')
+          .select('id, code')
+          .eq('inspection_id', inspectionId)
+          .eq('code', equipmentData.code)
+          .limit(1)
+          .maybeSingle();
+        if (existingError) {
+          console.error('[InspectionService] Error checking duplicate equipment:', existingError);
+        }
+        if (existingByCode) {
+          return { data: existingByCode, error: null };
+        }
+      }
+
       // Construir el objeto solo con los campos que tienen valores
       const equipmentToInsert: any = {
         inspection_id: inspectionId,

@@ -36,13 +36,11 @@ export default function Step4Finalize() {
   const [showSupervisorSuggestions, setShowSupervisorSuggestions] = useState(false);
   const [showMechanicSuggestions, setShowMechanicSuggestions] = useState(false);
 
-  // Prefill names from localStorage
+  // Prefill de nombres desde localStorage (solo nombres, no firmas)
   useEffect(() => {
     try {
       const supName = typeof window !== 'undefined' ? localStorage.getItem('inspections.supervisorName') : null;
       const mecName = typeof window !== 'undefined' ? localStorage.getItem('inspections.mechanicName') : null;
-      const supSig = typeof window !== 'undefined' ? localStorage.getItem('inspector360.signature.supervisor') : null;
-      const mecSig = typeof window !== 'undefined' ? localStorage.getItem('inspector360.signature.mechanic') : null;
 
       if (supName) {
         setSupervisorName(supName);
@@ -59,13 +57,6 @@ export default function Step4Finalize() {
           ...formData.signatures,
           mechanic_name: mecName,
         });
-      }
-      // Solo cargar firmas si los nombres coinciden
-      if (supSig && supName) {
-        setSupervisorSignature(supSig);
-      }
-      if (mecSig && mecName) {
-        setMechanicSignature(mecSig);
       }
     } catch {}
   }, []);
