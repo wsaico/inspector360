@@ -259,7 +259,7 @@ export class InspectionService {
         .from('inspections')
         .select('*')
         .eq('id', inspectionId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
       return { data: updatedInspection, error: null };
@@ -304,7 +304,7 @@ export class InspectionService {
         .from('inspections')
         .select('*')
         .eq('id', inspectionId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
 
@@ -350,7 +350,7 @@ export class InspectionService {
         .from('inspections')
         .select('*')
         .eq('id', inspectionId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
 
