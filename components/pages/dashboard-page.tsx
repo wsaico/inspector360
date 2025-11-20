@@ -15,6 +15,9 @@ import {
   Lock,
   ArrowRight,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useEffect, useMemo, useState } from 'react';
 import { ComplianceService } from '@/lib/services/compliance';
 import { InspectionService, InspectionTypeService } from '@/lib/services';
@@ -48,6 +51,7 @@ export default function DashboardPage() {
     complianceRate: 0,
   });
   const [inspectionTypes, setInspectionTypes] = useState<InspectionSystemType[]>([]);
+  const [recentInspections, setRecentInspections] = useState<any[]>([]);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [selectedType, setSelectedType] = useState<InspectionSystemType | null>(null);
 
@@ -82,14 +86,22 @@ export default function DashboardPage() {
 
         // Calcular pendientes: inspecciones con observaciones del operador sin respuesta del mecánico
         // o con firmas faltantes, dentro del rango del mes seleccionado y alcance de estación.
-        const { start, end } = ComplianceService.getMonthRange(month);
+        const { start, end } = ComplianceService.getDateRange({ month });
         // Obtener inspecciones ya filtradas por estación y mes para evitar mezclar estaciones
         const { data: scoped } = await InspectionService.getInspections({ station: station || undefined, start, end });
 
         const pendingReview = (scoped || []).reduce((acc: number, i: any) => {
-          const hasPending = hasPendingObservations(i) || !!getMissingSignaturesLabel(i);
+          const hasPending = !!getMissingSignaturesLabel(i);
           return acc + (hasPending ? 1 : 0);
         }, 0);
+
+        // Fetch recent inspections
+        const { data: recent } = await InspectionService.getInspections({
+          page: 1,
+          pageSize: 5,
+          station: station || undefined,
+        });
+        setRecentInspections(recent || []);
 
         setStats({
           totalInspections: total,
@@ -156,245 +168,249 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {canCreateInspections && (
-          <Link href="/inspections/new">
-            <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Nueva Inspección
-                </CardTitle>
-                <Plus className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Crear una nueva inspección técnica
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        )}
-
-        <Link href="/inspections">
-          <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Ver Inspecciones
-              </CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                Consultar inspecciones realizadas
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/compliance">
-          <Card className="cursor-pointer transition-all hover:shadow-lg hover:border-primary">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cumplimiento</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                Panel de métricas y cumplimiento
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            Hola, {profile?.full_name?.split(' ')[0] || 'Inspector'} 👋
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {canCreateInspections && (
+            <Link href="/inspections/new">
+              <Button className="bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all">
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Inspección
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="grid gap-3 md:grid-cols-3">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="grid gap-4 md:grid-cols-3 bg-white p-4 rounded-xl border shadow-sm"
+      >
         <div>
-          <label className="text-xs text-gray-500">Mes</label>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Periodo</label>
           <input
             type="month"
-            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Estación</label>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Estación</label>
           {showAllStations ? (
             <select
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               value={station || ''}
               onChange={(e) => setStation(e.target.value || undefined)}
             >
-              <option value="">Todas</option>
+              <option value="">Todas las estaciones</option>
               {stationOptions.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
           ) : (
             <input
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-gray-100"
+              className="mt-1 w-full rounded-lg border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
               value={profile?.station || ''}
               readOnly
             />
           )}
         </div>
-      </div>
+      </motion.div>
 
-      {/* Statistics - Diseño moderno y colorido */}
+      {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Total Inspecciones - Azul */}
-        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-white hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-900">
-              Total Inspecciones
-            </CardTitle>
-            <div className="rounded-full bg-blue-100 p-2">
-              <ClipboardList className="h-5 w-5 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-700">{stats.totalInspections}</div>
-            <p className="text-xs text-blue-600 mt-1">
-              {showAllStations && !station
-                ? 'Todas las estaciones'
-                : station
-                  ? `Estación ${station}`
-                  : 'Inspecciones'}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Este Mes - Verde */}
-        <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-white hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-900">Este Mes</CardTitle>
-            <div className="rounded-full bg-green-100 p-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-700">
-              {stats.completedThisMonth}
-            </div>
-            <p className="text-xs text-green-600 mt-1">
-              Completadas en {month.split('-')[1]}/{month.split('-')[0]}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Pendientes - Amarillo/Naranja */}
-        <Card className="border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-white hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-amber-900">Pendientes</CardTitle>
-            <div className="rounded-full bg-amber-100 p-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-amber-700">{stats.pendingReview}</div>
-            <p className="text-xs text-amber-600 mt-1">
-              {stats.pendingReview === 0 ? '¡Todo al día!' : 'Requieren atención'}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Cumplimiento - Púrpura */}
-        <Card className={`border-l-4 ${stats.complianceRate >= 80 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-white' : 'border-l-red-500 bg-gradient-to-br from-red-50 to-white'} hover:shadow-lg transition-all`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${stats.complianceRate >= 80 ? 'text-purple-900' : 'text-red-900'}`}>
-              Cumplimiento
-            </CardTitle>
-            <div className={`rounded-full ${stats.complianceRate >= 80 ? 'bg-purple-100' : 'bg-red-100'} p-2`}>
-              <TrendingUp className={`h-5 w-5 ${stats.complianceRate >= 80 ? 'text-purple-600' : 'text-red-600'}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-3xl font-bold ${stats.complianceRate >= 80 ? 'text-purple-700' : 'text-red-700'}`}>
-              {stats.complianceRate}%
-            </div>
-            <p className={`text-xs mt-1 ${stats.complianceRate >= 80 ? 'text-purple-600' : 'text-red-600'}`}>
-              {stats.complianceRate >= 80 ? '¡Excelente!' : 'Meta: 80%'} • 1/día
-            </p>
-          </CardContent>
-        </Card>
+        {[
+          {
+            title: "Total Inspecciones",
+            value: stats.totalInspections,
+            icon: ClipboardList,
+            color: "blue",
+            desc: showAllStations && !station ? 'Todas las estaciones' : station ? `Estación ${station}` : 'Total histórico'
+          },
+          {
+            title: "Este Mes",
+            value: stats.completedThisMonth,
+            icon: CheckCircle2,
+            color: "green",
+            desc: `Completadas en ${month.split('-')[1]}/${month.split('-')[0]}`
+          },
+          {
+            title: "Pendientes",
+            value: stats.pendingReview,
+            icon: AlertTriangle,
+            color: "amber",
+            desc: stats.pendingReview === 0 ? '¡Todo al día!' : 'Requieren atención'
+          },
+          {
+            title: "Cumplimiento",
+            value: `${stats.complianceRate}%`,
+            icon: TrendingUp,
+            color: stats.complianceRate >= 80 ? "purple" : "red",
+            desc: stats.complianceRate >= 80 ? '¡Excelente ritmo!' : 'Por debajo de la meta'
+          }
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.title}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <Card className={`border-l-4 border-l-${stat.color}-500 hover:shadow-lg transition-all duration-300 hover:-translate-y-1`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className={`text-sm font-medium text-${stat.color}-900`}>
+                  {stat.title}
+                </CardTitle>
+                <div className={`rounded-full bg-${stat.color}-100 p-2`}>
+                  <stat.icon className={`h-5 w-5 text-${stat.color}-600`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold text-${stat.color}-700`}>{stat.value}</div>
+                <p className={`text-xs text-${stat.color}-600 mt-1 font-medium`}>
+                  {stat.desc}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Tipos de Inspección */}
-      {inspectionTypes.length > 0 && (
-        <div className="space-y-4">
+      <div className="grid gap-8 md:grid-cols-7">
+        {/* Inspection Types - Left Column */}
+        <div className="md:col-span-4 space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold tracking-tight">Tipos de Inspección</h2>
-            <p className="text-sm text-muted-foreground">
-              Módulos disponibles en el sistema
-            </p>
+            <h2 className="text-xl font-bold tracking-tight text-gray-900">Módulos de Inspección</h2>
           </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {inspectionTypes.map((type) => {
-              const isActive = type.is_active;
-              const cardClasses = isActive
-                ? 'cursor-pointer transition-all hover:shadow-lg hover:border-primary hover:scale-105 bg-white'
-                : 'cursor-not-allowed bg-gray-50 opacity-75';
-
-              const handleClick = () => {
-                if (isActive) {
-                  // Redirigir a la ruta correspondiente
-                  if (type.code === 'technical') {
-                    window.location.href = '/inspections/new';
-                  }
-                } else {
-                  // Mostrar modal "Próximamente"
-                  setSelectedType(type);
-                  setShowComingSoonModal(true);
-                }
-              };
-
-              return (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {inspectionTypes.map((type, index) => (
+              <motion.div
+                key={type.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 + index * 0.1 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 <Card
-                  key={type.id}
-                  className={cardClasses}
-                  onClick={handleClick}
+                  className={`h-full cursor-pointer transition-all border-2 ${type.is_active
+                    ? 'hover:border-blue-500 hover:shadow-md bg-white'
+                    : 'opacity-75 bg-gray-50 border-dashed'
+                    }`}
+                  onClick={() => {
+                    if (type.is_active) {
+                      if (type.code === 'technical') window.location.href = '/inspections/new';
+                    } else {
+                      setSelectedType(type);
+                      setShowComingSoonModal(true);
+                    }
+                  }}
                 >
-                  <CardHeader className="space-y-3 pb-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`text-4xl ${isActive ? '' : 'grayscale'}`}>
-                          {type.icon}
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="text-4xl mb-2">{type.icon}</div>
+                      {type.is_active ? (
+                        <div className="bg-blue-100 p-1.5 rounded-full">
+                          <ArrowRight className="h-4 w-4 text-blue-600" />
                         </div>
-                        <div className="flex-1">
-                          <CardTitle className="text-base leading-tight">
-                            {type.name}
-                          </CardTitle>
-                        </div>
-                      </div>
-                      {isActive ? (
-                        <ArrowRight className="h-4 w-4 text-primary" />
                       ) : (
-                        <Lock className="h-4 w-4 text-gray-400" />
+                        <Lock className="h-5 w-5 text-gray-400" />
                       )}
                     </div>
-                    {!isActive && (
-                      <Badge variant="secondary" className="bg-amber-100 text-amber-800 w-fit">
+                    <CardTitle className="text-lg">{type.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                      {type.description}
+                    </p>
+                    {!type.is_active && (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">
                         Próximamente
                       </Badge>
                     )}
-                  </CardHeader>
-                  <CardContent className="pb-6">
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {type.description}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-2">
-                      Código: {type.form_prefix}
-                    </p>
                   </CardContent>
                 </Card>
-              );
-            })}
+              </motion.div>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* Recent Activity - Right Column */}
+        <div className="md:col-span-3 space-y-6">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900">Actividad Reciente</h2>
+          <Card className="h-full">
+            <CardContent className="p-0">
+              {recentInspections.length > 0 ? (
+                <div className="divide-y divide-gray-100">
+                  {recentInspections.map((inspection, i) => (
+                    <motion.div
+                      key={inspection.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + i * 0.1 }}
+                      className="flex items-center p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className={`
+                        rounded-full p-2 mr-4
+                        ${inspection.status === 'completed' ? 'bg-green-100 text-green-600' :
+                          inspection.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                            'bg-gray-100 text-gray-600'}
+                      `}>
+                        {inspection.status === 'completed' ? <CheckCircle2 className="h-4 w-4" /> :
+                          inspection.status === 'pending' ? <AlertTriangle className="h-4 w-4" /> :
+                            <ClipboardList className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {inspection.form_code || 'Borrador'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {inspection.station} • {format(new Date(inspection.created_at), "d MMM, HH:mm", { locale: es })}
+                        </p>
+                      </div>
+                      <Badge variant={
+                        inspection.status === 'completed' ? 'default' :
+                          inspection.status === 'pending' ? 'secondary' : 'outline'
+                      } className={
+                        inspection.status === 'completed' ? 'bg-green-600' :
+                          inspection.status === 'pending' ? 'bg-amber-100 text-amber-800' : ''
+                      }>
+                        {inspection.status === 'completed' ? 'Completado' :
+                          inspection.status === 'pending' ? 'Pendiente' : 'Borrador'}
+                      </Badge>
+                    </motion.div>
+                  ))}
+                  <div className="p-4 text-center border-t">
+                    <Link href="/inspections" className="text-sm text-blue-600 hover:underline font-medium">
+                      Ver todas las inspecciones
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="bg-gray-50 p-4 rounded-full mb-3">
+                    <ClipboardList className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">Sin actividad reciente</p>
+                  <p className="text-xs text-gray-500 mt-1">Las nuevas inspecciones aparecerán aquí</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Modal "Próximamente" */}
       <Dialog open={showComingSoonModal} onOpenChange={setShowComingSoonModal}>
@@ -446,29 +462,6 @@ export default function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Actividad Reciente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <ClipboardList className="h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-sm text-gray-500">
-              No hay inspecciones recientes
-            </p>
-            {canCreateInspections && (
-              <Link href="/inspections/new">
-                <Button className="mt-4">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Crear Primera Inspección
-                </Button>
-              </Link>
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

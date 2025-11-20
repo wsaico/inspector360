@@ -49,10 +49,6 @@ export function isMechanicSigned(inspection?: Inspection) {
 export function getMissingSignaturesLabel(inspection?: Inspection): string | null {
   if (!inspection) return null;
   const sup = isSupervisorSigned(inspection);
-  const mec = isMechanicSigned(inspection);
-  if (sup && mec) return null;
-  if (!sup && !mec) return 'Faltan firmas: Supervisor y Mecánico';
   if (!sup) return 'Falta firma: Supervisor';
-  if (!mec) return 'Falta firma: Mecánico';
   return null;
 }

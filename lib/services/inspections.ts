@@ -94,7 +94,7 @@ export class InspectionService {
       // Query OPTIMIZADO: solo traer lo necesario para el listado
       let query = supabase
         .from('inspections')
-        .select('id, form_code, station, inspection_date, inspection_type, inspector_name, status, created_at, updated_at, supervisor_name, supervisor_signature_url, mechanic_name, mechanic_signature_url', { count: 'exact' })
+        .select('id, form_code, station, inspection_date, inspection_type, inspector_name, status, created_at, updated_at, supervisor_name, supervisor_signature_url, mechanic_name, mechanic_signature_url, observations(id)', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       // Filtros opcionales por estación, estatus y rango de fechas
@@ -119,8 +119,8 @@ export class InspectionService {
         return { data: null, error: inspectionsError.message };
       }
 
-      // NO cargar equipment ni observations aquí - solo para listado rápido
-      // Si necesitan detalles, usar getInspectionById()
+      // NO cargar equipment aquí - solo para listado rápido
+      // Observations solo trae ids para detectar "con observación(es)" sin sobrecargar
       return { data: inspections || [], error: null, total: count ?? 0, page, pageSize };
     } catch (error: any) {
       console.error('[InspectionService] Error fetching inspections:', error);
@@ -675,14 +675,15 @@ export class InspectionService {
   }
 
   /**
-   * Re-calcula y actualiza el estado de una inspección basándose en firmas y observaciones
+   * Re-calcula y actualiza el estado de una inspección basándose en firmas
+   * Nueva regla: solo la firma del supervisor es obligatoria para completar.
    */
   static async recalculateInspectionStatus(inspectionId: string) {
     try {
-      // Obtener inspección actual
+      // Obtener inspección con equipos para decidir draft/pending
       const { data: inspection } = await supabase
         .from('inspections')
-        .select('supervisor_signature_url, mechanic_signature_url')
+        .select('supervisor_signature_url, equipment(id)')
         .eq('id', inspectionId)
         .single();
 
@@ -690,31 +691,18 @@ export class InspectionService {
         throw new Error('Inspección no encontrada');
       }
 
-      // Verificar observaciones pendientes
-      const { data: observations } = await supabase
-        .from('observations')
-        .select('obs_operator, obs_maintenance')
-        .eq('inspection_id', inspectionId);
+      const hasSupervisorSignature = !!inspection.supervisor_signature_url && String(inspection.supervisor_signature_url).trim().length > 0;
+      const hasEquipment = Array.isArray((inspection as any).equipment) && (inspection as any).equipment.length > 0;
 
-      const hasPendingObservations = observations &&
-        Array.isArray(observations) &&
-        observations.some(
-          (obs) => obs.obs_operator && obs.obs_operator.trim().length > 0 &&
-            (!obs.obs_maintenance || obs.obs_maintenance.trim().length === 0)
-        );
-
-      // Determinar estado correcto
       let correctStatus: 'draft' | 'pending' | 'completed';
-
-      if (hasPendingObservations) {
-        correctStatus = 'pending';
-      } else if (inspection.supervisor_signature_url && inspection.mechanic_signature_url) {
+      if (hasSupervisorSignature) {
         correctStatus = 'completed';
-      } else {
+      } else if (hasEquipment) {
         correctStatus = 'pending';
+      } else {
+        correctStatus = 'draft';
       }
 
-      // Actualizar estado
       const { error } = await supabase
         .from('inspections')
         .update({

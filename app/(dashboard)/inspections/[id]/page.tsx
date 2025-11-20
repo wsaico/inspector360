@@ -324,8 +324,8 @@ export default function InspectionDetailPage() {
           <div>
               <div className="flex items-center gap-3">
                 <h2 className="text-2xl font-bold">{inspection.form_code || 'Sin código'}</h2>
-                {hasPendingObservations(inspection) ? (
-                  <Badge variant="warning">Pendiente</Badge>
+                {inspection.status === 'completed' && ((inspection.observations?.length || 0) > 0) ? (
+                  <Badge variant="success">Completada con observación(es)</Badge>
                 ) : (
                   getStatusBadge(inspection.status)
                 )}
@@ -345,12 +345,12 @@ export default function InspectionDetailPage() {
               Continuar edición
             </Button>
           )}
-          {/* Botones para firmar cuando faltan firmas */}
-          {canEditInspections && !!getMissingSignaturesLabel(inspection) && (
+          {/* Botones de firma cuando falta alguna (supervisor obligatoria, mecánico opcional) */}
+          {canEditInspections && (!isSupervisorSigned(inspection) || !isMechanicSigned(inspection)) && (
             <div className="flex flex-col gap-2 w-full md:w-auto">
               {hasPendingObservations(inspection) && (
                 <p className="text-xs text-muted-foreground">
-                  Hay observaciones pendientes. Puede firmar, pero se recomienda responder primero.
+                  Hay observaciones registradas. La inspección puede estar completada, se recomienda revisarlas.
                 </p>
               )}
               <div className="flex gap-2">
@@ -406,7 +406,7 @@ export default function InspectionDetailPage() {
         <CardContent>
           {hasPendingObservations(inspection) && (
             <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm">
-              Hay observaciones del operador sin respuesta del mecánico. La inspección no está al 100%.
+              La inspección puede estar completada, pero se recomienda revisar las observaciones.
             </div>
           )}
           {getMissingSignaturesLabel(inspection) && (

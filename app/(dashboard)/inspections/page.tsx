@@ -91,7 +91,12 @@ export default function InspectionsPage() {
     // Usar el estado de la base de datos directamente
     // El backend ya calcula el estado correcto basándose en las firmas
     if (inspection.status === 'completed') {
-      return <Badge className="bg-green-500 hover:bg-green-600">Completada</Badge>;
+      const hasObs = Array.isArray((inspection as any).observations) && (inspection as any).observations.length > 0;
+      return (
+        <Badge className="bg-green-500 hover:bg-green-600">
+          {hasObs ? 'Completada con observación(es)' : 'Completada'}
+        </Badge>
+      );
     }
     if (inspection.status === 'pending') {
       // Mostrar información adicional si faltan firmas

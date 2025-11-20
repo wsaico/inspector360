@@ -52,44 +52,30 @@ async function checkInspection() {
     });
   }
 
-  // Verificar observaciones
+  // Verificar observaciones (solo para reporte informativo)
   const { data: observations } = await supabase
     .from('observations')
     .select('*')
     .eq('inspection_id', inspectionId);
 
   console.log(`\n📝 OBSERVACIONES: ${observations?.length || 0}`);
-  if (observations && observations.length > 0) {
-    observations.forEach((obs, idx) => {
-      console.log(`\n   [${idx + 1}]`);
-      console.log(`   - obs_operator: "${obs.obs_operator || 'NULL'}"`);
-      console.log(`   - obs_maintenance: "${obs.obs_maintenance || 'NULL'}"`);
-      const isPending = obs.obs_operator && obs.obs_operator.trim().length > 0 && (!obs.obs_maintenance || obs.obs_maintenance.trim().length === 0);
-      console.log(`   - PENDIENTE: ${isPending ? 'SÍ ⚠️' : 'NO ✅'}`);
-    });
-  }
 
-  // Calcular estado correcto
+  // Calcular estado correcto (solo firma de supervisor obligatoria)
   const hasSupervisorSig = !!inspection.supervisor_signature_url && inspection.supervisor_signature_url.trim().length > 0;
-  const hasMechanicSig = !!inspection.mechanic_signature_url && inspection.mechanic_signature_url.trim().length > 0;
-  const hasPendingObs = observations && observations.some((obs: any) =>
-    obs.obs_operator && obs.obs_operator.trim().length > 0 &&
-    (!obs.obs_maintenance || obs.obs_maintenance.trim().length === 0)
-  );
+  const hasEquipment = Array.isArray(inspection.equipment) && inspection.equipment.length > 0;
 
   let correctStatus: 'draft' | 'pending' | 'completed';
-  if (hasPendingObs) {
-    correctStatus = 'pending';
-  } else if (hasSupervisorSig && hasMechanicSig) {
+  if (hasSupervisorSig) {
     correctStatus = 'completed';
-  } else {
+  } else if (hasEquipment) {
     correctStatus = 'pending';
+  } else {
+    correctStatus = 'draft';
   }
 
   console.log(`\n🔍 ANÁLISIS:`);
   console.log(`   - Tiene firma supervisor: ${hasSupervisorSig ? 'SÍ ✅' : 'NO ❌'}`);
-  console.log(`   - Tiene firma mecánico: ${hasMechanicSig ? 'SÍ ✅' : 'NO ❌'}`);
-  console.log(`   - Tiene obs pendientes: ${hasPendingObs ? 'SÍ ⚠️' : 'NO ✅'}`);
+  // Firma de mecánico y respuesta son opcionales
   console.log(`   - Estado actual: ${inspection.status}`);
   console.log(`   - Estado correcto: ${correctStatus}`);
 
