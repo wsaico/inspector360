@@ -20,14 +20,17 @@ interface ComplianceChartProps {
     data: any[]
     daysInMonth: number
     currentDay: number
+    daysElapsed?: number
 }
 
-export function ComplianceChart({ data, daysInMonth, currentDay }: ComplianceChartProps) {
+export function ComplianceChart({ data, daysInMonth, currentDay, daysElapsed }: ComplianceChartProps) {
     // Calcular porcentaje de avance actual
     // Buscamos el último dato que tenga valor acumulativo (no futuro)
     const lastDataPoint = data.findLast(d => d.cumulative !== null);
     const currentCumulative = lastDataPoint?.cumulative || 0;
-    const progressPercentage = daysInMonth > 0 ? Math.round((currentCumulative / daysInMonth) * 100) : 0;
+    // Usar daysElapsed si está disponible, sino daysInMonth como fallback
+    const effectiveDays = daysElapsed || daysInMonth;
+    const progressPercentage = effectiveDays > 0 ? Math.round((currentCumulative / effectiveDays) * 100) : 0;
 
     return (
         <Card className="shadow-lg border-t-4 border-t-blue-500">
@@ -36,10 +39,10 @@ export function ComplianceChart({ data, daysInMonth, currentDay }: ComplianceCha
                     <div>
                         <CardTitle className="flex items-center gap-2 text-xl">
                             <TrendingUp className="h-6 w-6 text-blue-600" />
-                            Progreso de Cumplimiento
+                            Cumplimiento Diario Acumulado
                         </CardTitle>
                         <CardDescription className="mt-1">
-                            Meta: {daysInMonth} días (1 inspección por día)
+                            Días con inspección vs Meta (1 inspección/día)
                         </CardDescription>
                     </div>
                     <div className="flex flex-col items-end">

@@ -26,6 +26,7 @@ interface InspectionContextType {
   updateChecklist: (equipmentCode: string, itemCode: string, value: ChecklistItem) => void;
   setSignatures: (data: InspectionFormData['signatures']) => void;
   setEquipmentSignature: (equipmentCode: string, signature: string) => void;
+  setAdditionalComments: (comments: string) => void;
 
   // Navegacion
   nextStep: () => void;
@@ -54,6 +55,7 @@ const initialFormData: InspectionFormData = {
   checklists: {},
   signatures: {},
   equipmentSignatures: {},
+  additional_comments: '',
 };
 
 export function InspectionProvider({ children }: { children: ReactNode }) {
@@ -175,6 +177,10 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const setAdditionalComments = useCallback((comments: string) => {
+    setFormData(prev => ({ ...prev, additional_comments: comments }));
+  }, []);
+
   const setDraftInspectionId = useCallback((id: string | null) => {
     setDraftInspectionIdState(id);
   }, []);
@@ -263,6 +269,7 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
     updateChecklist,
     setSignatures,
     setEquipmentSignature,
+    setAdditionalComments,
     nextStep,
     prevStep,
     goToStep,

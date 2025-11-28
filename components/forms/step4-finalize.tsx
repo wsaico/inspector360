@@ -12,19 +12,21 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import dynamic from 'next/dynamic';
 const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
-import { CheckCircle2, Loader2, AlertCircle, Wrench } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, Wrench, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 
 export default function Step4Finalize() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { formData, setSignatures, resetForm, draftInspectionId, equipmentDbIds, updateObservation } = useInspectionForm();
+  const { formData, setSignatures, resetForm, draftInspectionId, equipmentDbIds, updateObservation, setAdditionalComments } = useInspectionForm();
   const [supervisorName, setSupervisorName] = useState('');
   const [supervisorSignature, setSupervisorSignature] = useState<string | null>(null);
   const [mechanicName, setMechanicName] = useState('');
   const [mechanicSignature, setMechanicSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mechanicResponses, setMechanicResponses] = useState<Record<string, string>>({});
+  const [showComments, setShowComments] = useState(false);
 
   // Estado para rastrear el nombre guardado junto con la firma
   const [savedSupervisorName, setSavedSupervisorName] = useState<string | null>(null);
@@ -35,6 +37,13 @@ export default function Step4Finalize() {
   const [mechanicNames, setMechanicNames] = useState<string[]>([]);
   const [showSupervisorSuggestions, setShowSupervisorSuggestions] = useState(false);
   const [showMechanicSuggestions, setShowMechanicSuggestions] = useState(false);
+
+  // Initialize showComments based on existing data
+  useEffect(() => {
+    if (formData.additional_comments && formData.additional_comments.length > 0) {
+      setShowComments(true);
+    }
+  }, [formData.additional_comments]);
 
   // Prefill de nombres desde localStorage (solo nombres, no firmas)
   useEffect(() => {
@@ -58,20 +67,20 @@ export default function Step4Finalize() {
           mechanic_name: mecName,
         });
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // Persist names to localStorage when they change
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', supervisorName || '');
-    } catch {}
+    } catch { }
   }, [supervisorName]);
 
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', mechanicName || '');
-    } catch {}
+    } catch { }
   }, [mechanicName]);
 
   // VALIDACIÓN: Invalidar firma del supervisor si el nombre cambia
@@ -90,7 +99,7 @@ export default function Step4Finalize() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('inspector360.signature.supervisor');
         }
-      } catch {}
+      } catch { }
       toast.info('Firma del supervisor invalidada. Por favor firme nuevamente.', { duration: 3000 });
     }
   }, [supervisorName, savedSupervisorName]);
@@ -111,7 +120,7 @@ export default function Step4Finalize() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('inspector360.signature.mechanic');
         }
-      } catch {}
+      } catch { }
       toast.info('Firma del mecánico invalidada. Por favor firme nuevamente.', { duration: 3000 });
     }
   }, [mechanicName, savedMechanicName]);
@@ -218,6 +227,7 @@ export default function Step4Finalize() {
           inspection_date: formData.general!.inspection_date,
           inspection_type: formData.general!.inspection_type,
           inspector_name: formData.general!.inspector_name,
+          additional_comments: formData.additional_comments,
         });
         if (updateDraftError) {
           throw new Error(updateDraftError);
@@ -230,6 +240,7 @@ export default function Step4Finalize() {
           inspection_date: formData.general!.inspection_date,
           inspection_type: formData.general!.inspection_type,
           inspector_name: formData.general!.inspector_name,
+          additional_comments: formData.additional_comments,
         });
         if (createError || !created) throw new Error(createError);
         inspectionId = created.id!;
@@ -438,6 +449,38 @@ export default function Step4Finalize() {
           </CardContent>
         </Card>
       )}
+
+      {/* Sección Comentarios Adicionales */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base sm:text-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-gray-500" />
+              Comentarios Adicionales
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="show-comments" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                {showComments ? 'Ocultar' : 'Agregar'}
+              </Label>
+              <Switch
+                id="show-comments"
+                checked={showComments}
+                onCheckedChange={setShowComments}
+              />
+            </div>
+          </CardTitle>
+        </CardHeader>
+        {showComments && (
+          <CardContent>
+            <Textarea
+              placeholder="Ingrese cualquier comentario adicional, observación general o nota importante sobre la inspección..."
+              value={formData.additional_comments || ''}
+              onChange={(e) => setAdditionalComments(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </CardContent>
+        )}
+      </Card>
 
       {/* Sección Supervisor - Mejorada para móvil */}
       <Card className="border-blue-200 bg-blue-50/50">

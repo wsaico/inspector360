@@ -19,9 +19,10 @@ import {
 } from "lucide-react"
 import { ComplianceChart } from "@/components/dashboard/compliance-chart"
 import { ComplianceAlert } from "@/components/dashboard/compliance-alert"
-import { TopStations } from "@/components/dashboard/top-stations"
+import { ComplianceTrend } from "@/components/dashboard/compliance-trend"
 import { StationComplianceChart } from "@/components/dashboard/station-compliance-chart"
 import { PendingInspectionsList } from "@/components/dashboard/pending-inspections-list"
+import { StationComplianceHeatmap } from "@/components/dashboard/station-compliance-heatmap"
 
 export default function CompliancePage() {
   const { profile, loading: profileLoading, user } = useAuth();
@@ -54,11 +55,13 @@ export default function CompliancePage() {
   const [dailyCompliance, setDailyCompliance] = useState<{
     daysWithInspection: number;
     daysInMonth: number;
+    daysElapsed: number;
     rate: number;
     breakdown: any[];
-  }>({ daysWithInspection: 0, daysInMonth: 0, rate: 0, breakdown: [] });
+  }>({ daysWithInspection: 0, daysInMonth: 0, daysElapsed: 0, rate: 0, breakdown: [] });
 
   const [stationComplianceStatus, setStationComplianceStatus] = useState<any[]>([]);
+  const [stationDailyStatus, setStationDailyStatus] = useState<any[]>([]);
 
   useEffect(() => {
     loadStations();
@@ -96,14 +99,16 @@ export default function CompliancePage() {
         complianceRes,
         issuesRes,
         dailyRes,
-        stationStatusRes
+        stationStatusRes,
+        stationDailyStatusRes
       ] = await Promise.all([
         ComplianceService.getOverallStats(filters),
         ComplianceService.getMonthlyTrends(filters),
         ComplianceService.getComplianceBreakdown(filters),
         ComplianceService.getTopIssues(5, filters),
         ComplianceService.getDailyCompliance({ ...filters, aggregateAll: !effectiveStation }),
-        ComplianceService.getStationComplianceStatus(filters)
+        ComplianceService.getStationComplianceStatus(filters),
+        ComplianceService.getStationDailyStatus(filters)
       ]);
 
       if (statsRes.data) setStats(statsRes.data);
@@ -112,6 +117,8 @@ export default function CompliancePage() {
       if (issuesRes.data) setTopIssues(issuesRes.data);
       if (dailyRes.data) setDailyCompliance(dailyRes.data);
       if (stationStatusRes.data) setStationComplianceStatus(stationStatusRes.data);
+      // @ts-ignore
+      if (stationDailyStatusRes.data) setStationDailyStatus(stationDailyStatusRes.data);
 
     } catch (error) {
       console.error("Error loading compliance data:", error);
@@ -121,32 +128,8 @@ export default function CompliancePage() {
   };
 
   // Calculate missed days for the alert
-  // We need to know how many days have passed in the selected range up to "today" (or end date if in past)
-  const calculateMissedDays = () => {
-    if (!startDate || !endDate) return 0;
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const today = new Date();
-
-    // The effective end date for counting "missed" days is the lesser of:
-    // 1. The selected end date
-    // 2. Today (we can't miss days in the future)
-    const effectiveEnd = end < today ? end : today;
-
-    // If start is in future, 0 missed
-    if (start > today) return 0;
-
-    // Calculate total days expected so far
-    const diffTime = Math.abs(effectiveEnd.getTime() - start.getTime());
-    const daysExpected = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include start day
-
-    // Missed = Expected - Actual
-    // Ensure we don't return negative if data is weird
-    return Math.max(0, daysExpected - dailyCompliance.daysWithInspection);
-  };
-
-  const missedDays = calculateMissedDays();
+  // Días perdidos = días transcurridos - días con inspección
+  const missedDays = Math.max(0, dailyCompliance.daysElapsed - dailyCompliance.daysWithInspection);
 
   return (
     <div className="space-y-6 p-6 pb-20">
@@ -200,12 +183,12 @@ export default function CompliancePage() {
       {/* Alert Section */}
       <ComplianceAlert
         missedDays={missedDays}
-        daysInMonth={dailyCompliance.daysInMonth} // Using daysInMonth as "Total Days in Range"
-        currentDay={dailyCompliance.daysInMonth} // For range view, we can consider the whole range as context
+        daysInMonth={dailyCompliance.daysInMonth}
+        currentDay={dailyCompliance.daysElapsed}
       />
 
       {/* KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cumplimiento Periodo</CardTitle>
@@ -216,7 +199,7 @@ export default function CompliancePage() {
               {dailyCompliance.rate}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {dailyCompliance.daysWithInspection} de {dailyCompliance.daysInMonth} días cumplidos
+              {dailyCompliance.daysWithInspection} de {dailyCompliance.daysElapsed} días cumplidos
             </p>
           </CardContent>
         </Card>
@@ -263,72 +246,106 @@ export default function CompliancePage() {
         </Card>
       </div>
 
-      {/* Main Chart & Top Stations */}
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
-        <div className="lg:col-span-4">
-          <ComplianceChart
-            data={dailyCompliance.breakdown}
-            daysInMonth={dailyCompliance.daysInMonth}
-            currentDay={dailyCompliance.daysWithInspection}
-          />
-        </div>
-        <TopStations
-          data={stationComplianceStatus}
-          daysInPeriod={dailyCompliance.daysInMonth}
+      {/* Main Chart & Ranking Side by Side */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ComplianceChart
+          data={dailyCompliance.breakdown || []}
+          daysInMonth={dailyCompliance.daysInMonth}
+          currentDay={dailyCompliance.daysWithInspection}
+          daysElapsed={dailyCompliance.daysElapsed}
+        />
+        <ComplianceTrend
+          data={stationComplianceStatus || []}
+          daysInPeriod={dailyCompliance.daysElapsed}
         />
       </div>
+
+      {/* Heatmap Full Width */}
+      <StationComplianceHeatmap
+        data={stationDailyStatus || []}
+        daysInMonth={dailyCompliance.daysElapsed}
+        startDate={startDate}
+        endDate={endDate}
+      />
 
       {/* Station Compliance & Pending List */}
       <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
         <div className="lg:col-span-4">
           <StationComplianceChart
-            data={stationComplianceStatus}
-            daysInPeriod={dailyCompliance.daysInMonth}
+            data={stationComplianceStatus || []}
+            daysInPeriod={dailyCompliance.daysElapsed}
           />
         </div>
-        <PendingInspectionsList data={stationComplianceStatus} />
+        <PendingInspectionsList data={stationComplianceStatus || []} />
       </div>
 
       {/* Secondary Charts & Tables */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
 
         {/* Historical Trend */}
-        <Card className="col-span-7">
-          <CardHeader>
-            <CardTitle>Tendencia Histórica</CardTitle>
-            <CardDescription>
-              Evolución de inspecciones en el tiempo
-            </CardDescription>
+        <Card className="col-span-7 shadow-lg border-t-4 border-t-purple-500">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Activity className="h-6 w-6 text-purple-600" />
+                  Tendencia Histórica de Inspecciones
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Cantidad total de inspecciones completadas por periodo
+                </CardDescription>
+              </div>
+              {monthlyData.length > 0 && (
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-purple-700">
+                    {monthlyData.reduce((sum, item) => sum + (item.inspections || 0), 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total Acumulado</p>
+                </div>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="pl-2">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+          <CardContent className="pt-6">
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={monthlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
                 <XAxis
                   dataKey="month"
-                  stroke="#888888"
-                  fontSize={12}
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
+                  label={{ value: 'Periodo', position: 'insideBottom', offset: -5, fill: '#9CA3AF', fontSize: 12 }}
                 />
                 <YAxis
-                  stroke="#888888"
-                  fontSize={12}
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
+                  label={{ value: 'Cantidad de Inspecciones', angle: -90, position: 'insideLeft', fill: '#9CA3AF', fontSize: 12 }}
                   tickFormatter={(value) => `${value}`}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                  contentStyle={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  }}
+                  labelStyle={{ fontWeight: 'bold', color: '#374151' }}
+                  cursor={{ fill: 'rgba(147, 51, 234, 0.1)' }}
                 />
                 <Bar
                   dataKey="inspections"
-                  fill="hsl(var(--primary))"
-                  radius={[4, 4, 0, 0]}
-                  name="Inspecciones"
+                  fill="#9333EA"
+                  radius={[8, 8, 0, 0]}
+                  name="Inspecciones Completadas"
+                  maxBarSize={60}
                 />
               </BarChart>
             </ResponsiveContainer>
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600">
+              <div className="h-3 w-3 bg-purple-600 rounded"></div>
+              <span>Inspecciones realizadas en cada periodo</span>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -401,6 +418,6 @@ export default function CompliancePage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </div >
   )
 }

@@ -177,6 +177,7 @@ export class InspectionService {
           inspection_date: inspectionData.inspection_date,
           inspection_type: inspectionData.inspection_type,
           inspector_name: inspectionData.inspector_name,
+          additional_comments: inspectionData.additional_comments,
           status: 'draft',
         })
         .select()
@@ -267,7 +268,7 @@ export class InspectionService {
       console.error('Error completing inspection:', error);
       return { data: null, error: error.message };
     }
-  } 
+  }
 
   /**
    * Sube firma del supervisor y actualiza la inspección

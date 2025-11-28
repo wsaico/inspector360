@@ -37,10 +37,35 @@ export class ComplianceService {
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const daysInMonth = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+      // Calcular días transcurridos para rango explícito
+      const now = new Date();
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+      let effectiveEnd = end < endOfDay ? end : endOfDay;
+
+      // Si el inicio es futuro, 0 días transcurridos
+      let daysElapsed = 0;
+      if (start <= endOfDay) {
+        const diffTimeElapsed = Math.abs(effectiveEnd.getTime() - start.getTime());
+        daysElapsed = Math.ceil(diffTimeElapsed / (1000 * 60 * 60 * 24));
+      }
+
+      // Formatear fechas sin timezone para evitar problemas de conversión
+      const formatDate = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+      };
+
       return {
-        start: start.toISOString(),
-        end: end.toISOString(),
-        daysInMonth
+        start: formatDate(start),
+        end: formatDate(end),
+        daysInMonth,
+        daysElapsed: Math.max(0, daysElapsed)
       };
     }
 
@@ -49,10 +74,48 @@ export class ComplianceService {
     const [y, m] = filters?.month ? filters.month.split('-').map(Number) : [now.getFullYear(), now.getMonth() + 1];
     const start = new Date(y!, (m! - 1), 1);
     const end = new Date(y!, (m! - 1) + 1, 0);
+
+    // Calcular días transcurridos (para el cálculo de tasa de cumplimiento)
+    // El "meta" debe ser hasta el día actual si estamos en el mes en curso
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    // Si el rango termina antes de hoy, usamos todo el rango (mes pasado)
+    // Si el rango termina después de hoy (mes actual o futuro), cortamos en hoy
+    let effectiveEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59);
+    if (effectiveEnd > endOfDay) {
+      effectiveEnd = endOfDay;
+    }
+
+    // Helper para formatear sin timezone
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const seconds = String(d.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+    };
+
+    // Si el inicio es futuro, 0 días transcurridos
+    if (start > endOfDay) {
+      return {
+        start: formatDate(start),
+        end: formatDate(new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59)),
+        daysInMonth: end.getDate(),
+        daysElapsed: 0
+      };
+    }
+
+    const diffTimeElapsed = Math.abs(effectiveEnd.getTime() - start.getTime());
+    // +1 porque si estamos en el día 1, ha pasado 1 día (el día 1)
+    const daysElapsed = Math.ceil(diffTimeElapsed / (1000 * 60 * 60 * 24));
+
     return {
-      start: start.toISOString(),
-      end: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString(),
-      daysInMonth: end.getDate()
+      start: formatDate(start),
+      end: formatDate(new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59)),
+      daysInMonth: end.getDate(),
+      daysElapsed: Math.max(0, daysElapsed) // Asegurar no negativo
     };
   }
 
@@ -67,8 +130,8 @@ export class ComplianceService {
         .from('inspections')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'completed')
-        .gte('created_at', start)
-        .lte('created_at', end);
+        .gte('inspection_date', start)
+        .lte('inspection_date', end);
 
       // Total de inspecciones completadas (aplicando filtro de estación si corresponde)
       const totalQuery = filters?.station ? baseInspections.eq('station', filters.station) : baseInspections;
@@ -84,8 +147,8 @@ export class ComplianceService {
         .from('inspections')
         .select('id')
         .eq('status', 'completed')
-        .gte('created_at', start)
-        .lte('created_at', end);
+        .gte('inspection_date', start)
+        .lte('inspection_date', end);
       const idsQuery = filters?.station ? baseIdsQuery.eq('station', filters.station) : baseIdsQuery;
       const { data: inspectionsForRange, error: idsError } = await idsQuery;
       if (idsError) throw idsError;
@@ -158,11 +221,11 @@ export class ComplianceService {
       const { start, end, daysInMonth } = ComplianceService.getDateRange(filters);
       const base = supabase
         .from('inspections')
-        .select('created_at')
+        .select('inspection_date')
         .eq('status', 'completed')
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .order('created_at', { ascending: true });
+        .gte('inspection_date', start)
+        .lte('inspection_date', end)
+        .order('inspection_date', { ascending: true });
       const query = filters?.station ? base.eq('station', filters.station) : base;
       const { data: inspections, error } = await query;
 
@@ -173,8 +236,8 @@ export class ComplianceService {
       const trendData: Record<string, number> = {};
       const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-      inspections?.forEach((inspection: { created_at: string }) => {
-        const date = new Date(inspection.created_at);
+      inspections?.forEach((inspection: { inspection_date: string }) => {
+        const date = new Date(inspection.inspection_date);
         let key;
         if (isLongRange) {
           key = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
@@ -210,8 +273,8 @@ export class ComplianceService {
         .from('inspections')
         .select('id')
         .eq('status', 'completed')
-        .gte('created_at', start)
-        .lte('created_at', end);
+        .gte('inspection_date', start)
+        .lte('inspection_date', end);
       const idsQuery = filters?.station ? baseIds.eq('station', filters.station) : baseIds;
       const { data: inspections, error: idsError } = await idsQuery;
 
@@ -275,8 +338,8 @@ export class ComplianceService {
         .from('inspections')
         .select('id')
         .eq('status', 'completed')
-        .gte('created_at', start)
-        .lte('created_at', end);
+        .gte('inspection_date', start)
+        .lte('inspection_date', end);
       const idsQuery = filters?.station ? baseIds.eq('station', filters.station) : baseIds;
       const { data: inspections, error: idsError } = await idsQuery;
 
@@ -321,9 +384,9 @@ export class ComplianceService {
       return { data: null, error: error.message };
     }
   }
-
   /**
    * Obtiene cumplimiento por estación para el rango actual
+   * Incluye métricas de puntualidad y cobertura
    */
   static async getStationComplianceStatus(filters?: { startDate?: string; endDate?: string; month?: string }) {
     try {
@@ -334,33 +397,101 @@ export class ComplianceService {
 
       if (stationsError) throw stationsError;
 
-      const { start, end, daysInMonth } = ComplianceService.getDateRange(filters);
+      const { start, end, daysElapsed } = ComplianceService.getDateRange(filters);
 
+      // Fetch inspections with created_at for punctuality check
       const { data: inspections, error: inspectionsError } = await supabase
         .from('inspections')
-        .select('station, created_at, status')
-        .in('status', ['completed', 'pending']) // Fetch both completed and pending
-        .gte('created_at', start)
-        .lte('created_at', end);
+        .select(`
+          id,
+          station,
+          inspection_date,
+          created_at,
+          status
+        `)
+        .in('status', ['completed', 'pending'])
+        .gte('inspection_date', start)
+        .lte('inspection_date', end);
 
       if (inspectionsError) throw inspectionsError;
 
-      const stationMap: Record<string, { count: number; pendingCount: number; daysWithInspection: number; complianceRate: number; status: 'on_track' | 'behind' | 'no_inspections' }> = {};
+      // Fetch equipment count for completed inspections
+      const completedIds = inspections?.filter((i: any) => i.status === 'completed').map((i: any) => i.id) || [];
+      let equipmentByInspection: Record<string, number> = {};
+
+      if (completedIds.length > 0) {
+        const { data: equipmentData, error: equipmentError } = await supabase
+          .from('equipment')
+          .select('inspection_id')
+          .in('inspection_id', completedIds);
+
+        if (equipmentError) throw equipmentError;
+
+        // Count equipment per inspection
+        equipmentData?.forEach((eq: any) => {
+          equipmentByInspection[eq.inspection_id] = (equipmentByInspection[eq.inspection_id] || 0) + 1;
+        });
+      }
+
+      // Map: StationCode -> Stats
+      const stationMap: Record<string, {
+        count: number;
+        pendingCount: number;
+        daysWithInspection: number;
+        complianceRate: number;
+        punctualityRate: number;
+        coverageRate: number;
+        equipmentCount: number;
+        status: 'on_track' | 'behind' | 'no_inspections'
+      }> = {};
 
       stations?.forEach((station: { code: string; name: string }) => {
-        const stationInspections = inspections?.filter((i: { station: string }) => i.station === station.code) || [];
-        const completedInspections = stationInspections.filter((i: { status: string }) => i.status === 'completed');
-        const pendingInspections = stationInspections.filter((i: { status: string }) => i.status === 'pending');
+        const stationInspections = inspections?.filter((i: any) => i.station === station.code) || [];
+        const completedInspections = stationInspections.filter((i: any) => i.status === 'completed');
+        const pendingInspections = stationInspections.filter((i: any) => i.status === 'pending');
 
         const uniqueDays = new Set<string>();
-        completedInspections.forEach((i: { created_at: string }) => {
-          const d = new Date(i.created_at);
+        let onTimeCount = 0;
+        let totalEquipment = 0;
+
+        completedInspections.forEach((i: any) => {
+          const d = new Date(i.inspection_date);
           const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString();
           uniqueDays.add(dayKey);
+
+          // Punctuality Check - Considerar puntual si se registra el mismo día o dentro de 2 días
+          if (i.created_at && i.inspection_date) {
+            const created = new Date(i.created_at);
+            const inspectionDate = new Date(i.inspection_date);
+
+            // Normalizar a medianoche para comparar solo fechas
+            const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+            const inspectionDay = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate());
+
+            // Calcular diferencia en días
+            const diffTime = createdDay.getTime() - inspectionDay.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            // Considerar puntual si se creó el mismo día o hasta 2 días después
+            if (diffDays >= 0 && diffDays <= 2) {
+              onTimeCount++;
+            }
+          }
+
+          // Equipment Count
+          const eqCount = equipmentByInspection[i.id] || 0;
+          totalEquipment += eqCount;
         });
 
         const daysWithInspection = uniqueDays.size;
-        const complianceRate = daysInMonth > 0 ? Math.round((daysWithInspection / daysInMonth) * 100) : 0;
+        const complianceRate = daysElapsed > 0 ? Math.min(100, Math.round((daysWithInspection / daysElapsed) * 100)) : 0;
+
+        const punctualityRate = completedInspections.length > 0
+          ? Math.round((onTimeCount / completedInspections.length) * 100)
+          : 0;
+
+        // Coverage Rate: 100% if totalEquipment > 0
+        const coverageRate = totalEquipment > 0 ? 100 : 0;
 
         let status: 'on_track' | 'behind' | 'no_inspections';
         if (stationInspections.length === 0) {
@@ -376,6 +507,9 @@ export class ComplianceService {
           pendingCount: pendingInspections.length,
           daysWithInspection,
           complianceRate,
+          punctualityRate,
+          coverageRate,
+          equipmentCount: totalEquipment,
           status,
         };
       });
@@ -385,6 +519,12 @@ export class ComplianceService {
         name: station.name,
         ...stationMap[station.code],
       })) || [];
+
+      // Sort by Compliance Rate desc, then Punctuality desc
+      stationStats.sort((a: { complianceRate: number; punctualityRate: number }, b: { complianceRate: number; punctualityRate: number }) => {
+        if (b.complianceRate !== a.complianceRate) return b.complianceRate - a.complianceRate;
+        return b.punctualityRate - a.punctualityRate;
+      });
 
       return { data: stationStats, error: null };
     } catch (error: any) {
@@ -398,20 +538,20 @@ export class ComplianceService {
    */
   static async getDailyCompliance(filters?: { station?: string; startDate?: string; endDate?: string; month?: string; aggregateAll?: boolean }) {
     try {
-      const { start, end, daysInMonth } = ComplianceService.getDateRange(filters);
+      const { start, end, daysInMonth, daysElapsed } = ComplianceService.getDateRange(filters);
       const base = supabase
         .from('inspections')
-        .select('created_at, station, status')
+        .select('inspection_date, station, status')
         .eq('status', 'completed')
-        .gte('created_at', start)
-        .lte('created_at', end);
+        .gte('inspection_date', start)
+        .lte('inspection_date', end);
       const query = filters?.station && !filters.aggregateAll ? base.eq('station', filters.station) : base;
       const { data, error } = await query;
       if (error) throw error;
 
       const seenDays: Set<string> = new Set();
-      data?.forEach((i: { created_at: string }) => {
-        const d = new Date(i.created_at);
+      data?.forEach((i: { inspection_date: string }) => {
+        const d = new Date(i.inspection_date);
         const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString();
         if (!seenDays.has(dayKey)) {
           seenDays.add(dayKey);
@@ -444,12 +584,14 @@ export class ComplianceService {
       });
 
       const daysWithInspection = seenDays.size;
-      const rate = daysInMonth > 0 ? Math.round((daysWithInspection / daysInMonth) * 100) : 0;
+      // Usar daysElapsed para el cálculo de tasa
+      const rate = daysElapsed > 0 ? Math.min(100, Math.round((daysWithInspection / daysElapsed) * 100)) : 0;
 
       return {
         data: {
           daysWithInspection,
           daysInMonth,
+          daysElapsed,
           rate,
           breakdown
         },
@@ -457,6 +599,105 @@ export class ComplianceService {
       };
     } catch (error: any) {
       console.error('Error fetching daily compliance:', error);
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Obtiene el estado diario de cumplimiento por estación (Heatmap data)
+   */
+  static async getStationDailyStatus(filters?: { startDate?: string; endDate?: string; month?: string }) {
+    try {
+      const { data: stations, error: stationsError } = await supabase
+        .from('stations')
+        .select('code, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (stationsError) throw stationsError;
+
+      const { start, end, daysInMonth } = ComplianceService.getDateRange(filters);
+
+      // Fetch all completed inspections in range
+      const { data: inspections, error: inspectionsError } = await supabase
+        .from('inspections')
+        .select('station, inspection_date')
+        .eq('status', 'completed')
+        .gte('inspection_date', start)
+        .lte('inspection_date', end);
+
+      if (inspectionsError) throw inspectionsError;
+
+      const startDateObj = new Date(start);
+      const now = new Date();
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+      // Map: StationCode -> { DateString -> Status }
+      const stationStatus: Record<string, { name: string; days: Record<string, 'completed' | 'missing' | 'future' | 'no_obligation'> }> = {};
+
+      // Initialize all stations
+      stations?.forEach((station: { code: string; name: string }) => {
+        stationStatus[station.code] = {
+          name: station.name,
+          days: {}
+        };
+      });
+
+      // Populate inspections
+      inspections?.forEach((i: { station: string; inspection_date: string }) => {
+        if (stationStatus[i.station]) {
+          // Parse date as local to avoid timezone issues
+          let key: string;
+          if (i.inspection_date.includes('T')) {
+            // If it's ISO format, extract just the date part
+            key = i.inspection_date.split('T')[0];
+          } else {
+            // If it's already YYYY-MM-DD, use as is
+            key = i.inspection_date;
+          }
+          stationStatus[i.station].days[key] = 'completed';
+        }
+      });
+
+      // Fill gaps
+      const result = Object.entries(stationStatus).map(([code, data]) => {
+        const days = [];
+        for (let i = 0; i < daysInMonth; i++) {
+          const currentDate = new Date(startDateObj);
+          currentDate.setDate(startDateObj.getDate() + i);
+
+          const key = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+
+          let status = data.days[key];
+
+          if (!status) {
+            // If no inspection, check if it's future or past
+            const currentEndOfDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59);
+
+            if (currentEndOfDay > endOfDay) {
+              status = 'future';
+            } else {
+              status = 'missing';
+            }
+          }
+
+          days.push({
+            date: key,
+            day: i + 1,
+            status
+          });
+        }
+
+        return {
+          code,
+          name: data.name,
+          days
+        };
+      });
+
+      return { data: result, error: null };
+    } catch (error: any) {
+      console.error('Error fetching station daily status:', error);
       return { data: null, error: error.message };
     }
   }

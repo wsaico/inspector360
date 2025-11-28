@@ -27,7 +27,7 @@ export function StationComplianceChart({ data, daysInPeriod }: StationCompliance
             <CardHeader>
                 <CardTitle>Cumplimiento por Estación</CardTitle>
                 <CardDescription>
-                    Comparativa de días cumplidos vs meta del periodo ({daysInPeriod} días)
+                    Comparativa de días cumplidos vs días transcurridos ({daysInPeriod} días)
                 </CardDescription>
             </CardHeader>
             <CardContent>

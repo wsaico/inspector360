@@ -100,6 +100,7 @@ export interface Inspection {
   updated_at?: string;
   equipment?: Equipment[];
   observations?: Observation[];
+  additional_comments?: string;
 }
 
 export interface InspectionFormData {
@@ -119,6 +120,7 @@ export interface InspectionFormData {
     mechanic_signature?: string;
   };
   equipmentSignatures: Record<string, string>; // equipment code -> signature URL
+  additional_comments?: string;
 }
 
 export interface ChecklistTemplateItem {
