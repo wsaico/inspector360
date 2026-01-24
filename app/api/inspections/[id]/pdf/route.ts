@@ -22,7 +22,17 @@ export async function GET(
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
-        // 2. Construir la URL interna que Puppeteer visitará
+        // 2. Extraer cookies para pasar a Puppeteer
+        // Fix: cookies() returns a Promise<ReadonlyRequestCookies> in modern Next.js
+        const allCookies = cookieStore.getAll();
+        const puppeteerCookies = allCookies.map((c: any) => ({
+            name: c.name,
+            value: c.value,
+            domain: 'localhost',
+            path: '/',
+        }));
+
+        // 3. Construir la URL interna que Puppeteer visitará
         // Nota: En producción, usar process.env.NEXT_PUBLIC_APP_URL
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -32,10 +42,10 @@ export async function GET(
 
         console.log(`[PDF API] Generando PDF para: ${renderUrl}`);
 
-        // 3. Generar PDF
-        const pdfBuffer = await PuppeteerService.generatePdf(renderUrl);
+        // 4. Generar PDF pasando cookies
+        const pdfBuffer = await PuppeteerService.generatePdf(renderUrl, puppeteerCookies);
 
-        // 4. Retornar el PDF como stream
+        // 5. Retornar el PDF como stream
         return new NextResponse(pdfBuffer, {
             headers: {
                 'Content-Type': 'application/pdf',

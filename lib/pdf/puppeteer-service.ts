@@ -8,7 +8,7 @@ export class PuppeteerService {
     /**
      * Genera un PDF a partir de una URL usando Puppeteer
      */
-    static async generatePdf(url: string): Promise<Buffer> {
+    static async generatePdf(url: string, cookies: any[] = []): Promise<Buffer> {
         const isDev = process.env.NODE_ENV === 'development';
 
         // Configuración para entorno local vs producción (Vercel/Serverless)
@@ -22,7 +22,7 @@ export class PuppeteerService {
                 args: chromium.args,
                 defaultViewport: chromium.defaultViewport,
                 executablePath: await chromium.executablePath(),
-                headless: chromium.headless,
+                headless: (chromium as any).headless === 'true' || (chromium as any).headless === true, // handle potential string/boolean inconsistency
                 ignoreHTTPSErrors: true,
             };
 
@@ -30,10 +30,10 @@ export class PuppeteerService {
             this.browser = await puppeteer.launch(options as any);
             const page = await this.browser.newPage();
 
-            // Autenticación básica si es necesaria (cookies, headers)
-            // En este caso, asumimos que la vista es pública o que pasamos query params seguros,
-            // O idealmente, el endpoint que llama a esto ya validó la sesión y aquí solo renderizamos.
-            // Para mayor seguridad en el futuro, se podrían pasar cookies de sesión aqui.
+            // Configurar cookies de sesión si se proporcionan
+            if (cookies && cookies.length > 0) {
+                await page.setCookie(...cookies);
+            }
 
             // Navegar a la URL
             await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
@@ -58,7 +58,7 @@ export class PuppeteerService {
 
         } catch (error) {
             console.error('Error generando PDF con Puppeteer:', error);
-            throw new Error('Falló la generación del PDF');
+            throw error;
         } finally {
             if (this.browser) {
                 await this.browser.close();
