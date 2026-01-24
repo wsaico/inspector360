@@ -20,7 +20,7 @@ export class PuppeteerService {
             }
             : {
                 args: chromium.args,
-                defaultViewport: chromium.defaultViewport,
+                defaultViewport: (chromium as any).defaultViewport,
                 executablePath: await chromium.executablePath(),
                 headless: (chromium as any).headless === 'true' || (chromium as any).headless === true, // handle potential string/boolean inconsistency
                 ignoreHTTPSErrors: true,
