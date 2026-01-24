@@ -362,17 +362,17 @@ export default function CompliancePage() {
           <CardContent>
             <div className="space-y-4">
               {topIssues.map((issue, i) => (
-                <div key={i} className="flex items-center">
-                  <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none truncate max-w-[200px]" title={issue.description}>
+                <div key={i} className="flex items-start py-2 border-b last:border-0">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
+                    {i + 1}
+                  </div>
+                  <div className="ml-3 space-y-1 flex-1">
+                    <p className="text-sm font-medium leading-normal text-gray-900">
                       {issue.description}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {issue.code} • {issue.count} incidencias
+                      Código: {issue.code} • <span className="font-semibold text-red-600">{issue.count} incidencias</span>
                     </p>
-                  </div>
-                  <div className="ml-auto font-medium">
-                    #{i + 1}
                   </div>
                 </div>
               ))}

@@ -314,6 +314,7 @@ export class PDFGenerator {
   // Matriz de checklist (filas: equipos, columnas: ítems) en horizontal
   private async addChecklistMatrix(inspection: Inspection) {
     // Encabezados exactos del HTML (12 ítems)
+    // Encabezados exactos del HTML (14 ítems)
     const headerItems = [
       'Extintor vigente: verificar presencia, fecha de vencimiento y de ultima inspección. El manómetro en zona verde.',
       'Pin de seguridad: comprobar que esté colocado correctamente y sin deformaciones.',
@@ -321,17 +322,19 @@ export class PDFGenerator {
       'Placards, stickers y micas: deben estar legibles, adheridos y sin daños.',
       'Nivel de combustible: debe ser suficiente para la operación prevista.',
       'Asiento y cinturón de seguridad: revisar estado, anclaje y funcionamiento.',
-      'Circulina operativa: encender y comprobar visibilidad (Aplica a todos los equipos). \nAlarma de retroceso operativo (Aplica a FT-PM-TR)',
+      'Circulina operativa: encender y comprobar visibilidad. (Aplica a todos los equipos). \nAlarma de retroceso operativo (Aplica a FT-PM-TR)',
       'Luces operativas: verificar luces delanteras, traseras y de freno.',
       'Cintas reflectivas: deben estar adheridas y visibles.',
       'Pintura: sin deterioro que afecte señalización o visibilidad del equipo.',
-      'Neumáticos sin desgaste: revisar la ausencia de grietas o desgaste de las llantas.',
+      'Neumáticos sin desgaste: revisar presión y ausencia de grietas o desgaste de las llantas.',
       'Frenos operativos (Freno de pedal y parqueo o mano): probar funcionamiento antes de iniciar el desplazamiento.',
+      'Bumpers: sin rayones, desgaste que pueda causar daños al fuselaje del avión (Aplica a FT-EM)',
+      'Sólo escaleras: estabilizadores operativos, peldaños y cintas antideslizantes en buen estado, luces operativas'
     ];
 
     const items = [...CHECKLIST_TEMPLATE]
       .sort((a, b) => a.order_index - b.order_index)
-      .slice(0, 12);
+      .slice(0, 14);
 
     const head = ['CÓDIGO', 'HORA', ...headerItems, 'FIRMA'];
     const hourStr = this.formatTimeLocal(inspection.inspection_date);

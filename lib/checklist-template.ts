@@ -16,7 +16,7 @@ export const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   {
     code: 'CHK-01',
     category: 'general',
-    description: 'Extintor vigente: verificar presencia, fecha de vencimiento y de última inspección. El manómetro en zona verde.',
+    description: 'Extintor vigente: verificar presencia, fecha de vencimiento y de ultima inspección. El manómetro en zona verde.',
     order_index: 1,
   },
   {
@@ -34,7 +34,7 @@ export const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   {
     code: 'CHK-04',
     category: 'general',
-    description: 'Placas, stikers y micas: deben estar legibles, adheridos y sin daños.',
+    description: 'Placards, stickers y micas: deben estar legibles, adheridos y sin daños.',
     order_index: 4,
   },
   {
@@ -52,7 +52,7 @@ export const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   {
     code: 'CHK-07',
     category: 'general',
-    description: 'Circulina operativa: encender y comprobar visibilidad (aplica a todos los equipos). Alarma de retroceso operativa (aplica a FT-PM-TR).',
+    description: 'Circulina operativa: encender y comprobar visibilidad. (Aplica a todos los equipos). Alarma de retroceso operativo (Aplica a FT-PM-TR)',
     order_index: 7,
   },
   {
@@ -76,32 +76,26 @@ export const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   {
     code: 'CHK-11',
     category: 'general',
-    description: 'Neumáticos: sin desgaste, revisar la ausencia de grietas o desgaste de las llantas.',
+    description: 'Neumáticos sin desgaste: revisar presión y ausencia de grietas o desgaste de las llantas.',
     order_index: 11,
   },
   {
     code: 'CHK-12',
     category: 'general',
-    description: 'Frenos operativos (freno de pedal y parqueo manual): probar funcionamiento antes de iniciar el desplazamiento.',
+    description: 'Frenos operativos (Freno de pedal y parqueo o mano): probar funcionamiento antes de iniciar el desplazamiento.',
     order_index: 12,
   },
   {
     code: 'CHK-13',
     category: 'general',
-    description: 'CÓDIGO: número o identificador del equipo o vehículo.',
+    description: 'Bumpers: sin rayones, desgaste que pueda causar daños al fuselaje del avión (Aplica a FT-EM)',
     order_index: 13,
   },
   {
     code: 'CHK-14',
     category: 'general',
-    description: 'HORA: registro de hora en que se realiza la inspección.',
+    description: 'Sólo escaleras: estabilizadores operativos, peldaños y cintas antideslizantes en buen estado, luces operativas',
     order_index: 14,
-  },
-  {
-    code: 'CHK-15',
-    category: 'general',
-    description: 'FIRMA: del operador responsable de la verificación.',
-    order_index: 15,
   },
 ];
 

@@ -36,7 +36,7 @@ interface Observation {
   obs_maintenance?: string;
 }
 
-const CHK_CODES = Array.from({ length: 12 }, (_, i) => `CHK-${String(i + 1).padStart(2, '0')}`);
+const CHK_CODES = Array.from({ length: 14 }, (_, i) => `CHK-${String(i + 1).padStart(2, '0')}`);
 
 function statusToMark(s?: 'conforme' | 'no_conforme' | 'no_aplica' | string): string {
   if (s === 'conforme') return '✓';
@@ -99,7 +99,7 @@ function renderBoldWithBreaks(input?: string): React.ReactNode {
     return (
       <React.Fragment key={`l${idx}`}>
         {nodes}
-        {idx < lines.length - 1 ? <br/> : null}
+        {idx < lines.length - 1 ? <br /> : null}
       </React.Fragment>
     );
   });
@@ -171,23 +171,25 @@ const FORATA057Template: React.FC<{
   compact?: boolean;
   padRows?: boolean;
 }> = ({ data = sampleData, headerMode = 'text', compact = false, padRows = true }) => {
-  // Encabezados de checklist: modo 'text' (descripción exacta) o 'codes' (CHK-01..12)
+  // Encabezados de checklist: modo 'text' (descripción exacta) o 'codes' (CHK-01..14)
   const checkHeaders = headerMode === 'codes'
     ? CHK_CODES
     : [
-        'Extintor vigente: verificar presencia, fecha de vencimiento y de ultima inspección. El manómetro en zona verde.',
-        'Pin de seguridad: comprobar que esté colocado correctamente y sin deformaciones.',
-        'Calzas: deben estar disponibles, sin fisuras ni desgaste excesivo.',
-        'Placards, stickers y micas: deben estar legibles, adheridos y sin daños.',
-        'Nivel de combustible: debe ser suficiente para la operación prevista.',
-        'Asiento y cinturón de seguridad: revisar estado, anclaje y funcionamiento.',
-        'Circulina operativa: encender y comprobar visibilidad (Aplica a todos los equipos). Alarma de retroceso operativo (Aplica a FT-PM-TR)',
-        'Luces operativas: verificar luces delanteras, traseras y de freno.',
-        'Cintas reflectivas: deben estar adheridas y visibles.',
-        'Pintura: sin deterioro que afecte señalización o visibilidad del equipo.',
-        'Neumáticos sin desgaste: revisar la ausencia de grietas o desgaste de las llantas.',
-        'Frenos operativos (Freno de pedal y parqueo o mano): probar funcionamiento antes de iniciar el desplazamiento.'
-      ];
+      'Extintor vigente: verificar presencia, fecha de vencimiento y de ultima inspección. El manómetro en zona verde.',
+      'Pin de seguridad: comprobar que esté colocado correctamente y sin deformaciones.',
+      'Calzas: deben estar disponibles, sin fisuras ni desgaste excesivo.',
+      'Placards, stickers y micas: deben estar legibles, adheridos y sin daños.',
+      'Nivel de combustible: debe ser suficiente para la operación prevista.',
+      'Asiento y cinturón de seguridad: revisar estado, anclaje y funcionamiento.',
+      'Circulina operativa: encender y comprobar visibilidad. (Aplica a todos los equipos). \nAlarma de retroceso operativo (Aplica a FT-PM-TR)',
+      'Luces operativas: verificar luces delanteras, traseras y de freno.',
+      'Cintas reflectivas: deben estar adheridas y visibles.',
+      'Pintura: sin deterioro que afecte señalización o visibilidad del equipo.',
+      'Neumáticos sin desgaste: revisar presión y ausencia de grietas o desgaste de las llantas.',
+      'Frenos operativos (Freno de pedal y parqueo o mano): probar funcionamiento antes de iniciar el desplazamiento.',
+      'Bumpers: sin rayones, desgaste que pueda causar daños al fuselaje del avión (Aplica a FT-EM)',
+      'Sólo escaleras: estabilizadores operativos, peldaños y cintas antideslizantes en buen estado, luces operativas'
+    ];
 
   // Filtrado de equipos sin datos cuando no se desea rellenar
   const hasEqData = (eq: Equipment) => {
@@ -270,7 +272,7 @@ const FORATA057Template: React.FC<{
                 <div className="text-gray-400 text-xs">LOGO</div>
               )}
             </td>
-            <td rowSpan={3} colSpan={10} className="text-center font-bold" style={{ fontSize: fs(14), lineHeight: 1.15 }}>
+            <td rowSpan={3} colSpan={12} className="text-center font-bold" style={{ fontSize: fs(14), lineHeight: 1.15 }}>
               CONTROL DE INSPECCIÓN DE REVISIÓN 360° DE EQUIPOS GSE MOTORIZADOS- ESTACIONES
             </td>
             <td colSpan={2} className="text-center font-bold bg-gray-200" style={{ fontSize: fs(11) }}>Código:</td>
@@ -302,9 +304,9 @@ const FORATA057Template: React.FC<{
               {data.inspector_name || ''}
             </td>
             <td className="no-border"></td>
-            <td rowSpan={2} colSpan={4} className="text-left" style={{ fontSize: fs(9), verticalAlign: 'top', padding: compact ? '4px' : '8px', lineHeight: 1.2 }}>
-              <strong>✓</strong> (Check) si el ítem cumple o está conforme.<br/>
-              <strong>X</strong> si el ítem no cumple o presenta una observación.<br/>
+            <td rowSpan={2} colSpan={6} className="text-left" style={{ fontSize: fs(9), verticalAlign: 'top', padding: compact ? '4px' : '8px', lineHeight: 1.2 }}>
+              <strong>✓</strong> (Check) si el ítem cumple o está conforme.<br />
+              <strong>X</strong> si el ítem no cumple o presenta una observación.<br />
               <strong>N/A</strong> si el ítem no aplica para el equipo o actividad inspeccionada.
             </td>
           </tr>
@@ -314,7 +316,7 @@ const FORATA057Template: React.FC<{
             <td colSpan={11} className="border-bottom no-border" style={{ borderTop: 'none' }}></td>
           </tr>
 
-          
+
 
           {/* Checklist Headers */}
           <tr className="forata-checklist-header" style={{ height: rowHeight(126) }}>
@@ -370,19 +372,19 @@ const FORATA057Template: React.FC<{
 
           {/* Separación: dos líneas vacías antes del texto de leyenda poschecklist */}
           <tr>
-            <td colSpan={15} className="no-border" style={{ border: 'none' }}>
+            <td colSpan={17} className="no-border" style={{ border: 'none' }}>
               <div style={{ height: rowHeight(13) }}>&nbsp;</div>
             </td>
           </tr>
           <tr>
-            <td colSpan={15} className="no-border" style={{ border: 'none' }}>
+            <td colSpan={17} className="no-border" style={{ border: 'none' }}>
               <div style={{ height: rowHeight(13) }}>&nbsp;</div>
             </td>
           </tr>
 
           {/* Legend Row */}
           <tr>
-            <td colSpan={15} className="text-center" style={{ height: rowHeight(48), fontSize: fs(11), padding: '6px' }}>
+            <td colSpan={17} className="text-center" style={{ height: rowHeight(48), fontSize: fs(11), padding: '6px' }}>
               {data.legend_text}
             </td>
           </tr>
@@ -390,8 +392,8 @@ const FORATA057Template: React.FC<{
           {/* Observations Header */}
           <tr style={{ height: rowHeight(25), backgroundColor: '#E7E6E6' }}>
             <td className="text-center font-bold" style={{ fontSize: fs(12) }}>CÓDIGO</td>
-            <td colSpan={7} className="text-center font-bold" style={{ fontSize: fs(12) }}>OBSERVACIONES OPERADOR</td>
-            <td colSpan={7} className="text-center font-bold" style={{ fontSize: fs(12) }}>OBSERVACIONES MANTENIMIENTO</td>
+            <td colSpan={8} className="text-center font-bold" style={{ fontSize: fs(12) }}>OBSERVACIONES OPERADOR</td>
+            <td colSpan={8} className="text-center font-bold" style={{ fontSize: fs(12) }}>OBSERVACIONES MANTENIMIENTO</td>
           </tr>
 
           {/* Observation Rows */}
@@ -400,8 +402,8 @@ const FORATA057Template: React.FC<{
               <td className="text-left" style={{ paddingLeft: '4px' }}>
                 {obs.equipment_code && obs.obs_id ? `${obs.equipment_code} - ${obs.obs_id}` : (obs.equipment_code || obs.obs_id || 'TLM-')}
               </td>
-              <td colSpan={7} className="text-center">{obs.obs_operator || ''}</td>
-              <td colSpan={7} className="text-center">{obs.obs_maintenance || ''}</td>
+              <td colSpan={8} className="text-center">{obs.obs_operator || ''}</td>
+              <td colSpan={8} className="text-center">{obs.obs_maintenance || ''}</td>
             </tr>
           ))}
 
@@ -426,7 +428,7 @@ const FORATA057Template: React.FC<{
                 />
               )}
             </td>
-            <td colSpan={5} className="no-border"></td>
+            <td colSpan={7} className="no-border"></td>
             <td colSpan={3} className="text-center no-border" style={{ verticalAlign: 'top' }}>
               {data.mechanic_signature_url && (
                 <img
@@ -453,29 +455,29 @@ const FORATA057Template: React.FC<{
             <td colSpan={2} className="no-border"></td>
             <td colSpan={3} className="text-center font-bold no-border border-top" style={{ verticalAlign: 'bottom', paddingTop: compact ? '6px' : '8px', fontSize: fs(10) }}>
               <div style={{ fontSize: fs(10), marginBottom: '4px', fontWeight: 'normal' }}>{data.supervisor_name || ''}</div>
-              FIRMA<br/>SUPERVISOR O ENCARGADO DE ESTACIÓN
+              FIRMA<br />SUPERVISOR O ENCARGADO DE ESTACIÓN
             </td>
-            <td colSpan={5} className="no-border"></td>
+            <td colSpan={7} className="no-border"></td>
             <td colSpan={3} className="text-center font-bold no-border border-top" style={{ verticalAlign: 'bottom', paddingTop: compact ? '6px' : '8px', fontSize: fs(10) }}>
               <div style={{ fontSize: fs(10), marginBottom: '4px', fontWeight: 'normal' }}>{data.mechanic_name || ''}</div>
-              FIRMA<br/>MECÁNICO DE ESTACIÓN
+              FIRMA<br />MECÁNICO DE ESTACIÓN
             </td>
             <td colSpan={2} className="no-border"></td>
           </tr>
-          
+
 
 
           {/* (Sin espacio adicional aquí) */}
-          
+
           {/* Footer / Note Row (letra muy pequeña, soporta **negrita**) */}
           <tr>
-            <td colSpan={15} className="text-left border-top" style={{ fontSize: compact ? '7pt' : '8pt', padding: compact ? '6px' : '8px' }}>
+            <td colSpan={17} className="text-left border-top" style={{ fontSize: compact ? '7pt' : '8pt', padding: compact ? '6px' : '8px' }}>
               {data.footer_text
                 ? renderBoldWithBreaks(data.footer_text)
                 : (
                   <>
-                    <strong>NOTA:</strong><br/>
-                    <strong>Para registros fisicos:</strong> No debe borrarse, bajo ninguna circunstancia, la información registrada originalmente en un registro; las correcciones o anulación de una parte de la información plasmada en los registros físicos, deben realizarse trazando una línea diagonal sobre la información a corregir o anular, garantizando que ésta quede legible, para luego consignar la nueva información al margen de la información original. La justificación de la corrección o anulación efectuada debe realizarse en la parte posterior del registro indicando la fecha, nombre y/o firma de quien lo ejecutó para que quede constancia.<br/><br/>
+                    <strong>NOTA:</strong><br />
+                    <strong>Para registros fisicos:</strong> No debe borrarse, bajo ninguna circunstancia, la información registrada originalmente en un registro; las correcciones o anulación de una parte de la información plasmada en los registros físicos, deben realizarse trazando una línea diagonal sobre la información a corregir o anular, garantizando que ésta quede legible, para luego consignar la nueva información al margen de la información original. La justificación de la corrección o anulación efectuada debe realizarse en la parte posterior del registro indicando la fecha, nombre y/o firma de quien lo ejecutó para que quede constancia.<br /><br />
                     <strong>Para registros electrónicos:</strong> Colocar un comentario sobre la información modificada. La justificación de la corrección o anulación efectuada debe realizarse en el comentario añadido indicando la fecha, nombre y/o firma de quien lo ejecutó para que quede constancia.
                   </>
                 )}

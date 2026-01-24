@@ -32,9 +32,9 @@ function TemplateWithData() {
   useEffect(() => {
     try {
       (window as any).__forata057_ready = false;
-    } catch {}
+    } catch { }
     return () => {
-      try { delete (window as any).__forata057_ready; } catch {}
+      try { delete (window as any).__forata057_ready; } catch { }
     };
   }, []);
 
@@ -46,7 +46,7 @@ function TemplateWithData() {
         // Cuando no hay id (preview desde formulario), lo damos por listo
         (window as any).__forata057_ready = true;
       }
-    } catch {}
+    } catch { }
   }, [inspectionId, remote]);
 
   // ✅ Auto print cuando DOM y recursos (imágenes) están listos
@@ -178,7 +178,7 @@ function TemplateWithData() {
         // Hora por equipo: prioriza updated_at, luego created_at, y finalmente la fecha global
         hour: getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
         checklist_data: (Object.fromEntries(
-          Array.from({ length: 12 }, (_, i) => {
+          Array.from({ length: 14 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
             const status = eq.checklist_data?.[code]?.status;
             return [code, { status }];
@@ -227,7 +227,7 @@ function TemplateWithData() {
       code: eq.code,
       hour,
       checklist_data: (Object.fromEntries(
-        Array.from({ length: 12 }, (_, i) => {
+        Array.from({ length: 14 }, (_, i) => {
           const code = `CHK-${String(i + 1).padStart(2, '0')}`;
           const status = formData.checklists?.[eq.code]?.[code]?.status;
           return [code, { status }];
