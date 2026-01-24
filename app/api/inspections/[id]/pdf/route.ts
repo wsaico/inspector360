@@ -15,7 +15,7 @@ export async function GET(
 
         // 1. Validar autenticación
         const cookieStore = await cookies();
-        const supabase = createClient(cookieStore);
+        const supabase = await createClient();
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
@@ -46,7 +46,7 @@ export async function GET(
         const pdfBuffer = await PuppeteerService.generatePdf(renderUrl, puppeteerCookies);
 
         // 5. Retornar el PDF como stream
-        return new NextResponse(pdfBuffer, {
+        return new NextResponse(pdfBuffer as any, {
             headers: {
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `attachment; filename="${template}-${id}.pdf"`,
