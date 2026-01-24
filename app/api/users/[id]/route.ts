@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * DELETE /api/users/[id]
  * Elimina un usuario por ID usando Supabase Admin API (service_role).
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } | Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -21,7 +21,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const url = new URL(request.url);
     const segments = url.pathname.split('/').filter(Boolean);
     const lastSegment = segments[segments.length - 1];
-    const resolvedParams = await (params as Promise<{ id: string }>);
+    const resolvedParams = await params;
     const userId = (resolvedParams?.id) || lastSegment;
     if (!userId) {
       return NextResponse.json(
