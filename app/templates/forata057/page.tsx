@@ -201,15 +201,31 @@ function TemplateWithData() {
           Array.from({ length: 14 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
 
-            // Fuzzy Key Lookup (handle case/whitespace mismatch)
-            let itemData = eq.checklist_data?.[code];
-            if (!itemData && eq.checklist_data) {
-              const fuzzyKey = Object.keys(eq.checklist_data).find(k => k.trim().toUpperCase() === code);
-              if (fuzzyKey) itemData = eq.checklist_data[fuzzyKey];
+            // 🛡️ ULTRA-ROBUST READING STRATEGY
+            let cData = eq.checklist_data;
+            // 1. Parse if string (common issue in some Supabase/Nextjs quirks)
+            if (typeof cData === 'string') {
+              try { cData = JSON.parse(cData); } catch (e) { cData = {}; }
+            }
+            if (!cData || typeof cData !== 'object') cData = {};
+
+            // 2. Fuzzy Key Lookup
+            let itemData = cData[code];
+            if (itemData === undefined) {
+              const fuzzyKey = Object.keys(cData).find(k => k.trim().toUpperCase() === code);
+              if (fuzzyKey) itemData = cData[fuzzyKey];
             }
 
-            let rawStatus = itemData?.status;
-            let status = rawStatus ? String(rawStatus).toLowerCase() : undefined;
+            // 3. Extract Status (Handle object or direct string)
+            let rawStatus = itemData?.status || itemData;
+            // If itemData is object but no status, maybe it has 'value' or other prop? Assume 'status' is primary.
+            if (typeof itemData === 'object' && itemData !== null && !itemData.status) {
+              // Fallback: check if the object itself is not the status. 
+              // If it's { "value": "conforme" } ...
+              if ((itemData as any).value) rawStatus = (itemData as any).value;
+            }
+
+            let status = rawStatus && typeof rawStatus === 'string' ? rawStatus.toLowerCase().trim() : undefined;
 
             // Force N/A if not applicable based on rules
             const equipmentSignal = `${eq.code} ${eq.type || ''}`;
