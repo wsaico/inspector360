@@ -42,12 +42,39 @@ export async function GET(
         // 3. (NUEVO) Fetch de datos Server-Side para inyección
         // Esto evita que Puppeteer tenga que navegar y hacer fetch (que falla por auth/cookies)
 
-        // A. Obtener inspección con equipos
+        // A. Obtener inspección con equipos (Explicit Select)
         const { data: inspection, error: inspError } = await supabase
             .from('inspections')
-            .select('*, equipment(*)')
+            .select(`
+                *,
+                equipment (
+                    id,
+                    code,
+                    type,
+                    checklist_data,
+                    inspector_signature_url,
+                    updated_at,
+                    created_at,
+                    hour
+                )
+            `)
             .eq('id', id)
             .single();
+
+        if (inspError || !inspection) {
+            console.error('Error fetching inspection server-side:', inspError);
+            return new NextResponse('Error fetching inspection data', { status: 404 });
+        }
+
+        // Debug Log
+        if (inspection.equipment && inspection.equipment.length > 0) {
+            const firstEq = inspection.equipment[0];
+            const cData = firstEq.checklist_data;
+            console.log(`[PDF DEBUG] Eq ${firstEq.code} Data Type:`, typeof cData);
+            if (cData && typeof cData === 'object') {
+                console.log(`[PDF DEBUG] Eq ${firstEq.code} Keys:`, Object.keys(cData));
+            }
+        }
 
         if (inspError || !inspection) {
             console.error('Error fetching inspection server-side:', inspError);
