@@ -200,7 +200,15 @@ function TemplateWithData() {
         checklist_data: (Object.fromEntries(
           Array.from({ length: 14 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
-            let rawStatus = eq.checklist_data?.[code]?.status;
+
+            // Fuzzy Key Lookup (handle case/whitespace mismatch)
+            let itemData = eq.checklist_data?.[code];
+            if (!itemData && eq.checklist_data) {
+              const fuzzyKey = Object.keys(eq.checklist_data).find(k => k.trim().toUpperCase() === code);
+              if (fuzzyKey) itemData = eq.checklist_data[fuzzyKey];
+            }
+
+            let rawStatus = itemData?.status;
             let status = rawStatus ? String(rawStatus).toLowerCase() : undefined;
 
             // Force N/A if not applicable based on rules
