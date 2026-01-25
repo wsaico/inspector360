@@ -38,10 +38,16 @@ interface Observation {
 
 const CHK_CODES = Array.from({ length: 14 }, (_, i) => `CHK-${String(i + 1).padStart(2, '0')}`);
 
-function statusToMark(s?: 'conforme' | 'no_conforme' | 'no_aplica' | string): string {
+const CheckIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'text-bottom' }}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+function statusToMark(s?: 'conforme' | 'no_conforme' | 'no_aplica' | string): React.ReactNode {
   if (!s) return '';
   const lower = s.toLowerCase().trim();
-  if (lower === 'conforme') return '✓';
+  if (lower === 'conforme') return <CheckIcon />;
   if (lower === 'no_conforme') return 'X';
   if (lower === 'no_aplica') return 'N/A';
   // 🚨 VISUAL DEBUG: If it's none of the above, print it (it might be "CHK-01 Missing" or similar)
@@ -308,7 +314,7 @@ const FORATA057Template: React.FC<{
             </td>
             <td className="no-border"></td>
             <td rowSpan={2} colSpan={6} className="text-left" style={{ fontSize: fs(9), verticalAlign: 'top', padding: compact ? '4px' : '8px', lineHeight: 1.2 }}>
-              <strong>✓</strong> (Check) si el ítem cumple o está conforme.<br />
+              <strong><CheckIcon /></strong> (Check) si el ítem cumple o está conforme.<br />
               <strong>X</strong> si el ítem no cumple o presenta una observación.<br />
               <strong>N/A</strong> si el ítem no aplica para el equipo o actividad inspeccionada.
             </td>
