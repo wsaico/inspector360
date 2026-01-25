@@ -203,7 +203,7 @@ function TemplateWithData() {
 
             // 🛡️ ULTRA-ROBUST READING STRATEGY
             let cData = eq.checklist_data;
-            // 1. Parse if string (common issue in some Supabase/Nextjs quirks)
+            // 1. Parse if string (Fix for Vercel/Supabase serialization issues)
             if (typeof cData === 'string') {
               try { cData = JSON.parse(cData); } catch (e) { cData = {}; }
             }
