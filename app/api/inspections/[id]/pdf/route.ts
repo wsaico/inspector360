@@ -39,7 +39,36 @@ export async function GET(
             path: '/',
         }));
 
-        // 3. Construir la URL interna que Puppeteer visitará
+        // 3. (NUEVO) Fetch de datos Server-Side para inyección
+        // Esto evita que Puppeteer tenga que navegar y hacer fetch (que falla por auth/cookies)
+
+        // A. Obtener inspección con equipos
+        const { data: inspection, error: inspError } = await supabase
+            .from('inspections')
+            .select('*, equipment(*)')
+            .eq('id', id)
+            .single();
+
+        if (inspError || !inspection) {
+            console.error('Error fetching inspection server-side:', inspError);
+            return new NextResponse('Error fetching inspection data', { status: 404 });
+        }
+
+        // B. Obtener observaciones
+        const { data: observations, error: obsError } = await supabase
+            .from('observations')
+            .select('*')
+            .eq('inspection_id', id);
+
+        // C. Construir objeto de datos completo
+        const initialData = {
+            ...inspection,
+            observations: observations || [],
+            // Asegurarnos que equipment sea un array (supabase puede devolverlo nulo si join falla, aunque con inner join no debería)
+            equipment: inspection.equipment || []
+        };
+
+        // 4. Construir URL
         // Prioridad: NEXT_PUBLIC_APP_URL > VERCEL_URL > Request Host > Localhost
         let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
@@ -51,14 +80,12 @@ export async function GET(
             }
         }
 
-        // Le pasamos print=true para que el componente sepa que debe esperar imágenes,
-        // y pdf=1 para que se renderice en modo "compacto/impresión" sin botones extra.
         const renderUrl = `${baseUrl}/templates/${template}?id=${id}&pdf=1&print=true`;
 
-        console.log(`[PDF API] Generando PDF para: ${renderUrl}`);
+        console.log(`[PDF API] Generando PDF con Server-Side Injection para: ${id}`);
 
-        // 4. Generar PDF pasando cookies
-        const pdfBuffer = await PuppeteerService.generatePdf(renderUrl, puppeteerCookies);
+        // 5. Generar PDF pasando cookies e initialData
+        const pdfBuffer = await PuppeteerService.generatePdf(renderUrl, puppeteerCookies, initialData);
 
         // 5. Retornar el PDF como stream
         return new NextResponse(pdfBuffer as any, {

@@ -23,6 +23,13 @@ function TemplateWithData() {
   useEffect(() => {
     const load = async () => {
       try {
+        // 1. Check for Server-Side Injected Data (Puppeteer optimization)
+        if (typeof window !== 'undefined' && (window as any).__PRELOADED_DATA__) {
+          console.log('Using preloaded data (Server-Side Injection)');
+          setRemote((window as any).__PRELOADED_DATA__);
+          return;
+        }
+
         if (!inspectionId) return;
         const { data, error } = await InspectionService.getInspectionById(inspectionId);
         if (error) {

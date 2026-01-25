@@ -7,7 +7,7 @@ export class PuppeteerService {
     /**
      * Genera un PDF a partir de una URL usando Puppeteer
      */
-    static async generatePdf(url: string, cookies: any[] = []): Promise<Buffer> {
+    static async generatePdf(url: string, cookies: any[] = [], initialData: any = null): Promise<Buffer> {
         const isDev = process.env.NODE_ENV === 'development';
         let browser: Browser | null = null;
 
@@ -49,6 +49,12 @@ export class PuppeteerService {
             }
 
             // Navigate to the template URL
+            if (initialData) {
+                await page.evaluateOnNewDocument((data) => {
+                    (window as any).__PRELOADED_DATA__ = data;
+                }, initialData);
+            }
+
             await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
 
             // Wait for the hydration signal from the template
