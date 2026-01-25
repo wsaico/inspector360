@@ -200,7 +200,8 @@ function TemplateWithData() {
         checklist_data: (Object.fromEntries(
           Array.from({ length: 14 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
-            let status = eq.checklist_data?.[code]?.status;
+            let rawStatus = eq.checklist_data?.[code]?.status;
+            let status = rawStatus ? String(rawStatus).toLowerCase() : undefined;
 
             // Force N/A if not applicable based on rules
             const equipmentSignal = `${eq.code} ${eq.type || ''}`;

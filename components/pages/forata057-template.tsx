@@ -39,9 +39,11 @@ interface Observation {
 const CHK_CODES = Array.from({ length: 14 }, (_, i) => `CHK-${String(i + 1).padStart(2, '0')}`);
 
 function statusToMark(s?: 'conforme' | 'no_conforme' | 'no_aplica' | string): string {
-  if (s === 'conforme') return '✓';
-  if (s === 'no_conforme') return 'X';
-  if (s === 'no_aplica') return 'N/A';
+  if (!s) return '';
+  const lower = s.toLowerCase().trim();
+  if (lower === 'conforme') return '✓';
+  if (lower === 'no_conforme') return 'X';
+  if (lower === 'no_aplica') return 'N/A';
   return '';
 }
 
