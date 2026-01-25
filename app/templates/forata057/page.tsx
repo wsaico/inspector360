@@ -178,7 +178,6 @@ function TemplateWithData() {
         code: eq.code,
         // Hora por equipo: prioriza updated_at, luego created_at, y finalmente la fecha global
         hour: getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
-        hour: getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
         checklist_data: (Object.fromEntries(
           Array.from({ length: 14 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
