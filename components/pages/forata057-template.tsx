@@ -44,7 +44,8 @@ function statusToMark(s?: 'conforme' | 'no_conforme' | 'no_aplica' | string): st
   if (lower === 'conforme') return '✓';
   if (lower === 'no_conforme') return 'X';
   if (lower === 'no_aplica') return 'N/A';
-  return '';
+  // 🚨 VISUAL DEBUG: If it's none of the above, print it (it might be "CHK-01 Missing" or similar)
+  return s.length < 10 ? s : s.substring(0, 10);
 }
 
 function formatDate(input?: string | Date): string {

@@ -227,10 +227,16 @@ function TemplateWithData() {
 
             let status = rawStatus && typeof rawStatus === 'string' ? rawStatus.toLowerCase().trim() : undefined;
 
-            // Force N/A if not applicable based on rules
+            // Force N/A if not applicable
             const equipmentSignal = `${eq.code} ${eq.type || ''}`;
             if (!isChecklistItemApplicable(code, equipmentSignal)) {
               status = 'no_aplica';
+            }
+
+            // 🚨 DEBUG: If still undefined, inject keys to see what we have
+            if (!status) {
+              const keys = Object.keys(cData).join(',');
+              status = keys.length ? `?${keys.substring(0, 5)}` : 'EMPTY';
             }
 
             return [code, { status }];
