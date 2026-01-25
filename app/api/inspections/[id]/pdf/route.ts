@@ -69,16 +69,8 @@ export async function GET(
         };
 
         // 4. Construir URL
-        // Prioridad: NEXT_PUBLIC_APP_URL > VERCEL_URL > Request Host > Localhost
-        let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-        if (!baseUrl) {
-            if (process.env.VERCEL_URL) {
-                baseUrl = `https://${process.env.VERCEL_URL}`;
-            } else {
-                baseUrl = `${protocol}://${host}`;
-            }
-        }
+        // 4. Construir URL basada estrictamente en el Host del request (para coincidir con cookies)
+        const baseUrl = `${protocol}://${host}`;
 
         const renderUrl = `${baseUrl}/templates/${template}?id=${id}&pdf=1&print=true`;
 
