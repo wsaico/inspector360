@@ -133,17 +133,42 @@ export class InspectionService {
    */
   static async getInspectionById(id: string) {
     try {
-      // Obtener inspección con equipos
+      // Obtener inspección con equipos y su maestro
       const { data: inspection, error: inspectionError } = await supabase
         .from('inspections')
         .select(`
           *,
-          equipment (*)
+          equipment (
+            *,
+            equipment_master (*)
+          )
         `)
         .eq('id', id)
         .single();
 
       if (inspectionError) throw inspectionError;
+
+      // Transformar datos para aplanar la estructura (EquipmentMaster -> Equipment)
+      if (inspection.equipment) {
+        inspection.equipment = inspection.equipment.map((eq: any) => {
+          const master = eq.equipment_master;
+          // Prioridad: Datos del Maestro > Datos Legacy (Solo lectura)
+          return {
+            ...eq,
+            brand: master?.brand || eq.brand,
+            model: master?.model || eq.model,
+            year: master?.year || eq.year,
+            serial_number: master?.serial_number || eq.serial_number,
+            motor_serial: master?.motor_serial || eq.motor_serial,
+            // Mantener explícitamente los campos clave
+            id: eq.id,
+            equipment_id: master?.id,
+            code: eq.code,
+            type: eq.type,
+            station: eq.station
+          };
+        });
+      }
 
       // Obtener observaciones asociadas explícitamente
       const { data: observations, error: obsError } = await supabase
@@ -388,40 +413,75 @@ export class InspectionService {
     equipmentData: Partial<Equipment>
   ) {
     try {
-      // Validar duplicado por código dentro de la misma inspección
+      // 1. Validar duplicado por código dentro de la misma inspección
       if (equipmentData.code) {
-        const { data: existingByCode, error: existingError } = await supabase
+        const { data: existingByCode } = await supabase
           .from('equipment')
           .select('id, code')
           .eq('inspection_id', inspectionId)
           .eq('code', equipmentData.code)
           .limit(1)
           .maybeSingle();
-        if (existingError) {
-          console.error('[InspectionService] Error checking duplicate equipment:', existingError);
-        }
+
         if (existingByCode) {
           return { data: existingByCode, error: null };
         }
       }
 
-      // Construir el objeto solo con los campos que tienen valores
+      // 2. Lógica "Get or Create" para EquipmentMaster
+      // Buscamos si ya existe el equipo en la tabla maestra (por código y estación)
+      let masterId = equipmentData.equipment_id;
+
+      if (!masterId && equipmentData.code && equipmentData.station) {
+        const { data: existingMaster } = await supabase
+          .from('equipment_master')
+          .select('id')
+          .eq('code', equipmentData.code)
+          .eq('station', equipmentData.station)
+          .maybeSingle();
+
+        if (existingMaster) {
+          masterId = existingMaster.id;
+        } else {
+          // NO existe en el maestro: Lo creamos automáticamente (Auto-register)
+          // Solo usamos los datos estáticos para el maestro
+          const { data: newMaster, error: createError } = await supabase
+            .from('equipment_master')
+            .insert({
+              code: equipmentData.code,
+              station: equipmentData.station,
+              type: equipmentData.type || 'UNKNOWN',
+              brand: equipmentData.brand,
+              model: equipmentData.model,
+              year: equipmentData.year,
+              serial_number: equipmentData.serial_number,
+              motor_serial: equipmentData.motor_serial,
+            })
+            .select('id')
+            .single();
+
+          if (createError) {
+            console.error('[InspectionService] Error creating equipment master:', createError);
+            // Safety: Si falla crear el maestro, seguimos sin ID maestro (se guardará legacy)
+          } else {
+            masterId = newMaster.id;
+          }
+        }
+      }
+
+      // 3. Insertar en Logs (La tabla 'equipment' actual)
+      // CLEAN CUT: No insertamos brand/model/etc aquí, solo referencias y data dinámica
       const equipmentToInsert: any = {
         inspection_id: inspectionId,
-        code: equipmentData.code,
-        type: equipmentData.type,
-        station: equipmentData.station,
+        equipment_id: masterId, // Foreign Key
+        code: equipmentData.code,     // Redundancia permitida (Búsqueda rápida)
+        station: equipmentData.station, // Redundancia permitida
+        type: equipmentData.type,     // Redundancia permitida
         checklist_data: equipmentData.checklist_data || {},
         order_index: equipmentData.order_index || 0,
+        description: equipmentData.description,
+        // OBSERVAMOS: No insertamos brand, model, year, etc (permanecen NULL en la tabla logs)
       };
-
-      // Agregar campos opcionales solo si tienen valores
-      if (equipmentData.brand) equipmentToInsert.brand = equipmentData.brand;
-      if (equipmentData.model) equipmentToInsert.model = equipmentData.model;
-      if (equipmentData.year) equipmentToInsert.year = equipmentData.year;
-      if (equipmentData.serial_number) equipmentToInsert.serial_number = equipmentData.serial_number;
-      if (equipmentData.motor_serial) equipmentToInsert.motor_serial = equipmentData.motor_serial;
-      if (equipmentData.description) equipmentToInsert.description = equipmentData.description;
 
       const { data, error } = await supabase
         .from('equipment')
@@ -560,22 +620,32 @@ export class InspectionService {
   static async getUniqueEquipment(station: string) {
     try {
       const { data, error } = await supabase
-        .from('equipment')
+        .from('equipment_master')
         .select('*')
         .eq('station', station)
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Eliminar duplicados por código de equipo
-      const uniqueEquipment = data?.reduce((acc: Equipment[], curr: Equipment) => {
-        if (!acc.find(eq => eq.code === curr.code)) {
-          acc.push(curr);
-        }
-        return acc;
-      }, []);
+      // Transformar EquipmentMaster a Equipment (para compatibilidad con el frontend)
+      const mappedEquipment = data?.map((master: any) => ({
+        // Datos maestros
+        equipment_id: master.id,
+        code: master.code,
+        type: master.type || 'UNKNOWN',
+        brand: master.brand,
+        model: master.model,
+        year: master.year,
+        serial_number: master.serial_number,
+        motor_serial: master.motor_serial,
+        station: master.station,
+        // Datos dummy para cumplir interfaz Equipment
+        checklist_data: {},
+        order_index: 0
+      }));
 
-      return { data: uniqueEquipment || [], error: null };
+      return { data: mappedEquipment || [], error: null };
     } catch (error: any) {
       console.error('Error fetching unique equipment:', error);
       return { data: [], error: error.message };

@@ -52,11 +52,26 @@ export interface ChecklistItem {
   description?: string;
 }
 
+export interface EquipmentMaster {
+  id: string;
+  code: string;
+  station: Station;
+  type: string;
+  brand?: string;
+  model?: string;
+  year?: number;
+  serial_number?: string;
+  motor_serial?: string;
+  is_active?: boolean;
+}
+
 export interface Equipment {
   id?: string;
+  equipment_id?: string; // Link to master (optional for backward compatibility during migration)
   inspection_id?: string;
   code: string;
   type: string;
+  // Legacy/Backup columns (fetched via JOIN from master for new records)
   brand?: string;
   model?: string;
   year?: number;
