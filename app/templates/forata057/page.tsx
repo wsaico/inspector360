@@ -334,7 +334,7 @@ function TemplateWithData() {
       mechanic_name: formData.signatures?.mechanic_name ?? '',
       mechanic_signature_url: formData.signatures?.mechanic_signature ?? '',
       mechanic_signature_date: formData.signatures?.mechanic_signature ? new Date() : undefined,
-      footer_text: FOR_ATA_057_FOOTER_NOTE,
+      footer_text: FOR_ATA_057_FOOTER_NOTE + ' | [DEBUG]: ' + (equipment.length > 0 ? JSON.stringify(equipment[0].checklist_data).substring(0, 300) : 'NO EQ'),
     };
   }, [formData, remote]);
 
