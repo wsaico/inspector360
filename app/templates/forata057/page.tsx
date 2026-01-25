@@ -22,9 +22,21 @@ function TemplateWithData() {
 
   useEffect(() => {
     const load = async () => {
-      if (!inspectionId) return;
-      const { data } = await InspectionService.getInspectionById(inspectionId);
-      if (data) setRemote(data);
+      try {
+        if (!inspectionId) return;
+        const { data, error } = await InspectionService.getInspectionById(inspectionId);
+        if (error) {
+          console.error('Error fetching inspection:', error);
+          setRemote({ error: error.message }); // Set error object
+        } else if (data) {
+          setRemote(data);
+        } else {
+          setRemote({ error: 'No data found' });
+        }
+      } catch (err: any) {
+        console.error('Crash fetching inspection:', err);
+        setRemote({ error: err.message || 'Unknown crash' });
+      }
     };
     load();
   }, [inspectionId]);
