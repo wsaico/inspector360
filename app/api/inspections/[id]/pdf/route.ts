@@ -54,8 +54,7 @@ export async function GET(
                     checklist_data,
                     inspector_signature_url,
                     updated_at,
-                    created_at,
-                    hour
+                    created_at
                 )
             `)
             .eq('id', id)
