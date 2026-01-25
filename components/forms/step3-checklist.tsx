@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
+import { isChecklistItemApplicable } from '@/lib/checklist-logic';
 import { ChecklistItem, Observation } from '@/types';
 import { CheckCircle2, XCircle, MinusCircle, Package, PenLine, CheckSquare, AlertCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -147,11 +148,23 @@ export default function Step3Checklist() {
     }
   };
 
-  
+
 
   const getProgress = () => {
-    const total = CHECKLIST_TEMPLATE.length; // 15 items
-    const completed = Object.keys(currentChecklist).length;
+    // Calcular items aplicables para este equipo
+    const equipmentSignal = `${currentEquipment.code} ${currentEquipment.type}`;
+    const applicableItems = CHECKLIST_TEMPLATE.filter(item =>
+      isChecklistItemApplicable(item.code, equipmentSignal)
+    );
+    const total = applicableItems.length;
+
+    // Contar completados solo de los aplicables
+    const completed = applicableItems.filter(item => {
+      const val = currentChecklist[item.code];
+      return !!val?.status;
+    }).length;
+
+    if (total === 0) return 100;
     return Math.round((completed / total) * 100);
   };
 
@@ -174,7 +187,16 @@ export default function Step3Checklist() {
   };
 
   const isChecklistComplete = () => {
-    const baseComplete = Object.keys(currentChecklist).length === CHECKLIST_TEMPLATE.length;
+    const equipmentSignal = `${currentEquipment.code} ${currentEquipment.type}`;
+    const applicableItems = CHECKLIST_TEMPLATE.filter(item =>
+      isChecklistItemApplicable(item.code, equipmentSignal)
+    );
+
+    // Verificar que todos los items aplicables tengan status
+    const baseComplete = applicableItems.every(item => {
+      const val = currentChecklist[item.code];
+      return !!val?.status;
+    });
 
     // Verificar que todos los items No Conformes tengan observación
     const itemsNoConformes = Object.entries(currentChecklist)
@@ -194,8 +216,13 @@ export default function Step3Checklist() {
 
   // Verificar cuántos equipos tienen checklist completo y firma
   const equiposConChecklistCompleto = formData.equipment.filter(eq => {
+    // Replicar lógica de completitud
+    const equipmentSignal = `${eq.code} ${eq.type}`;
+    const applicableItems = CHECKLIST_TEMPLATE.filter(item =>
+      isChecklistItemApplicable(item.code, equipmentSignal)
+    );
     const checklist = formData.checklists[eq.code] || {};
-    return Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
+    return applicableItems.every(item => !!checklist[item.code]?.status);
   }).length;
 
   const equiposConFirma = formData.equipment.filter(eq => {
@@ -203,7 +230,7 @@ export default function Step3Checklist() {
   }).length;
 
   const todoCompleto = equiposConChecklistCompleto === formData.equipment.length &&
-                       equiposConFirma === formData.equipment.length;
+    equiposConFirma === formData.equipment.length;
 
   return (
     <div className="space-y-6">
@@ -242,7 +269,13 @@ export default function Step3Checklist() {
         <CardContent className="flex gap-3 flex-wrap">
           {formData.equipment.map((eq, index) => {
             const equipmentChecklist = formData.checklists[eq.code] || {};
-            const equipmentProgress = Math.round((Object.keys(equipmentChecklist).length / CHECKLIST_TEMPLATE.length) * 100);
+            const equipmentSignal = `${eq.code} ${eq.type}`;
+            const applicableItems = CHECKLIST_TEMPLATE.filter(item =>
+              isChecklistItemApplicable(item.code, equipmentSignal)
+            );
+            const completedCount = applicableItems.filter(item => !!equipmentChecklist[item.code]?.status).length;
+            const totalCount = applicableItems.length || 1; // Prevent div by zero
+            const equipmentProgress = Math.round((completedCount / totalCount) * 100);
             const isSelected = selectedEquipment === index;
             const isComplete = equipmentProgress === 100;
             const tieneFirma = !!formData.equipmentSignatures[eq.code];
@@ -252,26 +285,23 @@ export default function Step3Checklist() {
               <button
                 key={eq.code}
                 onClick={() => setSelectedEquipment(index)}
-                className={`relative overflow-hidden rounded-xl p-4 transition-all duration-200 min-w-[140px] ${
-                  isSelected
-                    ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg scale-105'
-                    : todoListo
+                className={`relative overflow-hidden rounded-xl p-4 transition-all duration-200 min-w-[140px] ${isSelected
+                  ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg scale-105'
+                  : todoListo
                     ? 'bg-white border-2 border-green-400 text-purple-900 hover:border-green-500 hover:shadow-md'
                     : 'bg-white border-2 border-purple-200 text-purple-900 hover:border-purple-400 hover:shadow-md'
-                }`}
+                  }`}
               >
                 <div className="flex flex-col items-center gap-2">
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                    isSelected ? 'bg-white/20' : todoListo ? 'bg-green-100' : 'bg-purple-100'
-                  }`}>
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isSelected ? 'bg-white/20' : todoListo ? 'bg-green-100' : 'bg-purple-100'
+                    }`}>
                     <Package className={`h-5 w-5 ${isSelected ? 'text-white' : todoListo ? 'text-green-600' : 'text-purple-600'}`} />
                   </div>
                   <span className="text-sm font-bold">{eq.code}</span>
                   <div className="flex flex-col items-center gap-1">
                     {isComplete ? (
-                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                        isSelected ? 'bg-white/20' : 'bg-green-100'
-                      }`}>
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20' : 'bg-green-100'
+                        }`}>
                         <CheckCircle2 className={`h-3 w-3 ${isSelected ? 'text-white' : 'text-green-600'}`} />
                         <span className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-green-700'}`}>
                           100%
@@ -283,21 +313,18 @@ export default function Step3Checklist() {
                       </span>
                     )}
                     {isComplete && (
-                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                        tieneFirma
-                          ? isSelected ? 'bg-white/20' : 'bg-green-100'
-                          : isSelected ? 'bg-white/20' : 'bg-red-100'
-                      }`}>
-                        <PenLine className={`h-3 w-3 ${
-                          tieneFirma
-                            ? isSelected ? 'text-white' : 'text-green-600'
-                            : isSelected ? 'text-white' : 'text-red-600'
-                        }`} />
-                        <span className={`text-xs font-semibold ${
-                          tieneFirma
-                            ? isSelected ? 'text-white' : 'text-green-700'
-                            : isSelected ? 'text-white' : 'text-red-700'
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${tieneFirma
+                        ? isSelected ? 'bg-white/20' : 'bg-green-100'
+                        : isSelected ? 'bg-white/20' : 'bg-red-100'
                         }`}>
+                        <PenLine className={`h-3 w-3 ${tieneFirma
+                          ? isSelected ? 'text-white' : 'text-green-600'
+                          : isSelected ? 'text-white' : 'text-red-600'
+                          }`} />
+                        <span className={`text-xs font-semibold ${tieneFirma
+                          ? isSelected ? 'text-white' : 'text-green-700'
+                          : isSelected ? 'text-white' : 'text-red-700'
+                          }`}>
                           {tieneFirma ? 'Firmado' : 'Sin firma'}
                         </span>
                       </div>
@@ -311,19 +338,17 @@ export default function Step3Checklist() {
       </Card>
 
       {/* Progreso Moderno con Gradiente */}
-      <Card className={`border-2 shadow-lg ${
-        getProgress() === 100
-          ? 'border-green-200 bg-gradient-to-r from-green-50/30 to-white'
-          : 'border-blue-200 bg-gradient-to-r from-blue-50/30 to-white'
-      }`}>
+      <Card className={`border-2 shadow-lg ${getProgress() === 100
+        ? 'border-green-200 bg-gradient-to-r from-green-50/30 to-white'
+        : 'border-blue-200 bg-gradient-to-r from-blue-50/30 to-white'
+        }`}>
         <CardContent className="pt-5 pb-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                getProgress() === 100
-                  ? 'bg-gradient-to-br from-green-500 to-green-600'
-                  : 'bg-gradient-to-br from-blue-500 to-blue-600'
-              }`}>
+              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${getProgress() === 100
+                ? 'bg-gradient-to-br from-green-500 to-green-600'
+                : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                }`}>
                 <CheckSquare className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -331,21 +356,19 @@ export default function Step3Checklist() {
                 <p className="text-xs text-gray-500">{currentEquipment?.code}</p>
               </div>
             </div>
-            <div className={`px-4 py-2 rounded-xl ${
-              getProgress() === 100
-                ? 'bg-gradient-to-br from-green-500 to-green-600'
-                : 'bg-gradient-to-br from-blue-500 to-blue-600'
-            }`}>
+            <div className={`px-4 py-2 rounded-xl ${getProgress() === 100
+              ? 'bg-gradient-to-br from-green-500 to-green-600'
+              : 'bg-gradient-to-br from-blue-500 to-blue-600'
+              }`}>
               <span className="text-2xl font-bold text-white">{getProgress()}%</span>
             </div>
           </div>
           <div className="relative h-3 w-full rounded-full bg-gray-200 overflow-hidden">
             <div
-              className={`h-3 rounded-full transition-all duration-500 ${
-                getProgress() === 100
-                  ? 'bg-gradient-to-r from-green-500 to-green-600'
-                  : 'bg-gradient-to-r from-blue-500 to-blue-600'
-              }`}
+              className={`h-3 rounded-full transition-all duration-500 ${getProgress() === 100
+                ? 'bg-gradient-to-r from-green-500 to-green-600'
+                : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                }`}
               style={{ width: `${getProgress()}%` }}
             />
             {getProgress() === 100 && (
@@ -369,35 +392,40 @@ export default function Step3Checklist() {
       {/* Checklist Moderno con Iconos SVG Premium */}
       <div className="space-y-3">
         {CHECKLIST_TEMPLATE.map((item, index) => {
+          // Check Applicability using Code (primary) or Type (fallback)
+          // We pass "Code Type" combined string to cover both bases for the logic helper
+          const equipmentSignal = `${currentEquipment.code} ${currentEquipment.type}`;
+          const isApplicable = isChecklistItemApplicable(item.code, equipmentSignal);
+
+          if (!isApplicable) return null; // Hide card if not applicable
+
           const value = currentChecklist[item.code];
           const isCompleted = !!value?.status;
 
           return (
             <Card
               key={item.code}
-              className={`transition-all duration-300 hover:shadow-md ${
-                isCompleted
-                  ? value?.status === 'conforme'
-                    ? 'border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/30 to-white'
-                    : value?.status === 'no_conforme'
+              className={`transition-all duration-300 hover:shadow-md ${isCompleted
+                ? value?.status === 'conforme'
+                  ? 'border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/30 to-white'
+                  : value?.status === 'no_conforme'
                     ? 'border-l-4 border-l-red-500 bg-gradient-to-r from-red-50/30 to-white'
                     : 'border-l-4 border-l-gray-400 bg-gradient-to-r from-gray-50/30 to-white'
-                  : 'border-l-4 border-l-blue-200'
-              }`}
+                : 'border-l-4 border-l-blue-200'
+                }`}
             >
               <CardContent className="pt-4 pb-4">
                 <div className="space-y-3">
                   {/* Header del Item */}
                   <div className="flex items-start gap-3">
-                    <div className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center ${
-                      isCompleted
-                        ? value?.status === 'conforme'
-                          ? 'bg-gradient-to-br from-green-500 to-green-600 shadow-md'
-                          : value?.status === 'no_conforme'
+                    <div className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center ${isCompleted
+                      ? value?.status === 'conforme'
+                        ? 'bg-gradient-to-br from-green-500 to-green-600 shadow-md'
+                        : value?.status === 'no_conforme'
                           ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-md'
                           : 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-md'
-                        : 'bg-gradient-to-br from-blue-100 to-blue-200'
-                    }`}>
+                      : 'bg-gradient-to-br from-blue-100 to-blue-200'
+                      }`}>
                       <span className={`text-sm font-bold ${isCompleted ? 'text-white' : 'text-blue-600'}`}>
                         {index + 1}
                       </span>
@@ -444,11 +472,10 @@ export default function Step3Checklist() {
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => handleStatusChange(item.code, 'conforme')}
-                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${
-                        value?.status === 'conforme'
-                          ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg scale-105'
-                          : 'bg-white border-2 border-green-200 text-green-700 hover:border-green-400 hover:bg-green-50'
-                      }`}
+                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${value?.status === 'conforme'
+                        ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg scale-105'
+                        : 'bg-white border-2 border-green-200 text-green-700 hover:border-green-400 hover:bg-green-50'
+                        }`}
                     >
                       <div className="flex flex-col items-center gap-1">
                         <svg className={`h-6 w-6 ${value?.status === 'conforme' ? 'text-white' : 'text-green-600'}`} fill="currentColor" viewBox="0 0 20 20">
@@ -460,11 +487,10 @@ export default function Step3Checklist() {
 
                     <button
                       onClick={() => handleStatusChange(item.code, 'no_conforme')}
-                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${
-                        value?.status === 'no_conforme'
-                          ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg scale-105'
-                          : 'bg-white border-2 border-red-200 text-red-700 hover:border-red-400 hover:bg-red-50'
-                      }`}
+                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${value?.status === 'no_conforme'
+                        ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg scale-105'
+                        : 'bg-white border-2 border-red-200 text-red-700 hover:border-red-400 hover:bg-red-50'
+                        }`}
                     >
                       <div className="flex flex-col items-center gap-1">
                         <svg className={`h-6 w-6 ${value?.status === 'no_conforme' ? 'text-white' : 'text-red-600'}`} fill="currentColor" viewBox="0 0 20 20">
@@ -476,11 +502,10 @@ export default function Step3Checklist() {
 
                     <button
                       onClick={() => handleStatusChange(item.code, 'no_aplica')}
-                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${
-                        value?.status === 'no_aplica'
-                          ? 'bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-lg scale-105'
-                          : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
-                      }`}
+                      className={`relative overflow-hidden rounded-xl p-3 transition-all duration-200 ${value?.status === 'no_aplica'
+                        ? 'bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-lg scale-105'
+                        : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                        }`}
                     >
                       <div className="flex flex-col items-center gap-1">
                         <svg className={`h-6 w-6 ${value?.status === 'no_aplica' ? 'text-white' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">

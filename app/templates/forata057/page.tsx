@@ -6,6 +6,7 @@ import { InspectionProvider, useInspectionForm } from '@/context/inspection-cont
 import { useSearchParams } from 'next/navigation';
 import { InspectionService } from '@/lib/services';
 import { supabase } from '@/lib/supabase/client';
+import { isChecklistItemApplicable } from '@/lib/checklist-logic';
 
 function TemplateWithData() {
   const { formData } = useInspectionForm();
@@ -177,10 +178,18 @@ function TemplateWithData() {
         code: eq.code,
         // Hora por equipo: prioriza updated_at, luego created_at, y finalmente la fecha global
         hour: getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
+        hour: getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
         checklist_data: (Object.fromEntries(
           Array.from({ length: 14 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
-            const status = eq.checklist_data?.[code]?.status;
+            let status = eq.checklist_data?.[code]?.status;
+
+            // Force N/A if not applicable based on rules
+            const equipmentSignal = `${eq.code} ${eq.type || ''}`;
+            if (!isChecklistItemApplicable(code, equipmentSignal)) {
+              status = 'no_aplica';
+            }
+
             return [code, { status }];
           })
         )) as Record<string, { status?: 'conforme' | 'no_conforme' | 'no_aplica' }>,
@@ -229,7 +238,14 @@ function TemplateWithData() {
       checklist_data: (Object.fromEntries(
         Array.from({ length: 14 }, (_, i) => {
           const code = `CHK-${String(i + 1).padStart(2, '0')}`;
-          const status = formData.checklists?.[eq.code]?.[code]?.status;
+          let status = formData.checklists?.[eq.code]?.[code]?.status;
+
+          // Force N/A if not applicable based on rules
+          const equipmentSignal = `${eq.code} ${eq.type || ''}`;
+          if (!isChecklistItemApplicable(code, equipmentSignal)) {
+            status = 'no_aplica';
+          }
+
           return [code, { status }];
         })
       )) as Record<string, { status?: 'conforme' | 'no_conforme' | 'no_aplica' }>,
@@ -299,7 +315,7 @@ function TemplateWithData() {
                 const params = new URLSearchParams(window.location.search);
                 const id = params.get('id');
                 if (!id) {
-                  window.print();
+                  alert('Error: No se encontró el ID de la inspección en la URL.');
                   return;
                 }
 
@@ -321,9 +337,9 @@ function TemplateWithData() {
                 clearTimeout(timeout);
 
                 if (!res.ok) {
-                  // Fallback: si el backend no responde, usar impresión del navegador
-                  console.error('Error descargando PDF desde backend:', res.status, await res.text().catch(() => ''));
-                  window.print();
+                  const errText = await res.text().catch(() => 'Unknown error');
+                  console.error('Error backend PDF:', res.status, errText);
+                  alert(`Error generando PDF (Status ${res.status}):\n${errText}`);
                   return;
                 }
 
@@ -336,10 +352,9 @@ function TemplateWithData() {
                 a.click();
                 document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
-              } catch (error) {
+              } catch (error: any) {
                 console.error('Error generando/descargando PDF:', error);
-                // Fallback de último recurso
-                window.print();
+                alert(`Error inesperado al descargar PDF:\n${error.message || error}`);
               }
             }}
             style={{

@@ -78,8 +78,8 @@ export default function SignaturePad({
   const handleSave = useCallback(async () => {
     if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
       // Intentar usar el lienzo recortado si la librería lo expone
-      const rawCanvas: HTMLCanvasElement | undefined =
-        (sigCanvas.current as any).getTrimmedCanvas?.() || (sigCanvas.current as any).getCanvas?.();
+      // Use getCanvas() directly. Our optimizeSignature utility handles trimming manually.
+      const rawCanvas: HTMLCanvasElement | undefined = (sigCanvas.current as any).getCanvas?.();
 
       // Optimizar en el navegador para tamaño ~3–4 KB
       let dataURL: string;
@@ -157,8 +157,10 @@ export default function SignaturePad({
 
       // AUTO-GUARDAR local deshabilitado (sin localStorage)
       try {
-        const rawCanvas: HTMLCanvasElement | undefined =
-          (sigCanvas.current as any).getTrimmedCanvas?.() || (sigCanvas.current as any).getCanvas?.();
+        if (!sigCanvas.current) return;
+
+        // Use getCanvas() directly. Our optimizeSignature utility handles trimming manually.
+        const rawCanvas: HTMLCanvasElement | undefined = (sigCanvas.current as any).getCanvas?.();
         let dataURL: string;
         if (rawCanvas) {
           dataURL = await optimizeSignature(rawCanvas);
@@ -179,7 +181,7 @@ export default function SignaturePad({
       } catch (error) {
         console.error('Error auto-saving signature:', error);
       }
-  }
+    }
   }, [storageKey]);
 
   const handleRemove = useCallback(() => {

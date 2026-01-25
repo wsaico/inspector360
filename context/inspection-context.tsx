@@ -7,6 +7,7 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { CHECKLIST_TEMPLATE } from '@/lib/checklist-template';
+import { isChecklistItemApplicable } from '@/lib/checklist-logic';
 import { InspectionFormData, Equipment, ChecklistItem, Observation } from '@/types';
 import { Station, InspectionType } from '@/types';
 
@@ -223,7 +224,17 @@ export function InspectionProvider({ children }: { children: ReactNode }) {
         // Checklist: exigir checklist completo + observaciones para No Conformes + firma del inspector
         return formData.equipment.every(eq => {
           const checklist = formData.checklists[eq.code];
-          const checklistCompleto = checklist && Object.keys(checklist).length === CHECKLIST_TEMPLATE.length;
+          // Validar solo items aplicables
+          const equipmentSignal = `${eq.code} ${eq.type}`;
+          const applicableItems = CHECKLIST_TEMPLATE.filter(item =>
+            isChecklistItemApplicable(item.code, equipmentSignal)
+          );
+
+          // Verificar que TODOS los items aplicables tengan un valor en el checklist
+          const checklistCompleto = applicableItems.every(item => {
+            const val = checklist?.[item.code];
+            return !!val?.status;
+          });
 
           // Validar que todos los items No Conformes tengan observación
           const itemsNoConformes = Object.entries(checklist || {})

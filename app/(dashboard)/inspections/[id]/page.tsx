@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase/client';
 import { InspectionService } from '@/lib/services';
 import { handleSessionError } from '@/lib/supabase/session-validator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -266,31 +267,54 @@ export default function InspectionDetailPage() {
   // Firma temporal para rehidratación en móviles dentro del modal
   const [tempSignature, setTempSignature] = useState<string | null>(null);
 
+  /* 
+   * NEW: Download PDF via API (Server-side Puppeteer) 
+   * instead of opening a window with print=true
+   */
   const handleDownloadPDF = async () => {
     if (!inspection) return;
 
     try {
-      // Mostrar toast de carga y guardar el ID
       const loadingToast = toast.loading(`Generando PDF (${inspection.form_code || 'FOR-ATA-057'})...`);
 
-      // Pequeño delay para que el usuario vea el mensaje
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 1. Get Session for Authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
-      // Abrir la plantilla directamente para usar window.print()
-      const url = `/templates/forata057?id=${inspection.id}&pdf=1&print=true&logo=/logo.png`;
-      window.open(url, '_blank');
-
-      // Dismiss el toast de carga específico
-      toast.dismiss(loadingToast);
-
-      // Mostrar mensaje de éxito
-      toast.success('PDF abierto. Use Ctrl+P o el botón de imprimir para descargar.', {
-        duration: 4000,
+      // 2. Call API
+      const res = await fetch(`/api/inspections/${inspection.id}/pdf`, {
+        method: 'GET',
+        headers,
       });
+
+      // 3. Handle Errors
+      if (!res.ok) {
+        const errText = await res.text().catch(() => 'Unknown error');
+        toast.dismiss(loadingToast);
+        toast.error(`Error al generar PDF: ${res.status}`, { description: errText });
+        return;
+      }
+
+      // 4. Download File
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `INSPECCION-${inspection.form_code}-${inspection.id?.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.dismiss(loadingToast);
+      toast.success('PDF descargado correctamente');
 
     } catch (error: any) {
       console.error('Error generando/descargando PDF:', error);
-      toast.dismiss(); // Limpiar todos los toasts
+      toast.dismiss(); // Dismiss all
       toast.error(`No se pudo generar el PDF: ${error.message}`);
     }
   };
@@ -322,14 +346,14 @@ export default function InspectionDetailPage() {
             Volver
           </Button>
           <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold">{inspection.form_code || 'Sin código'}</h2>
-                {inspection.status === 'completed' && ((inspection.observations?.length || 0) > 0) ? (
-                  <Badge variant="success">Completada con observación(es)</Badge>
-                ) : (
-                  getStatusBadge(inspection.status)
-                )}
-              </div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold">{inspection.form_code || 'Sin código'}</h2>
+              {inspection.status === 'completed' && ((inspection.observations?.length || 0) > 0) ? (
+                <Badge variant="success">Completada con observación(es)</Badge>
+              ) : (
+                getStatusBadge(inspection.status)
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               Detalles de la inspección técnica
             </p>
@@ -364,7 +388,7 @@ export default function InspectionDetailPage() {
                       try {
                         const n = typeof window !== 'undefined' ? localStorage.getItem('inspections.supervisorName') : '';
                         setSignName(n || '');
-                      } catch {}
+                      } catch { }
                       setSignOpen(true);
                     }}
                   >
@@ -381,7 +405,7 @@ export default function InspectionDetailPage() {
                       try {
                         const n = typeof window !== 'undefined' ? localStorage.getItem('inspections.mechanicName') : '';
                         setSignName(n || '');
-                      } catch {}
+                      } catch { }
                       setSignOpen(true);
                     }}
                   >
@@ -585,7 +609,7 @@ export default function InspectionDetailPage() {
               </TableHeader>
               <TableBody>
                 {inspection.observations.map((obs) => (
-                  <TableRow key={obs.id || `${obs.obs_id}-${obs.equipment_code}`}> 
+                  <TableRow key={obs.id || `${obs.obs_id}-${obs.equipment_code}`}>
                     <TableCell className="font-medium">{obs.obs_id}</TableCell>
                     <TableCell>{obs.equipment_code}</TableCell>
                     <TableCell className="max-w-sm">
@@ -755,14 +779,14 @@ export default function InspectionDetailPage() {
                     if (signRole === 'supervisor') {
                       const { data, error } = await InspectionService.uploadSupervisorSignature(inspection.id!, signName, sig);
                       if (error) throw new Error(error);
-                      try { if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', signName); } catch {}
+                      try { if (typeof window !== 'undefined') localStorage.setItem('inspections.supervisorName', signName); } catch { }
                       toast.success('Firma del supervisor guardada correctamente');
                       // Recargar inspección para obtener estado actualizado
                       await loadInspection();
                     } else {
                       const { data, error } = await InspectionService.uploadMechanicSignature(inspection.id!, signName, sig);
                       if (error) throw new Error(error);
-                      try { if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', signName); } catch {}
+                      try { if (typeof window !== 'undefined') localStorage.setItem('inspections.mechanicName', signName); } catch { }
                       toast.success('Firma del mecánico guardada correctamente');
                       // Recargar inspección para obtener estado actualizado
                       await loadInspection();
