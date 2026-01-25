@@ -23,18 +23,33 @@ export async function GET(
         }
 
         // 2. Extraer cookies para pasar a Puppeteer
+        // 2. Extraer cookies para pasar a Puppeteer
         // Fix: cookies() returns a Promise<ReadonlyRequestCookies> in modern Next.js
         const allCookies = cookieStore.getAll();
+
+        // Determinar dominio para cookies
+        const host = req.headers.get('host') || 'localhost:3000';
+        const protocol = host.includes('localhost') ? 'http' : 'https';
+        const domain = host.split(':')[0]; // Remove port if present
+
         const puppeteerCookies = allCookies.map((c: any) => ({
             name: c.name,
             value: c.value,
-            domain: 'localhost',
+            domain: domain,
             path: '/',
         }));
 
         // 3. Construir la URL interna que Puppeteer visitará
-        // Nota: En producción, usar process.env.NEXT_PUBLIC_APP_URL
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        // Prioridad: NEXT_PUBLIC_APP_URL > VERCEL_URL > Request Host > Localhost
+        let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+        if (!baseUrl) {
+            if (process.env.VERCEL_URL) {
+                baseUrl = `https://${process.env.VERCEL_URL}`;
+            } else {
+                baseUrl = `${protocol}://${host}`;
+            }
+        }
 
         // Le pasamos print=true para que el componente sepa que debe esperar imágenes,
         // y pdf=1 para que se renderice en modo "compacto/impresión" sin botones extra.
