@@ -35,7 +35,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-import { WhatsNewModal } from '@/components/dashboard/whats-new-modal';
 
 export default function DashboardPage() {
   const { profile, error, user, status, loading: authLoading } = useAuth();
@@ -172,7 +171,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <WhatsNewModal />
       {/* Header Section */}
       {/* Action Buttons Header */}
       <div className="flex justify-end items-center gap-4 pt-2">

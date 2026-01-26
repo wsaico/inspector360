@@ -4,6 +4,7 @@ import React from 'react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Navbar } from '@/components/layout/navbar';
 import { useAuth, usePermissions } from '@/hooks';
+import { WhatsNewModal } from '@/components/dashboard/whats-new-modal';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { profile, user, loading, signOut } = useAuth();
@@ -13,6 +14,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
+      <WhatsNewModal />
       {/* Sidebar - Ahora recibe permisos y loading como props */}
       <Sidebar
         permissions={permissions}
