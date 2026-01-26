@@ -13,7 +13,7 @@ import { optimizeSignature } from '@/lib/utils/signature';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
-import { Eraser, Check, X, Edit2, CheckCircle } from 'lucide-react';
+import { Eraser, Check, X, Edit2, CheckCircle, PenTool } from 'lucide-react';
 
 interface SignaturePadProps {
   onSave: (signature: string) => void;
@@ -217,43 +217,35 @@ export default function SignaturePad({
 
       {/* Vista previa */}
       {savedSignature && !showCanvas && (
-        <div className="space-y-3">
-          <div className="relative overflow-hidden rounded-lg border-2 border-green-300 bg-white p-4">
+        <div className="space-y-4">
+          <div className="relative overflow-hidden rounded-[30px] border-4 border-[#B3D400]/30 bg-white p-6 shadow-inner">
             <img
               src={savedSignature}
               alt="Firma guardada"
               className="mx-auto h-32 w-full object-contain"
             />
-            <div className="absolute right-2 top-2 rounded-full bg-green-500 p-1">
-              <Check className="h-3 w-3 text-white" />
+            <div className="absolute right-4 top-4 rounded-xl bg-[#B3D400] p-2 shadow-lg">
+              <Check className="h-4 w-4 text-[#0A3161]" />
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              type="button"
-              onClick={handleSave}
-              className="flex-1 bg-primary"
-            >
-              <Check className="mr-2 h-4 w-4" />
-              Confirmar Firma
-            </Button>
+          <div className="flex gap-4">
             <Button
               type="button"
               variant="outline"
               onClick={handleEdit}
-              className="flex-1"
+              className="flex-1 h-12 rounded-2xl border-2 border-[#0A3161] text-[#0A3161] font-black uppercase text-[10px] tracking-widest hover:bg-[#0A3161] hover:text-white transition-all"
             >
               <Edit2 className="mr-2 h-4 w-4" />
-              Editar Firma
+              Editar
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={handleRemove}
-              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="flex-1 h-12 rounded-2xl text-red-600 border-2 border-red-100 hover:bg-red-50 font-black uppercase text-[10px] tracking-widest transition-all"
             >
               <X className="mr-2 h-4 w-4" />
-              Eliminar
+              Limpiar
             </Button>
           </div>
         </div>
@@ -261,69 +253,59 @@ export default function SignaturePad({
 
       {/* Canvas */}
       {(!savedSignature || showCanvas) && (
-        <Card className="border-2 border-dashed">
-          <CardContent className="p-4 space-y-3">
-            <div className="relative overflow-hidden rounded-lg border-2 border-gray-300 bg-white">
-              <SignatureCanvas
-                ref={sigCanvas}
-                canvasProps={{
-                  className: 'w-full h-40 sm:h-48 cursor-crosshair touch-none',
-                  style: { touchAction: 'none' },
-                }}
-                backgroundColor="white"
-                penColor="#093071"
-                onBegin={handleBegin}
-                onEnd={handleEnd}
-              />
-              {isEmpty && !isDrawing && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <p className="text-sm text-gray-400 text-center px-4">
-                    Firme aquí con el dedo o el mouse
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleClear}
-                  disabled={isEmpty}
-                  className="flex-1"
-                >
-                  <Eraser className="mr-2 h-4 w-4" />
-                  Limpiar
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={isEmpty}
-                  className="flex-1 bg-primary"
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Guardar
-                </Button>
+        <div className="space-y-5">
+          <div className="relative overflow-hidden rounded-[30px] border-4 border-slate-100 bg-white shadow-inner p-1">
+            <SignatureCanvas
+              ref={sigCanvas}
+              canvasProps={{
+                className: 'w-full h-48 sm:h-64 cursor-crosshair touch-none',
+                style: { touchAction: 'none' },
+              }}
+              backgroundColor="white"
+              penColor="#0A3161"
+              onBegin={handleBegin}
+              onEnd={handleEnd}
+            />
+            {isEmpty && !isDrawing && (
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center space-y-2">
+                <PenTool className="w-8 h-8 text-slate-100" />
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+                  Firme su Atala aquí
+                </p>
               </div>
-              {onCancel && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onCancel}
-                  className="w-full"
-                >
-                  ← Volver al Nombre
-                </Button>
-              )}
-            </div>
+            )}
+          </div>
 
-            <p className="text-xs text-center text-gray-500">
-              La firma se auto-guarda mientras dibuja y persiste al cerrar el teclado
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClear}
+                disabled={isEmpty}
+                className="flex-1 h-14 rounded-2xl border-2 border-slate-200 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all"
+              >
+                <Eraser className="mr-2 h-4 w-4" />
+                REINICIAR
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={isEmpty}
+                className="flex-1 h-14 rounded-2xl bg-[#0A3161] text-white hover:bg-[#0c3c75] font-black uppercase text-[10px] tracking-widest shadow-xl transition-all"
+              >
+                <Check className="mr-2 h-4 w-4 text-[#B3D400]" />
+                GUARDAR FIRMA
+              </Button>
+            </div>
+          </div>
+
+          <p className="text-[9px] font-black text-center text-slate-300 uppercase tracking-widest">
+            Biometría Digital • Inspector 360 Core
+          </p>
+        </div>
+      )
+      }
+    </div >
   );
 }

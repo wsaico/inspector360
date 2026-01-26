@@ -432,7 +432,9 @@ function TemplateWithData() {
 export default function Page() {
   return (
     <InspectionProvider>
-      <Suspense fallback={<div />}>\n      <TemplateWithData />\n      </Suspense>
+      <Suspense fallback={<div />}>
+        <TemplateWithData />
+      </Suspense>
     </InspectionProvider>
   );
 }

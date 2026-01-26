@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { useAuth } from '@/hooks';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 export default function DashboardGroupLayout({
   children,
@@ -27,7 +28,11 @@ export default function DashboardGroupLayout({
 
   if (devNoAuth) {
     // Entorno sin Supabase configurado: no bloquear navegación
-    return <DashboardShell>{children}</DashboardShell>;
+    return (
+      <ErrorBoundary>
+        <DashboardShell>{children}</DashboardShell>
+      </ErrorBoundary>
+    );
   }
 
   if (loading) {
@@ -42,5 +47,9 @@ export default function DashboardGroupLayout({
     return null;
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <ErrorBoundary>
+      <DashboardShell>{children}</DashboardShell>
+    </ErrorBoundary>
+  );
 }

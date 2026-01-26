@@ -2,6 +2,7 @@
 
 import {
     ComposedChart,
+    Bar,
     Line,
     Area,
     XAxis,
@@ -72,10 +73,19 @@ export function ComplianceChart({ data, daysInMonth, currentDay, daysElapsed }: 
                                 label={{ value: 'Fecha', position: 'insideBottom', offset: -5, fill: '#9CA3AF', fontSize: 12 }}
                                 interval="preserveStartEnd"
                             />
+                            {/* Eje izquierdo: Días Cumplidos (0 - 30) */}
                             <YAxis
+                                yAxisId="left"
                                 domain={[0, daysInMonth]}
                                 tick={{ fill: '#6B7280', fontSize: 12 }}
                                 label={{ value: 'Días Cumplidos', angle: -90, position: 'insideLeft', fill: '#9CA3AF', fontSize: 12 }}
+                            />
+                            {/* Eje derecho (oculto): Para las barras de actividad (0 - 3 para que las barras sean cortas) */}
+                            <YAxis
+                                yAxisId="right"
+                                orientation="right"
+                                domain={[0, 3]}
+                                hide
                             />
                             <Tooltip
                                 contentStyle={{
@@ -85,19 +95,35 @@ export function ComplianceChart({ data, daysInMonth, currentDay, daysElapsed }: 
                                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                                 }}
                                 labelFormatter={(label) => `${label}`}
+                                formatter={(value: any, name: string) => {
+                                    if (name === "Inspección Diaria") return value === 1 ? "Sí" : "No";
+                                    return value;
+                                }}
                             />
                             <Legend verticalAlign="top" height={36} />
 
-                            {/* Línea de Meta (Horizontal en el tope) */}
+                            {/* Barras de Actividad Diaria */}
+                            <Bar
+                                yAxisId="right"
+                                dataKey="value"
+                                name="Inspección Diaria"
+                                fill="#A5B4FC" // Indigo 300
+                                barSize={20}
+                                radius={[4, 4, 0, 0]}
+                            />
+
+                            {/* Línea de Meta */}
                             <ReferenceLine
+                                yAxisId="left"
                                 y={daysInMonth}
                                 stroke="#10B981"
                                 strokeDasharray="3 3"
-                                label={{ value: 'Meta del Periodo', position: 'insideTopRight', fill: '#10B981', fontSize: 12, fontWeight: 'bold' }}
+                                label={{ value: 'Meta', position: 'insideTopRight', fill: '#10B981', fontSize: 12, fontWeight: 'bold' }}
                             />
 
-                            {/* Área de "Ritmo Ideal" (Diagonal suave de fondo) */}
+                            {/* Área de "Ritmo Ideal" */}
                             <Area
+                                yAxisId="left"
                                 type="monotone"
                                 dataKey="target"
                                 stroke="#9CA3AF"
@@ -110,6 +136,7 @@ export function ComplianceChart({ data, daysInMonth, currentDay, daysElapsed }: 
 
                             {/* Línea de Progreso Real */}
                             <Line
+                                yAxisId="left"
                                 type="monotone"
                                 dataKey="cumulative"
                                 stroke="#3B82F6"
@@ -131,16 +158,16 @@ export function ComplianceChart({ data, daysInMonth, currentDay, daysElapsed }: 
                 </div>
                 <div className="mt-4 flex items-center justify-center gap-6 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 bg-indigo-300 rounded-sm"></div>
+                        <span>Inspección Diaria</span>
+                    </div>
+                    <div className="flex items-center gap-2">
                         <div className="h-1 w-6 bg-blue-500 rounded-full"></div>
                         <span>Tu Progreso</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="h-1 w-6 bg-emerald-500 border-t border-dashed border-emerald-500"></div>
                         <span>Meta ({daysInMonth})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="h-1 w-6 bg-gray-400 border-t border-dashed border-gray-400"></div>
-                        <span>Ritmo Ideal</span>
                     </div>
                 </div>
             </CardContent>

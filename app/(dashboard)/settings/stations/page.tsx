@@ -10,7 +10,15 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { StationsService, type StationConfig } from '@/lib/services/stations';
 import { STATIONS, Station } from '@/types/roles';
-import { Loader2, MapPin } from 'lucide-react';
+import { Loader2, MapPin, Pencil } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 export default function StationsSettingsPage() {
@@ -21,6 +29,10 @@ export default function StationsSettingsPage() {
   const [addCode, setAddCode] = useState<Station | ''>('');
   const [addCustomCode, setAddCustomCode] = useState('');
   const [addCustomName, setAddCustomName] = useState('');
+  const [addAddress, setAddAddress] = useState('');
+
+  const [editingStation, setEditingStation] = useState<StationConfig | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const allowedOptions = useMemo(() => Object.entries(STATIONS).map(([code, name]) => ({ code: code as Station, name })), []);
   const selectableCodes = useMemo(() => {
@@ -73,7 +85,15 @@ export default function StationsSettingsPage() {
     const finalCode = (codeFromSelect || codeFromInput) as Station | '';
     if (!finalCode) return;
     const nameOverride = nameFromInput || undefined;
-    const { success, error } = await StationsService.upsert(finalCode as Station, true, nameOverride);
+
+    // New Params Object
+    const { success, error } = await StationsService.upsert({
+      code: finalCode as Station,
+      is_active: true,
+      name: nameOverride,
+      address: addAddress
+    });
+
     if (!success) {
       toast.error(error || 'No se pudo agregar la estación');
       return;
@@ -82,9 +102,37 @@ export default function StationsSettingsPage() {
     setAddCode('');
     setAddCustomCode('');
     setAddCustomName('');
+    setAddAddress('');
     const res = await StationsService.listAll();
     setStations(res.data);
   }
+
+  // Edit Handlers
+  const openEdit = (station: StationConfig) => {
+    setEditingStation({ ...station });
+    setIsEditDialogOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editingStation) return;
+
+    const { success, error } = await StationsService.upsert({
+      code: editingStation.code,
+      name: editingStation.name,
+      address: editingStation.address,
+      is_active: editingStation.is_active // Mantener estado
+    });
+
+    if (!success) {
+      toast.error(error || 'Error al actualizar');
+      return;
+    }
+    toast.success('Estación actualizada');
+    setIsEditDialogOpen(false);
+    setEditingStation(null);
+    const res = await StationsService.listAll();
+    setStations(res.data);
+  };
 
   async function removeStation(code: Station) {
     const { success, error } = await StationsService.delete(code);
@@ -137,6 +185,7 @@ export default function StationsSettingsPage() {
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Nombre</TableHead>
+                  <TableHead>Dirección</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
@@ -146,6 +195,7 @@ export default function StationsSettingsPage() {
                   <TableRow key={s.code}>
                     <TableCell className="font-medium">{s.code}</TableCell>
                     <TableCell>{s.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{s.address || '-'}</TableCell>
                     <TableCell>
                       <select
                         className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
@@ -165,6 +215,14 @@ export default function StationsSettingsPage() {
                         onClick={() => toggleActive(s.code, !s.is_active)}
                       >
                         {s.is_active ? 'Desactivar' : 'Activar'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={usingFallback}
+                        onClick={() => openEdit(s)}
+                      >
+                        <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="destructive"
@@ -232,9 +290,52 @@ export default function StationsSettingsPage() {
                 disabled={usingFallback}
               />
             </div>
+            <div className="sm:col-span-2">
+              <Label htmlFor="add-address">Dirección (Opcional)</Label>
+              <Input
+                id="add-address"
+                placeholder="Dirección física"
+                value={addAddress}
+                onChange={(e) => setAddAddress(e.target.value)}
+                disabled={usingFallback}
+                className="mt-1"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Estación - {editingStation?.code}</DialogTitle>
+            <DialogDescription>Modifica los detalles de la estación</DialogDescription>
+          </DialogHeader>
+          {editingStation && (
+            <div className="grid gap-4 py-4">
+              <div>
+                <Label>Nombre</Label>
+                <Input
+                  value={editingStation.name}
+                  onChange={(e) => setEditingStation({ ...editingStation, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Dirección</Label>
+                <Input
+                  value={editingStation.address || ''}
+                  placeholder="Ej. Av. Faucett s/n"
+                  onChange={(e) => setEditingStation({ ...editingStation, address: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={saveEdit}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

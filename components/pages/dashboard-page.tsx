@@ -14,6 +14,7 @@ import {
   FileText,
   Lock,
   ArrowRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -33,6 +34,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+import { WhatsNewModal } from '@/components/dashboard/whats-new-modal';
 
 export default function DashboardPage() {
   const { profile, error, user, status, loading: authLoading } = useAuth();
@@ -169,20 +172,20 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <WhatsNewModal />
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Hola, {profile?.full_name?.split(' ')[0] || 'Inspector'} 👋
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Action Buttons Header */}
+      <div className="flex justify-end items-center gap-4 pt-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/talks/register">
+            <Button variant="outline" className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 shadow-sm transition-all font-bold">
+              <ShieldCheck className="mr-2 h-4 w-4" />
+              Registrar Charla
+            </Button>
+          </Link>
           {canCreateInspections && (
             <Link href="/inspections/new">
-              <Button className="bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all">
+              <Button className="bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all font-bold">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Inspección
               </Button>
@@ -295,6 +298,37 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold tracking-tight text-gray-900">Módulos de Inspección</h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* Quick Access to Safety Talks */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Link href="/talks/register">
+                <Card className="h-full cursor-pointer transition-all border-2 border-emerald-100 hover:border-emerald-500 hover:shadow-md bg-white">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="text-4xl mb-2 text-emerald-600">🛡️</div>
+                      <div className="bg-emerald-100 p-1.5 rounded-full">
+                        <ArrowRight className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    </div>
+                    <CardTitle className="text-lg">Charlas de Seguridad</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                      Registra la charla diaria, asistencia y firmas del personal.
+                    </p>
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-0">
+                      Acceso Rápido
+                    </Badge>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+
             {inspectionTypes.map((type, index) => (
               <motion.div
                 key={type.id}

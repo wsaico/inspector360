@@ -84,7 +84,7 @@ export class InspectionService {
    * Obtiene todas las inspecciones según los permisos del usuario
    * El RLS de Supabase maneja automáticamente el filtrado por rol
    */
-  static async getInspections(opts?: { page?: number; pageSize?: number; station?: string; status?: string; start?: string; end?: string }) {
+  static async getInspections(opts?: { page?: number; pageSize?: number; station?: string; status?: string; start?: string; end?: string; type?: string }) {
     try {
       const page = opts?.page && opts.page > 0 ? opts.page : 1;
       const pageSize = opts?.pageSize && opts.pageSize > 0 ? opts.pageSize : 10;
@@ -104,6 +104,11 @@ export class InspectionService {
       if (opts?.status) {
         query = query.eq('status', opts.status);
       }
+      // if (opts?.type && opts.type !== 'technical') {
+      //   // TEMPORAL: Desactivado para evitar ocultar data por error de coincidencia.
+      //   // query = query.eq('id', '00000000-0000-0000-0000-000000000000'); 
+      // }
+
       if (opts?.start) {
         query = query.gte('created_at', opts.start);
       }

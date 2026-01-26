@@ -122,7 +122,7 @@ export class ComplianceService {
   /**
    * Obtiene estadísticas generales
    */
-  static async getOverallStats(filters?: { station?: string; startDate?: string; endDate?: string; month?: string }) {
+  static async getOverallStats(filters?: { station?: string; stations?: string[]; startDate?: string; endDate?: string; month?: string }) {
     try {
       const { start, end } = ComplianceService.getDateRange(filters);
       // Base query por rango de fecha y estado completado
@@ -134,7 +134,13 @@ export class ComplianceService {
         .lte('inspection_date', end);
 
       // Total de inspecciones completadas (aplicando filtro de estación si corresponde)
-      const totalQuery = filters?.station ? baseInspections.eq('station', filters.station) : baseInspections;
+      let totalQuery = baseInspections;
+      if (filters?.stations && filters.stations.length > 0) {
+        totalQuery = totalQuery.in('station', filters.stations);
+      } else if (filters?.station) {
+        totalQuery = totalQuery.eq('station', filters.station);
+      }
+
       const { count: totalInspections, error: totalError } = await totalQuery;
 
       if (totalError) throw totalError;
@@ -149,7 +155,14 @@ export class ComplianceService {
         .eq('status', 'completed')
         .gte('inspection_date', start)
         .lte('inspection_date', end);
-      const idsQuery = filters?.station ? baseIdsQuery.eq('station', filters.station) : baseIdsQuery;
+
+      let idsQuery = baseIdsQuery;
+      if (filters?.stations && filters.stations.length > 0) {
+        idsQuery = idsQuery.in('station', filters.stations);
+      } else if (filters?.station) {
+        idsQuery = idsQuery.eq('station', filters.station);
+      }
+
       const { data: inspectionsForRange, error: idsError } = await idsQuery;
       if (idsError) throw idsError;
 
@@ -216,7 +229,7 @@ export class ComplianceService {
    * Obtiene tendencias (agrupadas por mes si el rango es amplio, o por día si es corto)
    * Por simplicidad para el evolutivo, si es rango corto (< 60 días) devolvemos por día.
    */
-  static async getMonthlyTrends(filters?: { station?: string; startDate?: string; endDate?: string; month?: string }) {
+  static async getMonthlyTrends(filters?: { station?: string; stations?: string[]; startDate?: string; endDate?: string; month?: string }) {
     try {
       const { start, end, daysInMonth } = ComplianceService.getDateRange(filters);
       const base = supabase
@@ -226,7 +239,14 @@ export class ComplianceService {
         .gte('inspection_date', start)
         .lte('inspection_date', end)
         .order('inspection_date', { ascending: true });
-      const query = filters?.station ? base.eq('station', filters.station) : base;
+
+      let query = base;
+      if (filters?.stations && filters.stations.length > 0) {
+        query = query.in('station', filters.stations);
+      } else if (filters?.station) {
+        query = query.eq('station', filters.station);
+      }
+
       const { data: inspections, error } = await query;
 
       if (error) throw error;
@@ -264,7 +284,7 @@ export class ComplianceService {
    * Obtiene desglose de cumplimiento (Pie Chart)
    * Debe filtrar por las inspecciones del rango seleccionado
    */
-  static async getComplianceBreakdown(filters?: { station?: string; startDate?: string; endDate?: string; month?: string }) {
+  static async getComplianceBreakdown(filters?: { station?: string; stations?: string[]; startDate?: string; endDate?: string; month?: string }) {
     try {
       const { start, end } = ComplianceService.getDateRange(filters);
 
@@ -275,7 +295,14 @@ export class ComplianceService {
         .eq('status', 'completed')
         .gte('inspection_date', start)
         .lte('inspection_date', end);
-      const idsQuery = filters?.station ? baseIds.eq('station', filters.station) : baseIds;
+
+      let idsQuery = baseIds;
+      if (filters?.stations && filters.stations.length > 0) {
+        idsQuery = idsQuery.in('station', filters.stations);
+      } else if (filters?.station) {
+        idsQuery = idsQuery.eq('station', filters.station);
+      }
+
       const { data: inspections, error: idsError } = await idsQuery;
 
       if (idsError) throw idsError;
@@ -330,7 +357,7 @@ export class ComplianceService {
   /**
    * Obtiene top de no conformidades por ítem en el rango
    */
-  static async getTopIssues(limit: number = 10, filters?: { station?: string; startDate?: string; endDate?: string; month?: string }) {
+  static async getTopIssues(limit: number = 10, filters?: { station?: string; stations?: string[]; startDate?: string; endDate?: string; month?: string }) {
     try {
       const { start, end } = ComplianceService.getDateRange(filters);
 
@@ -340,7 +367,14 @@ export class ComplianceService {
         .eq('status', 'completed')
         .gte('inspection_date', start)
         .lte('inspection_date', end);
-      const idsQuery = filters?.station ? baseIds.eq('station', filters.station) : baseIds;
+
+      let idsQuery = baseIds;
+      if (filters?.stations && filters.stations.length > 0) {
+        idsQuery = idsQuery.in('station', filters.stations);
+      } else if (filters?.station) {
+        idsQuery = idsQuery.eq('station', filters.station);
+      }
+
       const { data: inspections, error: idsError } = await idsQuery;
 
       if (idsError) throw idsError;
@@ -388,12 +422,18 @@ export class ComplianceService {
    * Obtiene cumplimiento por estación para el rango actual
    * Incluye métricas de puntualidad y cobertura
    */
-  static async getStationComplianceStatus(filters?: { startDate?: string; endDate?: string; month?: string }) {
+  static async getStationComplianceStatus(filters?: { startDate?: string; endDate?: string; month?: string; stations?: string[] }) {
     try {
-      const { data: stations, error: stationsError } = await supabase
+      let stationsQuery = supabase
         .from('stations')
         .select('code, name')
         .eq('is_active', true);
+
+      if (filters?.stations && filters.stations.length > 0) {
+        stationsQuery = stationsQuery.in('code', filters.stations);
+      }
+
+      const { data: stations, error: stationsError } = await stationsQuery;
 
       if (stationsError) throw stationsError;
 
@@ -536,7 +576,7 @@ export class ComplianceService {
   /**
    * Cumplimiento diario acumulativo en el rango seleccionado
    */
-  static async getDailyCompliance(filters?: { station?: string; startDate?: string; endDate?: string; month?: string; aggregateAll?: boolean }) {
+  static async getDailyCompliance(filters?: { station?: string; stations?: string[]; startDate?: string; endDate?: string; month?: string; aggregateAll?: boolean }) {
     try {
       const { start, end, daysInMonth, daysElapsed } = ComplianceService.getDateRange(filters);
       const base = supabase
@@ -545,7 +585,14 @@ export class ComplianceService {
         .eq('status', 'completed')
         .gte('inspection_date', start)
         .lte('inspection_date', end);
-      const query = filters?.station && !filters.aggregateAll ? base.eq('station', filters.station) : base;
+
+      let query = base;
+      if (filters?.stations && filters.stations.length > 0 && !filters.aggregateAll) {
+        query = query.in('station', filters.stations);
+      } else if (filters?.station && !filters.aggregateAll) {
+        query = query.eq('station', filters.station);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
@@ -606,13 +653,19 @@ export class ComplianceService {
   /**
    * Obtiene el estado diario de cumplimiento por estación (Heatmap data)
    */
-  static async getStationDailyStatus(filters?: { startDate?: string; endDate?: string; month?: string }) {
+  static async getStationDailyStatus(filters?: { startDate?: string; endDate?: string; month?: string; stations?: string[] }) {
     try {
-      const { data: stations, error: stationsError } = await supabase
+      let stationsQuery = supabase
         .from('stations')
         .select('code, name')
         .eq('is_active', true)
         .order('name');
+
+      if (filters?.stations && filters.stations.length > 0) {
+        stationsQuery = stationsQuery.in('code', filters.stations);
+      }
+
+      const { data: stations, error: stationsError } = await stationsQuery;
 
       if (stationsError) throw stationsError;
 

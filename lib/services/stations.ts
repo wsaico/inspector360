@@ -11,6 +11,7 @@ export type StationConfig = {
   code: Station;
   name: string;
   is_active: boolean;
+  address?: string;
   created_at?: string;
 };
 
@@ -32,6 +33,7 @@ export class StationsService {
         code: row.code as Station,
         name: row.name ?? STATIONS[row.code as Station] ?? String(row.code),
         is_active: !!row.is_active,
+        address: row.address,
         created_at: row.created_at,
       }));
 
@@ -47,16 +49,15 @@ export class StationsService {
     }
   }
 
-  /**
-   * Lista solo estaciones activas (usa fallback si corresponde)
-   */
+  // ... listActive ...
+
   static async listActive(): Promise<{ data: StationConfig[]; error: string | null; usingFallback: boolean }> {
     const res = await this.listAll();
     return { ...res, data: res.data.filter((s) => s.is_active) };
   }
 
   /**
-   * Activa o desactiva una estación (requiere tabla `stations`) 
+   * Activa o desactiva una estación
    */
   static async setActive(code: Station, active: boolean): Promise<{ success: boolean; error: string | null }> {
     try {
@@ -76,14 +77,19 @@ export class StationsService {
   }
 
   /**
-   * Agrega o actualiza una estación en `stations`. Solo permite códigos válidos.
+   * Agrega o actualiza una estación.
    */
-  static async upsert(code: Station, active = true, nameOverride?: string): Promise<{ success: boolean; error: string | null }> {
+  static async upsert(data: { code: Station; is_active?: boolean; name?: string; address?: string }): Promise<{ success: boolean; error: string | null }> {
     try {
-      const name = nameOverride ?? STATIONS[code] ?? String(code);
-      const { data, error } = await supabase
+      const name = data.name ?? STATIONS[data.code] ?? String(data.code);
+      const payload: any = { code: data.code, name };
+
+      if (data.is_active !== undefined) payload.is_active = data.is_active;
+      if (data.address !== undefined) payload.address = data.address;
+
+      const { error } = await supabase
         .from('stations')
-        .upsert({ code, name, is_active: active }, { onConflict: 'code' })
+        .upsert(payload, { onConflict: 'code' })
         .select()
         .single();
 

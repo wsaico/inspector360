@@ -7,7 +7,7 @@ export class PuppeteerService {
     /**
      * Genera un PDF a partir de una URL usando Puppeteer
      */
-    static async generatePdf(url: string, cookies: any[] = [], initialData: any = null): Promise<Buffer> {
+    static async generatePdf(url: string, cookies: any[] = [], initialData: any = null, landscape: boolean = true): Promise<Buffer> {
         const isDev = process.env.NODE_ENV === 'development';
         let browser: Browser | null = null;
 
@@ -60,10 +60,31 @@ export class PuppeteerService {
             // Wait for the hydration signal from the template
             await page.waitForFunction('window.__forata057_ready === true', { timeout: 60000 });
 
-            // Generate PDF
+            // INJECT AGGRESSIVE CLEANUP STYLE (Hides Dev Overlays, Portals, etc)
+            await page.addStyleTag({
+                content: `
+                    nextjs-portal, 
+                    #nextjs-proxy-error-portal, 
+                    [data-nextjs-dialog-overlay], 
+                    [data-nextjs-toast],
+                    .sonner-toast,
+                    [data-sonner-toaster],
+                    button:not(.print-only),
+                    .floating-button,
+                    .bolt-icon,
+                    div[id^="nextjs"],
+                    div[class^="nextjs"] { 
+                        display: none !important; 
+                        visibility: hidden !important; 
+                        opacity: 0 !important;
+                        pointer-events: none !important;
+                    }
+                `
+            });
+
             const pdf = await page.pdf({
                 format: 'A4',
-                landscape: true,
+                landscape: landscape,
                 printBackground: true,
                 margin: {
                     top: '0mm',

@@ -6,15 +6,15 @@ import { useAuth } from '@/hooks';
 import { useInspectionForm } from '@/context/inspection-context';
 import { InspectionService } from '@/lib/services';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import dynamic from 'next/dynamic';
 const SignaturePad = dynamic(() => import('./signature-pad'), { ssr: false });
-import { CheckCircle2, Loader2, AlertCircle, Wrench, MessageSquare } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, Wrench, MessageSquare, PenTool, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { EmployeeSelect } from './employee-select';
 
 export default function Step4Finalize() {
   const router = useRouter();
@@ -31,12 +31,6 @@ export default function Step4Finalize() {
   // Estado para rastrear el nombre guardado junto con la firma
   const [savedSupervisorName, setSavedSupervisorName] = useState<string | null>(null);
   const [savedMechanicName, setSavedMechanicName] = useState<string | null>(null);
-
-  // Estados para autocompletado de nombres
-  const [supervisorNames, setSupervisorNames] = useState<string[]>([]);
-  const [mechanicNames, setMechanicNames] = useState<string[]>([]);
-  const [showSupervisorSuggestions, setShowSupervisorSuggestions] = useState(false);
-  const [showMechanicSuggestions, setShowMechanicSuggestions] = useState(false);
 
   // Initialize showComments based on existing data
   useEffect(() => {
@@ -100,7 +94,7 @@ export default function Step4Finalize() {
           localStorage.removeItem('inspector360.signature.supervisor');
         }
       } catch { }
-      toast.info('Firma del supervisor invalidada. Por favor firme nuevamente.', { duration: 3000 });
+      // toast.info('Firma del supervisor invalidada. Por favor firme nuevamente.', { duration: 3000 });
     }
   }, [supervisorName, savedSupervisorName]);
 
@@ -121,25 +115,9 @@ export default function Step4Finalize() {
           localStorage.removeItem('inspector360.signature.mechanic');
         }
       } catch { }
-      toast.info('Firma del mecánico invalidada. Por favor firme nuevamente.', { duration: 3000 });
+      // toast.info('Firma del mecánico invalidada. Por favor firme nuevamente.', { duration: 3000 });
     }
   }, [mechanicName, savedMechanicName]);
-
-  // Cargar nombres de supervisores y mecánicos cuando se monta el componente
-  useEffect(() => {
-    const station = formData.general?.station;
-    if (station) {
-      const loadNames = async () => {
-        const [supervisorRes, mechanicRes] = await Promise.all([
-          InspectionService.getUniqueSupervisorNames(station),
-          InspectionService.getUniqueMechanicNames(station),
-        ]);
-        setSupervisorNames((supervisorRes.data as string[]) || []);
-        setMechanicNames((mechanicRes.data as string[]) || []);
-      };
-      loadNames();
-    }
-  }, [formData.general?.station]);
 
   // Cargar respuestas del mecánico existentes
   useEffect(() => {
@@ -346,31 +324,31 @@ export default function Step4Finalize() {
   return (
     <div className="space-y-6 pb-6">
       {/* Resumen compacto */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Resumen de la Inspección</CardTitle>
+      <Card className="border-0 shadow-lg rounded-[30px] overflow-hidden">
+        <CardHeader className="bg-[#0A3161] text-white p-6 pb-4">
+          <CardTitle className="text-lg font-black uppercase tracking-widest text-[#B3D400]">Resumen de la Inspección</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6 bg-slate-50/50">
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg bg-gray-50 p-3">
-              <Label className="text-xs text-muted-foreground">Fecha</Label>
-              <p className="text-sm font-semibold">{formData.general?.inspection_date.toLocaleDateString('es')}</p>
+            <div className="rounded-xl bg-white border border-slate-100 p-4 shadow-sm">
+              <Label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Fecha</Label>
+              <p className="text-base font-bold text-[#0A3161]">{formData.general?.inspection_date.toLocaleDateString('es')}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3">
-              <Label className="text-xs text-muted-foreground">Tipo</Label>
-              <p className="text-sm font-semibold">{formData.general?.inspection_type}</p>
+            <div className="rounded-xl bg-white border border-slate-100 p-4 shadow-sm">
+              <Label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tipo</Label>
+              <p className="text-base font-bold text-[#0A3161] capitalize">{formData.general?.inspection_type.replace('_', ' ')}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3">
-              <Label className="text-xs text-muted-foreground">Inspector</Label>
-              <p className="text-sm font-semibold truncate">{formData.general?.inspector_name}</p>
+            <div className="rounded-xl bg-white border border-slate-100 p-4 shadow-sm">
+              <Label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Inspector</Label>
+              <p className="text-base font-bold text-[#0A3161] truncate">{formData.general?.inspector_name}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3">
-              <Label className="text-xs text-muted-foreground">Estación</Label>
-              <p className="text-sm font-semibold">{formData.general?.station}</p>
+            <div className="rounded-xl bg-white border border-slate-100 p-4 shadow-sm">
+              <Label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estación</Label>
+              <p className="text-base font-bold text-[#0A3161]">{formData.general?.station}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 sm:col-span-2">
-              <Label className="text-xs text-muted-foreground">Equipos inspeccionados</Label>
-              <p className="text-sm font-semibold">{formData.equipment.length} equipo(s)</p>
+            <div className="rounded-xl bg-white border border-slate-100 p-4 shadow-sm sm:col-span-2">
+              <Label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Equipos inspeccionados</Label>
+              <p className="text-base font-bold text-[#0A3161]">{formData.equipment.length} equipo(s)</p>
             </div>
           </div>
         </CardContent>
@@ -378,64 +356,64 @@ export default function Step4Finalize() {
 
       {/* Sección de Respuestas del Mecánico a Observaciones */}
       {formData.observations.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">
-                <Wrench className="h-4 w-4 text-orange-700" />
+        <Card className="border-2 border-orange-200 bg-orange-50/30 rounded-[30px] overflow-hidden">
+          <CardHeader className="pb-3 border-b border-orange-100 bg-orange-50/50 p-6">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 shadow-sm border border-orange-200">
+                <Wrench className="h-5 w-5" />
               </div>
-              Respuestas del Mecánico a Observaciones
+              <span className="font-black uppercase tracking-wide text-orange-900">Respuestas (Mecánico)</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-6">
             {formData.observations.map((obs, index) => {
               const key = `${obs.equipment_code}::${obs.obs_id}`;
               const hasResponse = !!obs.obs_maintenance;
 
               return (
-                <Card key={index} className="border-orange-200">
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 space-y-2">
+                <Card key={index} className="border-0 shadow-sm bg-white rounded-xl overflow-hidden">
+                  <CardContent className="pt-4 space-y-3 p-5">
+                    <div className="flex items-start gap-4">
+                      <AlertCircle className="h-6 w-6 text-orange-500 flex-shrink-0 mt-1" />
+                      <div className="flex-1 space-y-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold px-2 py-1 rounded bg-orange-100 text-orange-900">
+                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-orange-100 text-orange-900 border border-orange-200">
                             {obs.equipment_code}
                           </span>
-                          <span className="text-xs font-semibold px-2 py-1 rounded bg-orange-100 text-orange-900">
+                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-orange-100 text-orange-900 border border-orange-200">
                             {obs.obs_id}
                           </span>
                         </div>
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                          <Label className="text-xs text-red-700 font-semibold">Observación del Inspector:</Label>
-                          <p className="text-sm text-red-900 mt-1">{obs.obs_operator}</p>
+                        <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+                          <Label className="text-[10px] uppercase font-bold text-red-400 tracking-wider">Observación del Inspector:</Label>
+                          <p className="text-sm font-medium text-red-900 mt-1">{obs.obs_operator}</p>
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">Respuesta del Mecánico:</Label>
+                          <Label className="text-xs font-bold uppercase text-slate-500 tracking-wide">Respuesta del Mecánico:</Label>
                           <Textarea
                             placeholder="Describa la acción correctiva tomada o el plan de reparación..."
                             value={mechanicResponses[key] || ''}
                             onChange={(e) => handleMechanicResponseChange(index, obs.equipment_code, obs.obs_id, e.target.value)}
-                            className="min-h-[80px] text-sm"
+                            className="min-h-[80px] text-sm rounded-xl border-slate-200 focus:border-[#0A3161] focus:ring-[#0A3161]"
                             rows={3}
                             disabled={hasResponse}
                           />
                           {hasResponse ? (
-                            <div className="px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                              <p className="text-xs font-semibold text-green-900 flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4" />
-                                Respuesta guardada correctamente
+                            <div className="px-4 py-3 bg-green-50 rounded-xl border border-green-200 shadow-sm">
+                              <p className="text-sm font-bold text-green-800 flex items-center gap-2">
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                Respuesta guardada
                               </p>
                             </div>
                           ) : (
                             <Button
                               size="sm"
                               onClick={() => handleSaveMechanicResponse(index, obs.equipment_code, obs.obs_id)}
-                              className="w-full bg-orange-600 hover:bg-orange-700"
+                              className="w-full bg-[#0A3161] hover:bg-[#152d6f] text-white font-bold rounded-xl"
                               disabled={!mechanicResponses[key]?.trim()}
                             >
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-[#B3D400]" />
                               Guardar Respuesta
                             </Button>
                           )}
@@ -451,15 +429,17 @@ export default function Step4Finalize() {
       )}
 
       {/* Sección Comentarios Adicionales */}
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="border-0 shadow-md rounded-[30px] overflow-hidden">
+        <CardHeader className="pb-3 bg-slate-50 p-6 border-b border-slate-100">
           <CardTitle className="text-base sm:text-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-gray-500" />
-              Comentarios Adicionales
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center border border-slate-200 shadow-sm">
+                <MessageSquare className="h-5 w-5 text-slate-500" />
+              </div>
+              <span className="font-bold text-slate-700">Comentarios Adicionales</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Label htmlFor="show-comments" className="text-sm font-normal text-muted-foreground cursor-pointer">
+              <Label htmlFor="show-comments" className="text-xs font-bold uppercase text-slate-400 cursor-pointer">
                 {showComments ? 'Ocultar' : 'Agregar'}
               </Label>
               <Switch
@@ -471,75 +451,53 @@ export default function Step4Finalize() {
           </CardTitle>
         </CardHeader>
         {showComments && (
-          <CardContent>
+          <CardContent className="p-6">
             <Textarea
               placeholder="Ingrese cualquier comentario adicional, observación general o nota importante sobre la inspección..."
               value={formData.additional_comments || ''}
               onChange={(e) => setAdditionalComments(e.target.value)}
-              className="min-h-[100px]"
+              className="min-h-[100px] rounded-xl border-slate-200 focus:border-[#0A3161] focus:ring-[#0A3161] p-4 text-base"
             />
           </CardContent>
         )}
       </Card>
 
-      {/* Sección Supervisor - Mejorada para móvil */}
-      <Card className="border-blue-200 bg-blue-50/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-              <span className="text-sm font-bold text-blue-700">1</span>
+      {/* Sección Supervisor - Mejorada con EmployeeSelect */}
+      <Card className="border-0 shadow-lg rounded-[30px] overflow-hidden">
+        <CardHeader className="bg-[#0A3161] p-6 pb-4">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-3 text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 border border-white/20">
+              <span className="text-lg font-black text-[#B3D400]">1</span>
             </div>
-            Supervisor o Encargado de Estación
+            <div className="flex flex-col">
+              <span className="font-black uppercase tracking-widest text-sm text-[#B3D400]">Responsable (1)</span>
+              <span className="font-medium text-slate-300">Supervisor de Estación</span>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2 relative">
-            <Label htmlFor="supervisor-name" className="text-sm font-medium">Nombre del Supervisor</Label>
-            <Input
-              id="supervisor-name"
+        <CardContent className="space-y-6 p-6 bg-slate-50/50">
+          <div className="space-y-3 relative z-20">
+            <Label htmlFor="supervisor-name" className="text-xs font-black uppercase text-[#0A3161] tracking-wider flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Nombre del Supervisor
+            </Label>
+
+            <EmployeeSelect
+              stationCode={formData.general?.station || 'AQP'}
               value={supervisorName}
-              autoComplete="off"
-              onFocus={() => setShowSupervisorSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSupervisorSuggestions(false), 200)}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSupervisorName(value);
+              onChange={(val) => {
+                setSupervisorName(val);
                 setSignatures({
                   ...formData.signatures,
-                  supervisor_name: value,
+                  supervisor_name: val,
                 });
               }}
-              placeholder="Ej: Juan Pérez García"
-              className="bg-white"
+              className="h-12 rounded-xl border-slate-200 bg-white"
+              placeholder="Seleccione al supervisor..."
             />
-            {/* Sugerencias de autocompletado para supervisor */}
-            {showSupervisorSuggestions && supervisorNames.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {supervisorNames
-                  .filter(name => name.toLowerCase().includes(supervisorName.toLowerCase()))
-                  .slice(0, 5)
-                  .map((name, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      className="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm transition-colors flex items-center gap-2"
-                      onClick={() => {
-                        setSupervisorName(name);
-                        setSignatures({
-                          ...formData.signatures,
-                          supervisor_name: name,
-                        });
-                        setShowSupervisorSuggestions(false);
-                      }}
-                    >
-                      <CheckCircle2 className="h-4 w-4 text-gray-400" />
-                      {name}
-                    </button>
-                  ))}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {supervisorNames.length > 0 ? '💡 Nombres usados previamente en esta estación' : '💾 Se guarda automáticamente para la próxima inspección'}
+
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1 fa-fade">
+              {supervisorName ? '✓ Personal Seleccionado' : 'Seleccione de la lista oficial'}
             </p>
           </div>
           <SignaturePad
@@ -566,64 +524,42 @@ export default function Step4Finalize() {
         </CardContent>
       </Card>
 
-      {/* Sección Mecánico - Mejorada para móvil */}
-      <Card className="border-green-200 bg-green-50/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-              <span className="text-sm font-bold text-green-700">2</span>
+      {/* Sección Mecánico - Mejorada con EmployeeSelect */}
+      <Card className="border-0 shadow-lg rounded-[30px] overflow-hidden">
+        <CardHeader className="bg-[#0A3161] p-6 pb-4">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-3 text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 border border-white/20">
+              <span className="text-lg font-black text-[#B3D400]">2</span>
             </div>
-            Mecánico de Estación
+            <div className="flex flex-col">
+              <span className="font-black uppercase tracking-widest text-sm text-[#B3D400]">Responsable (2)</span>
+              <span className="font-medium text-slate-300">Mecánico de Turno</span>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2 relative">
-            <Label htmlFor="mechanic-name" className="text-sm font-medium">Nombre del Mecánico</Label>
-            <Input
-              id="mechanic-name"
+        <CardContent className="space-y-6 p-6 bg-slate-50/50">
+          <div className="space-y-3 relative z-10">
+            <Label htmlFor="mechanic-name" className="text-xs font-black uppercase text-[#0A3161] tracking-wider flex items-center gap-2">
+              <Wrench className="h-4 w-4" />
+              Nombre del Mecánico
+            </Label>
+
+            <EmployeeSelect
+              stationCode={formData.general?.station || 'AQP'}
               value={mechanicName}
-              autoComplete="off"
-              onFocus={() => setShowMechanicSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowMechanicSuggestions(false), 200)}
-              onChange={(e) => {
-                const value = e.target.value;
-                setMechanicName(value);
+              onChange={(val) => {
+                setMechanicName(val);
                 setSignatures({
                   ...formData.signatures,
-                  mechanic_name: value,
+                  mechanic_name: val,
                 });
               }}
-              placeholder="Ej: María López Ruiz"
-              className="bg-white"
+              className="h-12 rounded-xl border-slate-200 bg-white"
+              placeholder="Seleccione al mecánico..."
             />
-            {/* Sugerencias de autocompletado para mecánico */}
-            {showMechanicSuggestions && mechanicNames.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {mechanicNames
-                  .filter(name => name.toLowerCase().includes(mechanicName.toLowerCase()))
-                  .slice(0, 5)
-                  .map((name, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      className="w-full text-left px-4 py-2 hover:bg-green-50 text-sm transition-colors flex items-center gap-2"
-                      onClick={() => {
-                        setMechanicName(name);
-                        setSignatures({
-                          ...formData.signatures,
-                          mechanic_name: name,
-                        });
-                        setShowMechanicSuggestions(false);
-                      }}
-                    >
-                      <CheckCircle2 className="h-4 w-4 text-gray-400" />
-                      {name}
-                    </button>
-                  ))}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {mechanicNames.length > 0 ? '💡 Nombres usados previamente en esta estación' : '💾 Se guarda automáticamente para la próxima inspección'}
+
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1 fa-fade">
+              {mechanicName ? '✓ Personal Seleccionado' : 'Seleccione de la lista oficial'}
             </p>
           </div>
           <SignaturePad
@@ -651,21 +587,21 @@ export default function Step4Finalize() {
       </Card>
 
       {/* Botón de completar - Fixed en móvil */}
-      <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-2">
+      <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-4 z-30">
         <Button
-          className="w-full shadow-lg"
+          className="w-full h-14 rounded-2xl shadow-xl bg-[#0A3161] hover:bg-[#152d6f] text-white text-lg font-black uppercase tracking-widest transition-all hover:scale-[1.01]"
           size="lg"
           onClick={handleComplete}
           disabled={isSubmitting}
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Guardando Inspección...
+              <Loader2 className="mr-2 h-6 w-6 animate-spin text-[#B3D400]" />
+              Guardando...
             </>
           ) : (
             <>
-              <CheckCircle2 className="mr-2 h-5 w-5" />
+              <CheckCircle2 className="mr-2 h-6 w-6 text-[#B3D400]" />
               Completar Inspección
             </>
           )}

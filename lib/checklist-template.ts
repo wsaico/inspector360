@@ -97,6 +97,12 @@ export const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
     description: 'Sólo escaleras: estabilizadores operativos, peldaños y cintas antideslizantes en buen estado, luces operativas',
     order_index: 14,
   },
+  {
+    code: 'CHK-15',
+    category: 'general',
+    description: 'Otros / Condición General: Verificar cualquier otra condición no listada que afecte la operatividad o seguridad.',
+    order_index: 15,
+  },
 ];
 
 /**

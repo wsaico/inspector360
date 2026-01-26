@@ -5,7 +5,7 @@ import { useAuth, usePermissions } from "@/hooks"
 import { ComplianceService } from "@/lib/services/compliance"
 import { StationsService } from "@/lib/services/stations"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MultiSelect } from "@/components/ui/multi-select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
@@ -39,7 +39,8 @@ export default function CompliancePage() {
     return d.toISOString().split('T')[0]; // Today
   });
 
-  const [station, setStation] = useState<string | undefined>(undefined);
+  // Multi-select state for stations
+  const [selectedStations, setSelectedStations] = useState<string[]>([]);
   const [stationsList, setStationsList] = useState<any[]>([]);
 
   // State for data
@@ -71,7 +72,7 @@ export default function CompliancePage() {
     if (user) {
       fetchData();
     }
-  }, [user, startDate, endDate, station]);
+  }, [user, startDate, endDate, selectedStations]);
 
   const loadStations = async () => {
     const { data } = await StationsService.listActive();
@@ -82,13 +83,13 @@ export default function CompliancePage() {
     setLoading(true);
     try {
       // Determine effective station filter
-      // If user can't view all, force their station. If they can, use selected or undefined (all)
-      const effectiveStation = !canViewAllStations && profile?.station
-        ? profile.station
-        : station;
+      // If user can't view all, force their station.
+      const effectiveStations = !canViewAllStations && profile?.station
+        ? [profile.station]
+        : selectedStations;
 
       const filters = {
-        station: effectiveStation === 'all' ? undefined : effectiveStation,
+        stations: effectiveStations.length > 0 ? effectiveStations : undefined,
         startDate,
         endDate
       };
@@ -106,7 +107,7 @@ export default function CompliancePage() {
         ComplianceService.getMonthlyTrends(filters),
         ComplianceService.getComplianceBreakdown(filters),
         ComplianceService.getTopIssues(5, filters),
-        ComplianceService.getDailyCompliance({ ...filters, aggregateAll: !effectiveStation }),
+        ComplianceService.getDailyCompliance({ ...filters, aggregateAll: effectiveStations.length === 0 }),
         ComplianceService.getStationComplianceStatus(filters),
         ComplianceService.getStationDailyStatus(filters)
       ]);
@@ -138,11 +139,11 @@ export default function CompliancePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cumplimiento</h1>
           <p className="text-muted-foreground">
-            Monitoreo de indicadores clave y cumplimiento normativo
+            Monitoreo de indicadores
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto items-end md:items-center">
           <div className="flex items-center gap-2">
             <Input
               type="date"
@@ -160,22 +161,14 @@ export default function CompliancePage() {
           </div>
 
           {canViewAllStations && (
-            <Select
-              value={station || "all"}
-              onValueChange={(v) => setStation(v === "all" ? undefined : v)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todas las estaciones" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las estaciones</SelectItem>
-                {stationsList.map((s) => (
-                  <SelectItem key={s.code} value={s.code}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-[280px]">
+              <MultiSelect
+                options={stationsList.map(s => ({ label: s.name, value: s.code }))}
+                selected={selectedStations}
+                onChange={setSelectedStations}
+                placeholder="Todas las estaciones"
+              />
+            </div>
           )}
         </div>
       </div>
@@ -260,13 +253,50 @@ export default function CompliancePage() {
         />
       </div>
 
-      {/* Heatmap Full Width */}
-      <StationComplianceHeatmap
-        data={stationDailyStatus || []}
-        daysInMonth={dailyCompliance.daysElapsed}
-        startDate={startDate}
-        endDate={endDate}
-      />
+      {/* Heatmap & Top Issues side by side to avoid empty space */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <StationComplianceHeatmap
+            data={stationDailyStatus || []}
+            daysInMonth={dailyCompliance.daysElapsed}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        </div>
+
+        <Card className="lg:col-span-4 h-full shadow-lg border-t-2 border-t-red-200">
+          <CardHeader className="pb-3 pt-4">
+            <CardTitle className="text-lg font-bold">Top No Conformidades</CardTitle>
+            <CardDescription className="text-xs">
+              Items con mayor tasa de fallo en el periodo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {topIssues.map((issue, i) => (
+                <div key={i} className="flex items-start py-2 border-b last:border-0 border-slate-50">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">
+                    {i + 1}
+                  </div>
+                  <div className="ml-3 space-y-1 flex-1 min-w-0">
+                    <p className="text-xs font-semibold leading-tight text-slate-800 line-clamp-2">
+                      {issue.description}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      ID: {issue.code} • <span className="font-bold text-red-500">{issue.count} casos</span>
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {topIssues.length === 0 && (
+                <div className="text-center text-muted-foreground py-10 text-xs italic">
+                  No hay datos insuficientes
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Station Compliance & Pending List */}
       <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
@@ -279,128 +309,39 @@ export default function CompliancePage() {
         <PendingInspectionsList data={stationComplianceStatus || []} />
       </div>
 
-      {/* Secondary Charts & Tables */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-
-        {/* Historical Trend */}
-        <Card className="col-span-7 shadow-lg border-t-4 border-t-purple-500">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Activity className="h-6 w-6 text-purple-600" />
-                  Tendencia Histórica de Inspecciones
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  Cantidad total de inspecciones completadas por periodo
-                </CardDescription>
-              </div>
-              {monthlyData.length > 0 && (
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-purple-700">
-                    {monthlyData.reduce((sum, item) => sum + (item.inspections || 0), 0)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Total Acumulado</p>
-                </div>
-              )}
-            </div>
+      {/* Historical Trend & Compliance Detail */}
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
+        <Card className="lg:col-span-4 shadow-lg border-t-2 border-t-purple-500">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg font-bold">
+              <Activity className="h-5 w-5 text-purple-600" />
+              Tendencia Histórica
+            </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6">
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={monthlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                  tickLine={false}
-                  axisLine={false}
-                  label={{ value: 'Periodo', position: 'insideBottom', offset: -5, fill: '#9CA3AF', fontSize: 12 }}
-                />
-                <YAxis
-                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                  tickLine={false}
-                  axisLine={false}
-                  label={{ value: 'Cantidad de Inspecciones', angle: -90, position: 'insideLeft', fill: '#9CA3AF', fontSize: 12 }}
-                  tickFormatter={(value) => `${value}`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                  }}
-                  labelStyle={{ fontWeight: 'bold', color: '#374151' }}
-                  cursor={{ fill: 'rgba(147, 51, 234, 0.1)' }}
-                />
-                <Bar
-                  dataKey="inspections"
-                  fill="#9333EA"
-                  radius={[8, 8, 0, 0]}
-                  name="Inspecciones Completadas"
-                  maxBarSize={60}
-                />
+          <CardContent className="pt-4">
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ fontSize: '11px' }} />
+                <Bar dataKey="inspections" fill="#9333EA" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600">
-              <div className="h-3 w-3 bg-purple-600 rounded"></div>
-              <span>Inspecciones realizadas en cada periodo</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top Issues */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Top No Conformidades</CardTitle>
-            <CardDescription>
-              Items con mayor tasa de fallo
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topIssues.map((issue, i) => (
-                <div key={i} className="flex items-start py-2 border-b last:border-0">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
-                    {i + 1}
-                  </div>
-                  <div className="ml-3 space-y-1 flex-1">
-                    <p className="text-sm font-medium leading-normal text-gray-900">
-                      {issue.description}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Código: {issue.code} • <span className="font-semibold text-red-600">{issue.count} incidencias</span>
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {topIssues.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  No hay datos suficientes
-                </div>
-              )}
-            </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Desglose de Cumplimiento</CardTitle>
-            <CardDescription>
-              Estado de items inspeccionados
-            </CardDescription>
+        <Card className="lg:col-span-3 shadow-lg border-t-2 border-t-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-bold">Estado de Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
                   data={complianceData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
+                  innerRadius={50}
+                  outerRadius={70}
                   paddingAngle={5}
                   dataKey="value"
                 >
@@ -412,7 +353,6 @@ export default function CompliancePage() {
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>

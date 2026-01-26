@@ -64,13 +64,36 @@ export default function InspectionDetailPage() {
   const [mechanicNames, setMechanicNames] = useState<string[]>([]);
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
 
+  const [comingSoonType, setComingSoonType] = useState<string | null>(null);
+
   useEffect(() => {
     if (!params?.id) {
       router.replace('/inspections');
       return;
     }
+
+    const id = params.id as string;
+
+    // VALIDACIÓN CRÍTICA: Detectar si el ID es en realidad un CÓDIGO DE TIPO
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+    if (!isUuid) {
+      // Si es el módulo Técnico (principal), redirigir al listado
+      if (id === 'technical') {
+        router.replace(`/inspections?type=${id}`);
+        return;
+      }
+
+      // Para otros módulos (extintores, botiquín, etc.), mostrar "Próximamente"
+      setComingSoonType(id);
+      setLoading(false);
+      return;
+    }
+
     loadInspection();
   }, [params.id]);
+
+  // Early return logic moved to bottom to prevent Hook Violation
 
   // Cargar nombres de supervisores y mecánicos cuando se abre el modal
   useEffect(() => {
@@ -318,6 +341,45 @@ export default function InspectionDetailPage() {
       toast.error(`No se pudo generar el PDF: ${error.message}`);
     }
   };
+
+  if (comingSoonType) {
+    const labels: Record<string, string> = {
+      extinguisher: 'Inspección de Extintores',
+      first_aid: 'Inspección de Botiquín',
+      internal: 'Inspección Interna',
+      botiquin: 'Inspección de Botiquín',
+      extintores: 'Inspección de Extintores'
+    };
+
+    return (
+      <div className="flex flex-col items-center justify-center space-y-6 py-20 text-center animate-in fade-in duration-500">
+        <div className="relative">
+          <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-20 blur-xl rounded-full"></div>
+          <Package className="h-24 w-24 text-blue-600 relative z-10" />
+        </div>
+        <div className="space-y-2 max-w-md">
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+            {labels[comingSoonType] || 'Nuevo Módulo'}
+          </h2>
+          <Badge variant="secondary" className="text-sm py-1 px-4 bg-blue-100 text-blue-700 hover:bg-blue-100">
+            Próximamente
+          </Badge>
+          <p className="text-muted-foreground text-lg">
+            Estamos trabajando duro preparando este módulo de inspección especializado.
+          </p>
+        </div>
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver
+          </Button>
+          <Button onClick={() => router.push('/inspections')}>
+            Ir a Inspecciones Técnicas
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

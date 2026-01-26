@@ -20,12 +20,13 @@ interface UseInspectionsOptions {
   enabled?: boolean;
   station?: string;
   status?: string;
+  type?: string;
   startDate?: string;
   endDate?: string;
 }
 
 export function useInspections(options: UseInspectionsOptions = {}) {
-  const { page = 1, pageSize = 10, enabled = true, station: filterStation, status, startDate, endDate } = options;
+  const { page = 1, pageSize = 10, enabled = true, station: filterStation, status, type, startDate, endDate } = options;
   const { profile, user } = useAuth();
   const { canViewAllStations } = usePermissions();
 
@@ -43,6 +44,7 @@ export function useInspections(options: UseInspectionsOptions = {}) {
       pageSize,
       station: stationFilter,
       status,
+      type,
       startDate,
       endDate,
       userId: !canViewAllStations ? userId : undefined, // Mantiene cache estable
@@ -55,6 +57,7 @@ export function useInspections(options: UseInspectionsOptions = {}) {
         pageSize,
         station: stationFilter,
         status,
+        type,
         start: startDate,
         end: endDate,
       });

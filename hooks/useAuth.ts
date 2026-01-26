@@ -21,7 +21,19 @@ interface AuthState {
 export function useAuth() {
   // Persistencia manual para mejorar experiencia ante cortes de red
   const PERSIST_KEY = 'i360.auth.persist';
-  const TTL_MS = 5 * 60 * 1000; // 5 minutos: evita sesiones zombis tras expirar
+
+  const readPersisted = (): { user: SupabaseUser | null; profile: UserProfile | null; savedAt: number } => {
+    try {
+      if (typeof window === 'undefined') return { user: null, profile: null, savedAt: 0 };
+      const raw = window.localStorage.getItem(PERSIST_KEY);
+      if (!raw) return { user: null, profile: null, savedAt: 0 };
+      const obj = JSON.parse(raw);
+      // Validar si la sesión guardada no es demasiado antigua (opcional, pero ayuda)
+      return { user: obj.user || null, profile: obj.profile || null, savedAt: obj.savedAt || 0 };
+    } catch {
+      return { user: null, profile: null, savedAt: 0 };
+    }
+  };
 
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -30,63 +42,73 @@ export function useAuth() {
     error: null,
   });
 
-  const readPersisted = (): { user: SupabaseUser | null; profile: UserProfile | null; savedAt: number } => {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(PERSIST_KEY) : null;
-      if (!raw) return { user: null, profile: null, savedAt: 0 };
-      const obj = JSON.parse(raw);
-      return { user: obj.user || null, profile: obj.profile || null, savedAt: obj.savedAt || 0 };
-    } catch {
-      return { user: null, profile: null, savedAt: 0 };
-    }
-  };
-
   const writePersisted = (user: SupabaseUser | null, profile: UserProfile | null) => {
     try {
       if (typeof window === 'undefined') return;
       window.localStorage.setItem(PERSIST_KEY, JSON.stringify({ user, profile, savedAt: Date.now() }));
-    } catch {}
+    } catch { }
   };
 
   const clearPersisted = () => {
     try {
       if (typeof window === 'undefined') return;
       window.localStorage.removeItem(PERSIST_KEY);
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
-    // IMPORTANTE: Confiar en el middleware para validación de sesión
+    // 1. Cargar persistencia INMEDIATAMENTE al montar el componente (Client-side only)
+    const persisted = readPersisted();
+    if (persisted.user) {
+      setAuthState({
+        user: persisted.user,
+        profile: persisted.profile,
+        loading: false,
+        error: null,
+      });
+    }
+
+    // 2. Confiar en el middleware para validación de sesión
     // Solo cargar sesión inicial y escuchar cambios - sin validaciones periódicas
     const initSession = async () => {
       try {
-        // Intentar cargar sesión existente (sin timeout agresivo)
+        // Intentar cargar sesión existente
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
           console.warn('[useAuth] Error obteniendo sesión:', error.message);
-          clearPersisted();
-          setAuthState({ user: null, profile: null, loading: false, error: null });
+          // Solo limpiar si realmente hay un error de sesión, no si no hay sesión
+          if (error.status !== 401) {
+            clearPersisted();
+            setAuthState({ user: null, profile: null, loading: false, error: null });
+          }
           return;
         }
 
         if (session?.user) {
-          // ✅ OPTIMIZADO: Marcar autenticado INMEDIATAMENTE
-          setAuthState({ user: session.user, profile: null, loading: false, error: null });
+          // Si ya tenemos datos persistidos, no los reseteamos a profile: null
+          const persisted = readPersisted();
+          const currentProfile = (persisted.user?.id === session.user.id) ? persisted.profile : null;
 
-          // Cargar perfil en background - no bloquear UI
+          setAuthState({
+            user: session.user,
+            profile: currentProfile,
+            loading: !currentProfile, // Seguir cargando solo si no tenemos perfil
+            error: null
+          });
+
+          // Sincronizar perfil en background
           loadUserProfile(session.user).then((profile) => {
             writePersisted(session.user, profile);
           });
         } else {
-          // Sin sesión: limpiar estado
+          // Sin sesión real: ahora sí limpiar estado
           clearPersisted();
           setAuthState({ user: null, profile: null, loading: false, error: null });
         }
       } catch (error) {
         console.error('[useAuth] Error inicializando sesión:', error);
-        clearPersisted();
-        setAuthState({ user: null, profile: null, loading: false, error: null });
+        setAuthState(prev => ({ ...prev, loading: false }));
       }
     };
 
@@ -95,7 +117,7 @@ export function useAuth() {
     // Escuchar cambios de autenticación (login/logout/token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        console.log('[useAuth] Auth event:', event);
+        // console.log('[useAuth] Auth event:', event);
 
         if (session?.user) {
           // ✅ OPTIMIZADO: Login INMEDIATO - Perfil en background
@@ -126,7 +148,7 @@ export function useAuth() {
       const metaProfile = buildProfileFromMetadata(supabaseUser);
 
       if (metaProfile) {
-        console.log('[useAuth] ⚡ Perfil cargado INSTANTÁNEAMENTE desde metadata JWT');
+        // console.log('[useAuth] ⚡ Perfil cargado INSTANTÁNEAMENTE desde metadata JWT');
         // Establecer perfil INMEDIATAMENTE sin esperar query
         setAuthState({ user: supabaseUser, profile: metaProfile, loading: false, error: null });
 
@@ -142,7 +164,7 @@ export function useAuth() {
               // Verificar si usuario está activo
               const isActive = data.is_active === true;
               if (isActive) {
-                console.log('[useAuth] ✓ Perfil verificado con base de datos');
+                // console.log('[useAuth] ✓ Perfil verificado con base de datos');
                 setAuthState({ user: supabaseUser, profile: data as UserProfile, loading: false, error: null });
               } else {
                 console.warn('[useAuth] ⚠ Usuario inactivo según base de datos');
@@ -263,11 +285,23 @@ export function useAuth() {
   };
 }
 
-  const buildProfileFromMetadata = (supabaseUser: SupabaseUser): UserProfile | null => {
+const buildProfileFromMetadata = (supabaseUser: SupabaseUser): UserProfile | null => {
   try {
     const meta = (supabaseUser as any).user_metadata || (supabaseUser as any).app_metadata || {};
     const email = (supabaseUser as any).email as string | undefined;
-    const full_name = (meta && meta.full_name) ? meta.full_name : (email || '');
+
+    // NO usar el correo como full_name por defecto para evitar parpadeos feos
+    let full_name = (meta && meta.full_name) ? meta.full_name : '';
+
+    // Simplificar nombres robóticos
+    if (full_name.toLowerCase() === 'administrador principal') {
+      full_name = 'Administrador';
+    }
+
+    // Si es el admin conocido y no tiene nombre, ponerle Administrador
+    if (!full_name && email?.toLowerCase() === 'admin@inspector360.com') {
+      full_name = 'Administrador';
+    }
     const metaRoleRaw = meta?.role as string | undefined;
     const allowedRoles = ['admin', 'supervisor', 'inspector', 'sig'] as const;
     const normalizedRole = typeof metaRoleRaw === 'string' ? metaRoleRaw.trim().toLowerCase() : undefined;
