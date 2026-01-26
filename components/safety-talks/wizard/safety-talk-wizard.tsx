@@ -255,28 +255,28 @@ export function SafetyTalkWizard() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto min-h-screen p-4 md:p-8 bg-[#F8FAFC]">
-            {/* Stepper Indicator - AUTHENTIC STYLE */}
-            <div className="mb-16 flex justify-between items-center max-w-3xl mx-auto relative px-4">
+        <div className="w-full max-w-6xl mx-auto min-h-screen p-3 md:p-8 bg-[#F8FAFC]">
+            {/* Stepper Indicator - AUTHENTIC STYLE - Refined for Mobile */}
+            <div className="mb-8 md:mb-16 flex justify-between items-center max-w-3xl mx-auto relative px-2 md:px-4">
                 {[0, 1, 2, 3, 4].map(s => (
                     <div key={s} className="flex flex-col items-center relative z-10 group">
                         <div className={`
-                            h-14 w-14 rounded-2xl flex items-center justify-center border-2 transition-all duration-500 transform
+                            h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-2xl flex items-center justify-center border-2 transition-all duration-500 transform
                             ${step === s ? 'bg-[#0A3161] border-[#0A3161] text-white shadow-[0_8px_20px_-6px_rgba(10,49,97,0.4)] -translate-y-1' :
                                 step > s ? 'bg-[#B3D400] border-[#B3D400] text-[#0A3161]' : 'bg-white border-slate-200 text-slate-400'}
                         `}>
-                            {step > s ? <CheckCircle className="w-7 h-7" /> : <span className="text-xl font-black">{s + 1}</span>}
+                            {step > s ? <CheckCircle className="w-5 h-5 md:w-7 md:h-7" /> : <span className="text-sm md:text-xl font-black">{s + 1}</span>}
                         </div>
-                        <span className={`text-[10px] font-black mt-3 uppercase tracking-[0.1em] ${step === s ? 'text-[#0A3161]' : 'text-slate-400'}`}>
-                            {s === 0 ? 'Inicio' : s === 1 ? 'Líder' : s === 2 ? 'Colaboradores' : s === 3 ? 'Firmas' : 'Final'}
+                        <span className={`text-[8px] md:text-[10px] font-black mt-2 md:mt-3 uppercase tracking-tighter md:tracking-[0.1em] ${step === s ? 'text-[#0A3161]' : 'text-slate-400'}`}>
+                            {s === 0 ? 'Inicio' : s === 1 ? 'Líder' : s === 2 ? 'Equipos' : s === 3 ? 'Firmas' : 'Final'}
                         </span>
-                        {step === s && <motion.div layoutId="step-indicator" className="h-1 w-6 bg-[#B3D400] rounded-full mt-1" />}
+                        {step === s && <motion.div layoutId="step-indicator" className="h-1 w-4 md:w-6 bg-[#B3D400] rounded-full mt-1" />}
                     </div>
                 ))}
                 {/* Background tracks */}
-                <div className="absolute top-[28px] left-[10%] right-[10%] h-[2px] bg-slate-200 -z-0" />
+                <div className="absolute top-[20px] md:top-[28px] left-[10%] right-[10%] h-[2px] bg-slate-200 -z-0" />
                 <div
-                    className="absolute top-[28px] left-[10%] h-[2px] bg-[#0A3161] -z-0 transition-all duration-700 ease-in-out"
+                    className="absolute top-[20px] md:top-[28px] left-[10%] h-[2px] bg-[#0A3161] -z-0 transition-all duration-700 ease-in-out"
                     style={{ width: `${(step / 4) * 80}%` }}
                 />
             </div>
@@ -292,19 +292,19 @@ export function SafetyTalkWizard() {
                 >
                     {/* STEP 0: START */}
                     {step === 0 && (
-                        <div className="max-w-4xl mx-auto space-y-10 py-4 logo-animate">
-                            <div className="text-center space-y-6">
-                                <h1 className="text-5xl font-black tracking-tight text-[#0A3161]">Charla de Seguridad</h1>
+                        <div className="max-w-4xl mx-auto space-y-6 md:space-y-10 py-2 md:py-4 logo-animate">
+                            <div className="text-center space-y-4 md:space-y-6">
+                                <h1 className="text-2xl md:text-5xl font-black tracking-tight text-[#0A3161] px-2">Charla de Seguridad</h1>
 
-                                <div className="flex items-center justify-center gap-4">
-                                    <div className="h-[2px] w-12 bg-slate-200" />
+                                <div className="flex items-center justify-center gap-2 md:gap-4">
+                                    <div className="hidden sm:block h-[2px] w-8 md:w-12 bg-slate-200" />
                                     {profile?.role === 'admin' ? (
-                                        <div className="flex flex-col items-center space-y-3">
-                                            <div className="flex items-center gap-2 text-[#0A3161] font-bold text-sm uppercase">
-                                                <Building2 className="w-4 h-4" /> Configuración de Estación
+                                        <div className="flex flex-col items-center space-y-2 md:space-y-3">
+                                            <div className="flex items-center gap-2 text-[#0A3161] font-bold text-[10px] md:text-sm uppercase tracking-widest">
+                                                <Building2 className="w-3 h-3 md:w-4 md:h-4" /> Estación
                                             </div>
                                             <select
-                                                className="bg-white border-2 border-slate-200 rounded-xl px-6 py-3 text-2xl font-black text-[#0A3161] focus:border-[#0A3161] outline-none shadow-xl transition-all hover:bg-slate-50"
+                                                className="w-full max-w-[280px] md:max-w-none bg-white border-2 border-slate-200 rounded-xl px-4 py-2 md:px-6 md:py-3 text-lg md:text-2xl font-black text-[#0A3161] focus:border-[#0A3161] outline-none shadow-lg transition-all"
                                                 value={currentStation}
                                                 onChange={(e) => setCurrentStation(e.target.value)}
                                             >
@@ -314,32 +314,34 @@ export function SafetyTalkWizard() {
                                             </select>
                                         </div>
                                     ) : (
-                                        <p className="text-2xl text-slate-500 font-bold tracking-tight">Estación <span className="text-[#0A3161]">{currentStation}</span> • {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                                        <p className="text-lg md:text-2xl text-slate-500 font-bold tracking-tight px-4 text-center">
+                                            Estación <span className="text-[#0A3161]">{currentStation}</span> • <span className="block md:inline mt-1 text-sm md:text-xl">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                                        </p>
                                     )}
-                                    <div className="h-[2px] w-12 bg-slate-200" />
+                                    <div className="hidden sm:block h-[2px] w-8 md:w-12 bg-slate-200" />
                                 </div>
                             </div>
 
-                            <Card className="border-0 shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white rounded-3xl overflow-hidden">
-                                <div className="grid md:grid-cols-5 h-full">
-                                    <div className="md:col-span-3 p-10 space-y-6">
+                            <Card className="border-0 shadow-2xl bg-white rounded-[32px] overflow-hidden w-full">
+                                <div className="grid grid-cols-1 md:grid-cols-5 h-full">
+                                    <div className="md:col-span-3 p-6 md:p-10 space-y-6 w-full">
                                         {!schedule && !isManualSelection ? (
-                                            <div className="space-y-6 animate-in fade-in zoom-in duration-500">
-                                                <div className="w-16 h-16 bg-[#B3D400]/20 rounded-2xl flex items-center justify-center">
+                                            <div className="space-y-6 animate-in fade-in zoom-in duration-500 text-center md:text-left">
+                                                <div className="w-16 h-16 bg-[#B3D400]/20 rounded-2xl flex items-center justify-center mx-auto md:mx-0">
                                                     <CheckCircle className="w-10 h-10 text-[#7BB342]" />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <h2 className="text-3xl font-black text-[#0A3161] leading-tight flex items-center gap-3">
+                                                    <h2 className="text-xl md:text-3xl font-black text-[#0A3161] leading-tight">
                                                         ¡Estación al día!
                                                     </h2>
                                                     <p className="text-slate-500 font-medium">No hay charlas programadas pendientes para este turno.</p>
                                                 </div>
                                                 <Button
                                                     variant="outline"
-                                                    className="border-[#0A3161] text-[#0A3161] font-black uppercase tracking-widest text-[10px] h-12 px-6 rounded-xl hover:bg-slate-50"
+                                                    className="w-full md:w-auto border-[#0A3161] text-[#0A3161] font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 px-6 rounded-xl hover:bg-slate-50"
                                                     onClick={() => setIsManualSelection(true)}
                                                 >
-                                                    <Plus className="w-4 h-4 mr-2" /> Realizar Charla No Programada
+                                                    <Plus className="w-4 h-4 mr-2" /> Realizar Charla Especial
                                                 </Button>
                                             </div>
                                         ) : isManualSelection && !selectedBulletin ? (
@@ -381,11 +383,11 @@ export function SafetyTalkWizard() {
                                                             ))}
 
                                                             <div
-                                                                className="p-4 border-2 border-dashed border-slate-200 rounded-xl hover:border-[#0A3161] hover:bg-[#0A3161]/5 cursor-pointer flex flex-col items-center justify-center text-center gap-2 transition-all mt-4"
+                                                                className="p-3 border-2 border-dashed border-slate-200 rounded-xl hover:border-[#0A3161] hover:bg-[#0A3161]/5 cursor-pointer flex flex-col items-center justify-center text-center gap-2 transition-all mt-4"
                                                                 onClick={() => setIsQuickCreating(true)}
                                                             >
-                                                                <Plus className="w-5 h-5 text-[#0A3161]" />
-                                                                <span className="text-[10px] font-black text-[#0A3161] uppercase tracking-widest">¿No encuentras el tema? Créalo ahora</span>
+                                                                <Plus className="w-4 h-4 text-[#0A3161]" />
+                                                                <span className="text-[9px] font-black text-[#0A3161] uppercase tracking-widest">¿No encuentras el tema? Créalo ahora</span>
                                                             </div>
                                                         </div>
                                                     </>
@@ -472,10 +474,10 @@ export function SafetyTalkWizard() {
                                                         <p className="text-[#B3D400] font-black text-xs uppercase tracking-[0.2em]">
                                                             {isManualSelection ? 'Charla No Programada' : 'Tema del Día'}
                                                         </p>
-                                                        <h2 className="text-3xl font-black text-[#0A3161] leading-tight">
+                                                        <h2 className="text-xl md:text-3xl font-black text-[#0A3161] leading-tight">
                                                             {selectedBulletin?.title}
                                                         </h2>
-                                                        <p className="text-slate-400 font-mono text-sm">{selectedBulletin?.code}</p>
+                                                        <p className="text-slate-400 font-mono text-[10px] md:text-sm">{selectedBulletin?.code}</p>
                                                     </div>
                                                     {isManualSelection && (
                                                         <Button variant="ghost" size="icon" onClick={() => setSelectedBulletin(null)} className="text-slate-300">
@@ -484,28 +486,28 @@ export function SafetyTalkWizard() {
                                                     )}
                                                 </div>
 
-                                                <div className="pt-6 flex gap-4">
+                                                <div className="pt-4 md:pt-6 flex flex-col sm:flex-row gap-4 items-center sm:items-end">
                                                     {selectedBulletin?.document_url && (
                                                         <Button
                                                             variant="outline"
-                                                            className="border-2 border-[#0A3161] text-[#0A3161] font-black uppercase text-xs tracking-widest hover:bg-[#0A3161] hover:text-white transition-all px-6 py-6"
+                                                            className="w-full sm:w-auto border-2 border-[#0A3161] text-[#0A3161] font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-[#0A3161] hover:text-white transition-all px-4 py-4 md:px-6 md:py-6"
                                                             onClick={() => window.open(selectedBulletin.document_url, '_blank')}
                                                         >
                                                             <FileText className="w-4 h-4 mr-2" /> Leer Boletín
                                                         </Button>
                                                     )}
-                                                    <div className="flex -space-x-2">
+                                                    <div className="flex -space-x-3">
                                                         {[1, 2, 3].map(i => (
-                                                            <div key={i} className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-black text-slate-400 uppercase">I360</div>
+                                                            <div key={i} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] md:text-[10px] font-black text-slate-400 uppercase shadow-sm">I360</div>
                                                         ))}
-                                                        <div className="w-10 h-10 rounded-full bg-[#B3D400] border-2 border-white flex items-center justify-center text-[10px] font-black text-[#0A3161]">+{employees.length}</div>
+                                                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#B3D400] border-2 border-white flex items-center justify-center text-[8px] md:text-[10px] font-black text-[#0A3161] shadow-sm">+{employees.length}</div>
                                                     </div>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
-                                    <div className={`md:col-span-2 p-10 flex flex-col items-center justify-center text-center space-y-6 transition-all duration-700 ${!selectedBulletin ? 'bg-slate-100' : 'bg-[#0A3161]'}`}>
-                                        <PlayCircle className={`w-20 h-20 transition-colors ${!selectedBulletin ? 'text-slate-300' : 'text-[#B3D400] animate-pulse'}`} strokeWidth={1.5} />
+                                    <div className={`md:col-span-2 p-6 md:p-10 flex flex-col items-center justify-center text-center space-y-4 md:space-y-6 transition-all duration-700 ${!selectedBulletin ? 'bg-slate-100' : 'bg-[#0A3161]'}`}>
+                                        <PlayCircle className={`w-16 h-16 md:w-20 md:h-20 transition-colors ${!selectedBulletin ? 'text-slate-300' : 'text-[#B3D400] animate-pulse'}`} strokeWidth={1.5} />
                                         <div className="space-y-1">
                                             <p className={`font-black text-xl uppercase tracking-tighter ${(!selectedBulletin && !isQuickCreating) || (isQuickCreating && !quickTitle) ? 'text-slate-400' : 'text-white'}`}>
                                                 {isQuickCreating ? (quickTitle ? '¿Listos con el tema?' : 'Creando...') : (!selectedBulletin ? 'Esperando...' : '¿Listos para iniciar?')}
@@ -516,7 +518,7 @@ export function SafetyTalkWizard() {
                                         </div>
                                         <Button
                                             size="lg"
-                                            className={`w-full font-black py-8 rounded-2xl shadow-2xl transition-all text-lg uppercase tracking-widest ${(!selectedBulletin && !isQuickCreating) || (isQuickCreating && !quickTitle) ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#B3D400] text-[#0A3161] hover:bg-[#c9ee00] hover:scale-[1.03] active:scale-95'}`}
+                                            className={`w-full font-black py-6 md:py-8 rounded-2xl shadow-2xl transition-all text-base md:text-lg uppercase tracking-widest ${(!selectedBulletin && !isQuickCreating) || (isQuickCreating && !quickTitle) ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#B3D400] text-[#0A3161] hover:bg-[#c9ee00] hover:scale-[1.03] active:scale-95'}`}
                                             onClick={handleStartTalk}
                                             disabled={(!selectedBulletin && !isQuickCreating) || (isQuickCreating && !quickTitle)}
                                         >
@@ -530,19 +532,19 @@ export function SafetyTalkWizard() {
 
                     {/* STEP 1: PRESENTER */}
                     {step === 1 && (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-4 border-[#0A3161]/10 pb-6">
+                        <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-4 border-[#0A3161]/10 pb-4 md:pb-6">
                                 <div className="space-y-1">
                                     <Badge className="bg-[#0A3161] text-white rounded-md mb-2">Paso 01</Badge>
-                                    <h2 className="text-4xl font-black text-[#0A3161] flex items-center gap-3">
+                                    <h2 className="text-2xl md:text-4xl font-black text-[#0A3161] flex items-center gap-3">
                                         Responsable de Charla
                                     </h2>
                                 </div>
-                                <div className="bg-white border-2 border-[#0A3161] rounded-2xl px-6 py-3 flex items-center gap-4 shadow-sm">
+                                <div className="bg-white border-2 border-[#0A3161] rounded-2xl px-4 py-2 md:px-6 md:py-3 flex items-center gap-4 shadow-sm self-start md:self-auto">
                                     <Clock className="w-5 h-5 text-[#0A3161]" />
                                     <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cronómetro Iniciado</p>
-                                        <p className="text-lg font-black text-[#0A3161]">{startTime ? new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+                                        <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Iniciado a las</p>
+                                        <p className="text-sm md:text-lg font-black text-[#0A3161] leading-none">{startTime ? new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -629,14 +631,14 @@ export function SafetyTalkWizard() {
                                 </Card>
                             </div>
 
-                            <div className="flex justify-end pt-10 border-t border-slate-100">
+                            <div className="flex justify-end pt-6 md:pt-10 border-t border-slate-100">
                                 <Button
                                     size="lg"
                                     onClick={handleNext}
                                     disabled={!presenterId || !presenterSignature}
-                                    className={`h-20 px-16 rounded-2xl font-black text-lg transition-all duration-500 shadow-xl ${presenterSignature ? 'bg-[#0A3161] hover:bg-[#0c3c75] text-white' : 'bg-slate-200 text-slate-400'}`}
+                                    className={`h-16 md:h-20 w-full md:w-auto px-10 md:px-16 rounded-2xl font-black text-base md:text-lg transition-all duration-500 shadow-xl ${presenterSignature ? 'bg-[#0A3161] hover:bg-[#0c3c75] text-white' : 'bg-slate-200 text-slate-400'}`}
                                 >
-                                    Siguiente: Asistencia <ChevronRight className="w-5 h-5 ml-2" />
+                                    Siguiente: Equipos <ChevronRight className="w-5 h-5 ml-2" />
                                 </Button>
                             </div>
                         </div>
@@ -644,21 +646,21 @@ export function SafetyTalkWizard() {
 
                     {/* STEP 2: ATTENDANCE */}
                     {step === 2 && (
-                        <div className="space-y-8">
-                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-4 border-[#0A3161]/10 pb-6">
+                        <div className="space-y-6 md:space-y-8">
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-4 border-[#0A3161]/10 pb-4 md:pb-6">
                                 <div className="space-y-1">
                                     <Badge className="bg-[#B3D400] text-[#0A3161] rounded-md mb-2">Paso 02</Badge>
-                                    <h2 className="text-4xl font-black text-[#0A3161]">Registro Colaboradores</h2>
+                                    <h2 className="text-2xl md:text-4xl font-black text-[#0A3161]">Registro Personal</h2>
                                 </div>
-                                <div className="bg-[#0A3161] rounded-2xl px-8 py-4 text-white shadow-xl flex items-center gap-6">
+                                <div className="bg-[#0A3161] rounded-2xl px-6 py-3 md:px-8 md:py-4 text-white shadow-xl flex items-center gap-4 md:gap-6 self-start md:self-auto">
                                     <div className="text-center">
-                                        <p className="text-[10px] font-black text-blue-200/50 uppercase tracking-widest">Colaboradores</p>
-                                        <p className="text-2xl font-black">{selectedEmployees.length}</p>
+                                        <p className="text-[9px] md:text-[10px] font-black text-blue-200/50 uppercase tracking-widest leading-none mb-1">Presentes</p>
+                                        <p className="text-xl md:text-2xl font-black">{selectedEmployees.length}</p>
                                     </div>
-                                    <div className="w-[1px] h-10 bg-white/10" />
+                                    <div className="w-[1px] h-8 md:h-10 bg-white/10" />
                                     <div className="text-center">
-                                        <p className="text-[10px] font-black text-blue-200/50 uppercase tracking-widest">Estación</p>
-                                        <p className="text-2xl font-black tracking-tighter">{currentStation}</p>
+                                        <p className="text-[9px] md:text-[10px] font-black text-blue-200/50 uppercase tracking-widest leading-none mb-1">Estación</p>
+                                        <p className="text-xl md:text-2xl font-black tracking-tighter">{currentStation}</p>
                                     </div>
                                 </div>
                             </div>
@@ -666,11 +668,11 @@ export function SafetyTalkWizard() {
 
                             {/* Search Bar for Attendees */}
                             <div className="sticky top-0 z-20 bg-[#F8FAFC] pb-4 pt-2">
-                                <div className="relative max-w-lg">
-                                    <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                                <div className="relative max-w-full">
+                                    <Search className="absolute left-3 top-3 h-4 w-4 md:h-5 md:w-5 text-slate-400" />
                                     <Input
-                                        placeholder="Buscar colaborador por nombre, DNI o cargo..."
-                                        className="pl-10 h-12 bg-white border-slate-200 rounded-xl shadow-sm text-lg"
+                                        placeholder="Filtrar por nombre, DNI o cargo..."
+                                        className="pl-9 md:pl-10 h-10 md:h-12 bg-white border-slate-200 rounded-xl shadow-sm md:text-lg"
                                         value={attendeeSearch}
                                         onChange={(e) => setAttendeeSearch(e.target.value)}
                                     />
@@ -775,17 +777,17 @@ export function SafetyTalkWizard() {
 
                     {/* STEP 3: SIGNATURES */}
                     {step === 3 && (
-                        <div className="space-y-8 pb-20">
-                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-4 border-[#0A3161]/10 pb-6">
+                        <div className="space-y-6 md:space-y-8 pb-10 md:pb-20">
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b-4 border-[#0A3161]/10 pb-4 md:pb-6">
                                 <div className="space-y-1">
                                     <Badge className="bg-[#0A3161] text-white rounded-md mb-2">Paso 03</Badge>
-                                    <h2 className="text-4xl font-black text-[#0A3161]">Ronda de Firmas</h2>
+                                    <h2 className="text-2xl md:text-4xl font-black text-[#0A3161]">Ronda de Firmas</h2>
                                 </div>
-                                <div className="flex gap-2">
-                                    <div className="bg-[#B3D400] px-6 py-2 rounded-xl text-[#0A3161] font-black flex items-center gap-3 shadow-lg">
-                                        <span className="text-2xl">{Object.keys(attendeeSignatures).length}</span>
+                                <div className="flex gap-2 self-start md:self-auto">
+                                    <div className="bg-[#B3D400] px-4 py-2 md:px-6 md:py-2 rounded-xl text-[#0A3161] font-black flex items-center gap-3 shadow-lg">
+                                        <span className="text-xl md:text-2xl">{Object.keys(attendeeSignatures).length}</span>
                                         <div className="w-[1px] h-6 bg-[#0A3161]/20" />
-                                        <span className="text-xs uppercase tracking-tighter">Firmados</span>
+                                        <span className="text-[10px] md:text-xs uppercase tracking-tighter">Firmados</span>
                                     </div>
                                 </div>
                             </div>
@@ -829,15 +831,15 @@ export function SafetyTalkWizard() {
                                 />
                             </div>
 
-                            <div className="flex justify-between pt-10">
-                                <Button variant="ghost" onClick={handleBack} className="font-black text-[#0A3161] uppercase tracking-widest text-xs">
-                                    ← Volver a Colaboradores
+                            <div className="flex flex-col md:flex-row gap-4 justify-between pt-6 md:pt-10">
+                                <Button variant="ghost" onClick={handleBack} className="w-full md:w-auto font-black text-[#0A3161] uppercase tracking-widest text-[10px] md:text-xs">
+                                    ← Volver al Personal
                                 </Button>
                                 <Button
                                     size="lg"
                                     onClick={handleNext}
                                     disabled={Object.keys(attendeeSignatures).length < selectedEmployees.length}
-                                    className={`h-20 px-16 rounded-2xl font-black text-lg transition-all duration-700 shadow-2xl ${Object.keys(attendeeSignatures).length === selectedEmployees.length ? 'bg-[#0A3161] text-white hover:bg-[#0c3c75] hover:scale-105' : 'bg-slate-200 text-slate-400'}`}
+                                    className={`h-16 md:h-20 px-10 md:px-16 rounded-2xl font-black text-base md:text-lg transition-all duration-700 shadow-2xl ${Object.keys(attendeeSignatures).length === selectedEmployees.length ? 'bg-[#0A3161] text-white hover:bg-[#0c3c75] hover:scale-105' : 'bg-slate-200 text-slate-400'}`}
                                 >
                                     Ver Resumen Final <ChevronRight className="w-6 h-6 ml-2" />
                                 </Button>
@@ -847,15 +849,15 @@ export function SafetyTalkWizard() {
 
                     {/* STEP 4: SUMMARY */}
                     {step === 4 && (
-                        <div className="max-w-4xl mx-auto space-y-10 animate-in zoom-in duration-700">
-                            <div className="text-center space-y-4">
+                        <div className="max-w-4xl mx-auto space-y-6 md:space-y-10 animate-in zoom-in duration-700 pb-10">
+                            <div className="text-center space-y-3 md:space-y-4">
                                 <motion.div animate={{ rotate: 360 }} transition={{ duration: 1 }} className="inline-block">
-                                    <div className="w-24 h-24 bg-[#B3D400] rounded-[30px] flex items-center justify-center shadow-xl mx-auto">
-                                        <CheckCircle className="w-14 h-14 text-[#0A3161]" strokeWidth={2.5} />
+                                    <div className="w-16 h-16 md:w-24 md:h-24 bg-[#B3D400] rounded-2xl md:rounded-[30px] flex items-center justify-center shadow-xl mx-auto">
+                                        <CheckCircle className="w-10 h-10 md:w-14 md:h-14 text-[#0A3161]" strokeWidth={2.5} />
                                     </div>
                                 </motion.div>
-                                <h2 className="text-5xl font-black text-[#0A3161] tracking-tighter">¡Charlas Lista!</h2>
-                                <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-[10px]">Verificación de cumplimiento finalizada</p>
+                                <h2 className="text-3xl md:text-5xl font-black text-[#0A3161] tracking-tighter">¡Charla Lista!</h2>
+                                <p className="text-slate-400 font-bold uppercase tracking-[0.2em] md:tracking-[0.3em] text-[9px] md:text-[10px]">Cierre de cumplimiento técnico finalizado</p>
                             </div>
 
                             <Card className="border-0 shadow-2xl rounded-[40px] overflow-hidden bg-white">
@@ -918,22 +920,22 @@ export function SafetyTalkWizard() {
                                 </CardContent>
                             </Card>
 
-                            <div className="flex justify-between pt-6 items-center">
-                                <Button variant="ghost" onClick={handleBack} disabled={loading} className="px-10 font-bold text-slate-300 hover:text-[#0A3161] uppercase text-xs tracking-widest">Regresar</Button>
+                            <div className="flex flex-col md:flex-row gap-4 justify-between pt-6 items-center">
+                                <Button variant="ghost" onClick={handleBack} disabled={loading} className="w-full md:w-auto px-10 font-bold text-slate-300 hover:text-[#0A3161] uppercase text-[10px] md:text-xs tracking-widest">Regresar</Button>
                                 <Button
                                     size="lg"
                                     onClick={handleSubmitExecution}
                                     disabled={loading}
-                                    className="bg-[#0A3161] hover:bg-[#0c3c75] text-white font-black px-16 h-24 text-xl rounded-[30px] shadow-2xl transition-all hover:scale-[1.05] active:scale-95 uppercase tracking-widest"
+                                    className="w-full md:w-auto bg-[#0A3161] hover:bg-[#0c3c75] text-white font-black px-12 md:px-16 h-16 md:h-24 text-lg md:text-xl rounded-2xl md:rounded-[30px] shadow-2xl transition-all hover:scale-[1.05] active:scale-95 uppercase tracking-widest"
                                 >
                                     {loading ? (
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-6 w-6 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                                        <div className="flex items-center gap-4 justify-center">
+                                            <div className="h-5 w-5 md:h-6 md:w-6 border-4 border-white/20 border-t-white rounded-full animate-spin" />
                                             PROCESANDO
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-4">
-                                            FINALIZAR REGISTRO <CheckCircle className="w-6 h-6" />
+                                        <div className="flex items-center gap-4 justify-center">
+                                            FINALIZAR <CheckCircle className="w-5 h-5 md:w-6 md:h-6" />
                                         </div>
                                     )}
                                 </Button>

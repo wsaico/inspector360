@@ -8,6 +8,7 @@ import { useAuth, usePermissions } from '@/hooks';
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { profile, user, loading, signOut } = useAuth();
   const permissions = usePermissions();
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const canViewAllStations = permissions.canViewAllStations;
 
   return (
@@ -17,6 +18,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         permissions={permissions}
         loading={loading}
         signOut={signOut}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -25,6 +28,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           profile={profile}
           user={user}
           canViewAllStations={canViewAllStations}
+          onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">

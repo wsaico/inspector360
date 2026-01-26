@@ -28,6 +28,8 @@ interface SidebarProps {
   permissions: RolePermissions;
   loading: boolean;
   signOut: () => Promise<{ success: boolean; error: string | null }>;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 interface NavItem {
@@ -105,12 +107,11 @@ const navigationGroups: NavGroup[] = [
   }
 ];
 
-export function Sidebar({ permissions, loading, signOut }: SidebarProps) {
+export function Sidebar({ permissions, loading, signOut, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
   const [inspectionTypes, setInspectionTypes] = useState<InspectionSystemType[]>([]);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     'Inspecciones': true,
     'Charlas de Seguridad': true,
@@ -151,27 +152,16 @@ export function Sidebar({ permissions, loading, signOut }: SidebarProps) {
 
   return (
     <>
-      <div className="lg:hidden fixed top-4 right-4 z-[60]">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="bg-[#0A3161] border-white/10 text-white h-12 w-12 shadow-2xl rounded-2xl"
-        >
-          {isMobileOpen ? <CloseIcon className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </Button>
-      </div>
-
-      {isMobileOpen && (
+      {isOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[50] lg:hidden"
-          onClick={() => setIsMobileOpen(false)}
+          onClick={onClose}
         />
       )}
 
       <aside className={cn(
         "fixed inset-y-0 left-0 z-[55] w-72 transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 shadow-2xl lg:shadow-none h-full bg-[#0A3161]",
-        isMobileOpen ? "translate-x-0" : "-translate-x-full"
+        isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex h-full flex-col">
           <div className="flex h-20 items-center gap-3 px-6 border-b border-white/5 bg-white/5 backdrop-blur-sm shrink-0">
@@ -235,7 +225,7 @@ export function Sidebar({ permissions, loading, signOut }: SidebarProps) {
                                     <Link
                                       key={type.id}
                                       href={`/inspections/${type.code}`}
-                                      onClick={() => setIsMobileOpen(false)}
+                                      onClick={onClose}
                                       className={cn(
                                         'flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-bold uppercase transition-all',
                                         pathname === `/inspections/${type.code}` ? 'text-[#B3D400] bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5'
@@ -261,7 +251,7 @@ export function Sidebar({ permissions, loading, signOut }: SidebarProps) {
                                       <Link
                                         key={sub.href}
                                         href={sub.href}
-                                        onClick={() => setIsMobileOpen(false)}
+                                        onClick={onClose}
                                         className={cn(
                                           'flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-bold uppercase transition-all',
                                           isSubActive ? 'text-[#B3D400] bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5'
@@ -281,7 +271,7 @@ export function Sidebar({ permissions, loading, signOut }: SidebarProps) {
                           <Link
                             key={item.href}
                             href={item.href}
-                            onClick={() => setIsMobileOpen(false)}
+                            onClick={onClose}
                             className={cn(
                               'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-black transition-all',
                               isActive ? 'bg-[#B3D400]/10 text-white border-l-2 border-[#B3D400]' : 'text-white/60 hover:bg-white/5 hover:text-white'
