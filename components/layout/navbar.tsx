@@ -224,8 +224,8 @@ export function Navbar({ profile, user, canViewAllStations, onMenuToggle }: Navb
           <Menu className="h-6 w-6 text-gray-600" />
         </Button>
 
-        {/* Logo oficial en móvil */}
-        <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+        {/* Logo oficial en móvil - Oculto en desktop para evitar duplicidad */}
+        <Link href="/dashboard" className="flex items-center gap-2 shrink-0 lg:hidden">
           <img src="/I360.svg" alt="Inspector 360" className="h-7 md:h-10 w-auto" />
         </Link>
 
