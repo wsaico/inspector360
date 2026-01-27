@@ -605,20 +605,17 @@ export class PDFGenerator {
 
   // Formatea fecha preservando día cuando llega como string
   private formatDateLocal(input: Date | string): string {
-    if (typeof input === 'string') {
-      const m = input.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
-      if (m) return `${m[3]}/${m[2]}/${m[1]}`;
-    }
-    return format(typeof input === 'string' ? new Date(input) : input, 'dd/MM/yyyy', { locale: es });
+    const timeZone = 'America/Lima';
+    const date = typeof input === 'string' ? new Date(input) : input;
+    const zonedDate = toZonedTime(date, timeZone);
+    return format(zonedDate, 'dd/MM/yyyy', { locale: es });
   }
 
   private formatTimeLocal(input: Date | string): string {
-    if (typeof input === 'string') {
-      const m = input.match(/T(\d{2}):(\d{2})/);
-      if (m) return `${m[1]}:${m[2]}`;
-      return '';
-    }
-    return format(input, 'HH:mm', { locale: es });
+    const timeZone = 'America/Lima';
+    const date = typeof input === 'string' ? new Date(input) : input;
+    const zonedDate = toZonedTime(date, timeZone);
+    return format(zonedDate, 'HH:mm', { locale: es });
   }
 
   /**
