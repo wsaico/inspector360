@@ -7,6 +7,9 @@ import { useSearchParams } from 'next/navigation';
 import { InspectionService } from '@/lib/services';
 import { supabase } from '@/lib/supabase/client';
 import { isChecklistItemApplicable } from '@/lib/checklist-logic';
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 
 function TemplateWithData() {
   const { formData } = useInspectionForm();
@@ -184,9 +187,9 @@ function TemplateWithData() {
       try {
         const d = typeof val === 'string' ? new Date(val) : new Date(val);
         if (isNaN(d.getTime())) return '';
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mi = String(d.getMinutes()).padStart(2, '0');
-        return `${hh}:${mi}`;
+        // Convertir a Lima para visualización correcta
+        const zoned = toZonedTime(d, 'America/Lima');
+        return format(zoned, 'HH:mm', { locale: es });
       } catch {
         return '';
       }
@@ -195,8 +198,8 @@ function TemplateWithData() {
     if (remote) {
       const equipment = (remote.equipment || []).map((eq: any) => ({
         code: eq.code,
-        // Hora por equipo: prioriza updated_at, luego created_at, y finalmente la fecha global
-        hour: getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
+        // Hora por equipo: prioriza eq.hour (si existe), luego updated_at, luego created_at, y finalmente la fecha global
+        hour: (eq as any)?.hour || getHour((eq as any)?.updated_at || (eq as any)?.created_at || remote.inspection_date),
         checklist_data: (Object.fromEntries(
           Array.from({ length: 14 }, (_, i) => {
             const code = `CHK-${String(i + 1).padStart(2, '0')}`;
