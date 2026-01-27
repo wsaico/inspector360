@@ -513,7 +513,9 @@ export default function InspectionDetailPage() {
               <p className="text-sm text-muted-foreground mt-0.5">
                 {(() => {
                   try {
-                    const d = new Date(inspection.inspection_date);
+                    // Priorizar fecha de actualización o creación para tener la hora exacta, igual que en el PDF
+                    const timestamp = inspection.updated_at || inspection.created_at || inspection.inspection_date;
+                    const d = new Date(timestamp);
                     const zoned = toZonedTime(d, 'America/Lima');
                     return format(zoned, 'h:mm a', { locale: es });
                   } catch { return ''; }
