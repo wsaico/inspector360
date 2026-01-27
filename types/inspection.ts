@@ -82,6 +82,7 @@ export interface Equipment {
   checklist_data: Record<string, ChecklistItem>;
   order_index: number;
   description?: string;
+  hour?: string;
 }
 
 export interface Observation {

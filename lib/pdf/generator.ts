@@ -347,7 +347,7 @@ export class PDFGenerator {
         if (st === 'no_aplica') return 'N/A';
         return '';
       });
-      return [eq.code || '-', hourStr, ...values, ''];
+      return [eq.code || '-', eq.hour || hourStr, ...values, ''];
     });
 
     const usableW = this.pageWidth - this.margin * 2;
