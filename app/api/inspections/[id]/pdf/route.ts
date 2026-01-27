@@ -51,7 +51,6 @@ export async function GET(
                     id,
                     code,
                     type,
-                    hour,
                     checklist_data,
                     inspector_signature_url,
                     updated_at,
