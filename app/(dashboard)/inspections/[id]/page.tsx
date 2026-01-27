@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { InspectionService } from '@/lib/services';
 import { handleSessionError } from '@/lib/supabase/session-validator';
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -507,6 +510,15 @@ export default function InspectionDetailPage() {
                 Fecha de Inspección
               </div>
               <p className="font-semibold">{formatInspectionDate(inspection.inspection_date)}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {(() => {
+                  try {
+                    const d = new Date(inspection.inspection_date);
+                    const zoned = toZonedTime(d, 'America/Lima');
+                    return format(zoned, 'h:mm a', { locale: es });
+                  } catch { return ''; }
+                })()}
+              </p>
             </div>
             <div>
               <div className="flex items-center text-sm text-muted-foreground mb-1">
