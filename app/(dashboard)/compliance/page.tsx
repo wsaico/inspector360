@@ -67,10 +67,15 @@ export default function CompliancePage() {
   const [stationDailyStatus, setStationDailyStatus] = useState<any[]>([]);
 
   // New State for Safety Talks
-  const [safetyStats, setSafetyStats] = useState({
+  // New State for Safety Talks
+  const [safetyStats, setSafetyStats] = useState<{
+    execution: { totalScheduled: number; totalExecuted: number; rate: number };
+    punctuality: { totalExecuted: number; onTime: number; rate: number; regularizationRate: number };
+    pending: Array<{ date: string; title: string; type: 'global' | 'specific'; missingCount: number }>;
+  }>({
     execution: { totalScheduled: 0, totalExecuted: 0, rate: 0 },
     punctuality: { totalExecuted: 0, onTime: 0, rate: 0, regularizationRate: 0 },
-    pending: [] // Add pending array to state
+    pending: [] // Now correctly typed
   });
 
   // New State for Safety Talks Breakdown
@@ -137,6 +142,7 @@ export default function CompliancePage() {
 
       // @ts-ignore
       if (stationDailyStatusRes.data) setStationDailyStatus(stationDailyStatusRes.data);
+      // @ts-ignore
       if (safetyStatsRes.data) setSafetyStats(safetyStatsRes.data);
       // @ts-ignore
       if (safetyBreakdownRes.data) setSafetyTalksBreakdown(safetyBreakdownRes.data);

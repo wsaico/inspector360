@@ -834,8 +834,10 @@ export class ComplianceService {
 
       // A) EJECUCIÓN
       // Total Programado: Expandir globales según el número de estaciones aplicables
+
+      // Total Programado: Expandir globales según el número de estaciones aplicables
       let calculatedTotalScheduled = 0;
-      schedules?.forEach(sch => {
+      schedules?.forEach((sch: any) => {
         if (sch.station_code) {
           // Programación específica: cuenta como 1
           calculatedTotalScheduled += 1;
@@ -844,50 +846,7 @@ export class ComplianceService {
           calculatedTotalScheduled += applicableStationsCount;
         }
       });
-
-      const totalScheduled = calculatedTotalScheduled;
-      const totalExecuted = executions?.length || 0;
-
-      const executionRate = totalScheduled > 0
-        ? Math.min(100, Math.round((totalExecuted / totalScheduled) * 100))
-        : (totalExecuted > 0 ? 100 : 0); // Si no hubo programado pero sí ejecutado, 100%.
-
-      // B) PUNTUALIDAD
-      // El usuario prefiere que la puntualidad refleje el cumplimiento GLOBAL.
-      // Es decir: % de PUNTUALES respecto al TOTAL PROGRAMADO.
-      // Si hay 10 programadas y solo 1 se hace (puntual), la puntualidad es 10% (no 100%).
-
-      let onTimeCount = 0;
-      let lateCount = 0;
-
-      executions?.forEach((ex: any) => {
-        if (!ex.created_at || !ex.executed_at) return;
-
-        const executedDate = new Date(ex.executed_at);
-        const createdDate = new Date(ex.created_at);
-        const execDay = new Date(executedDate.getFullYear(), executedDate.getMonth(), executedDate.getDate());
-        const createDay = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
-
-        const diffValid = createDay.getTime() - execDay.getTime();
-        const diffDays = Math.floor(diffValid / (1000 * 60 * 60 * 24));
-
-        if (diffDays <= 1) {
-          onTimeCount++;
-        } else {
-          lateCount++;
-        }
-      });
-
-      const punctualityRate = totalScheduled > 0
-        ? Math.round((onTimeCount / totalScheduled) * 100)
-        : (totalExecuted > 0 && onTimeCount > 0 ? 100 : 0); // Fallback si no hubo programado pero sí puntual
-
-      // C) REGULARIZACIÓN
-      // Ahora también respecto al TOTAL PROGRAMADO para que sumen lógico (Puntual + Tarde = Ejecutado)
-      const regularizationRate = totalScheduled > 0
-        ? Math.round((lateCount / totalScheduled) * 100)
-        : (totalExecuted > 0 && lateCount > 0 ? 100 : 0);
-
+      // ... 
       // D) LISTA DE PENDIENTES
       const pendingList: Array<{ date: string; title: string; type: 'global' | 'specific'; missingCount: number }> = [];
 
@@ -902,68 +861,143 @@ export class ComplianceService {
       schedules?.forEach((sch: any) => {
         const executionsCount = executionsBySchedule[sch.id] || 0;
         let requiredCount = 0;
-        let type: 'global' | 'specific' = 'specific';
+        // ...
+        // Calcular Rates finales
+        const result = Object.values(statsMap).map((s: any) => {
+          const execRate = s.scheduled > 0
+          // ...
+          schedules?.forEach((sch: any) => {
+            // Si tiene station_code, asignar a esa. Si es null (Global), asignar a TODAS las activas.
+            // ...
+            // Procesar Executions (Ejecución y Puntualidad)
+            executions?.forEach((exc: any) => {
+              if (statsMap[exc.station_code]) {
+                calculatedTotalScheduled += 1;
+              } else {
+                // Programación global: cuenta como N (todas las estaciones del alcance actual)
+                calculatedTotalScheduled += applicableStationsCount;
+              }
+            });
 
-        if (sch.station_code) {
-          requiredCount = 1;
-          type = 'specific';
-        } else {
-          requiredCount = applicableStationsCount;
-          type = 'global';
+            const totalScheduled = calculatedTotalScheduled;
+            const totalExecuted = executions?.length || 0;
+
+            const executionRate = totalScheduled > 0
+              ? Math.min(100, Math.round((totalExecuted / totalScheduled) * 100))
+              : (totalExecuted > 0 ? 100 : 0); // Si no hubo programado pero sí ejecutado, 100%.
+
+            // B) PUNTUALIDAD
+            // El usuario prefiere que la puntualidad refleje el cumplimiento GLOBAL.
+            // Es decir: % de PUNTUALES respecto al TOTAL PROGRAMADO.
+            // Si hay 10 programadas y solo 1 se hace (puntual), la puntualidad es 10% (no 100%).
+
+            let onTimeCount = 0;
+            let lateCount = 0;
+
+            executions?.forEach((ex: any) => {
+              if (!ex.created_at || !ex.executed_at) return;
+
+              const executedDate = new Date(ex.executed_at);
+              const createdDate = new Date(ex.created_at);
+              const execDay = new Date(executedDate.getFullYear(), executedDate.getMonth(), executedDate.getDate());
+              const createDay = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
+
+              const diffValid = createDay.getTime() - execDay.getTime();
+              const diffDays = Math.floor(diffValid / (1000 * 60 * 60 * 24));
+
+              if (diffDays <= 1) {
+                onTimeCount++;
+              } else {
+                lateCount++;
+              }
+            });
+
+            const punctualityRate = totalScheduled > 0
+              ? Math.round((onTimeCount / totalScheduled) * 100)
+              : (totalExecuted > 0 && onTimeCount > 0 ? 100 : 0); // Fallback si no hubo programado pero sí puntual
+
+            // C) REGULARIZACIÓN
+            // Ahora también respecto al TOTAL PROGRAMADO para que sumen lógico (Puntual + Tarde = Ejecutado)
+            const regularizationRate = totalScheduled > 0
+              ? Math.round((lateCount / totalScheduled) * 100)
+              : (totalExecuted > 0 && lateCount > 0 ? 100 : 0);
+
+            // D) LISTA DE PENDIENTES
+            const pendingList: Array<{ date: string; title: string; type: 'global' | 'specific'; missingCount: number }> = [];
+
+            // Mapa para contar ejecuciones por Schedule ID
+            const executionsBySchedule: Record<string, number> = {};
+            executions?.forEach((ex: any) => {
+              if (ex.schedule_id) {
+                executionsBySchedule[ex.schedule_id] = (executionsBySchedule[ex.schedule_id] || 0) + 1;
+              }
+            });
+
+            schedules?.forEach((sch: any) => {
+              const executionsCount = executionsBySchedule[sch.id] || 0;
+              let requiredCount = 0;
+              let type: 'global' | 'specific' = 'specific';
+
+              if (sch.station_code) {
+                requiredCount = 1;
+                type = 'specific';
+              } else {
+                requiredCount = applicableStationsCount;
+                type = 'global';
+              }
+
+              const missing = requiredCount - executionsCount;
+              if (missing > 0) {
+                pendingList.push({
+                  date: sch.scheduled_date,
+                  title: sch.bulletin?.title || 'Charla Programada',
+                  type,
+                  missingCount: missing
+                });
+              }
+            });
+
+            // Ordenar pendientes por fecha (más reciente primero)
+            pendingList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+            return {
+              data: {
+                execution: {
+                  totalScheduled,
+                  totalExecuted,
+                  rate: executionRate
+                },
+                punctuality: {
+                  totalExecuted,
+                  onTime: onTimeCount,
+                  rate: punctualityRate,
+                  regularizationRate
+                },
+                pending: pendingList
+              },
+              error: null
+            };
+
+          } catch (error: any) {
+            console.error('Error fetching safety talk stats:', error);
+            return { data: null, error: error.message };
+          }
         }
-
-        const missing = requiredCount - executionsCount;
-        if (missing > 0) {
-          pendingList.push({
-            date: sch.scheduled_date,
-            title: sch.bulletin?.title || 'Charla Programada',
-            type,
-            missingCount: missing
-          });
-        }
-      });
-
-      // Ordenar pendientes por fecha (más reciente primero)
-      pendingList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      return {
-        data: {
-          execution: {
-            totalScheduled,
-            totalExecuted,
-            rate: executionRate
-          },
-          punctuality: {
-            totalExecuted,
-            onTime: onTimeCount,
-            rate: punctualityRate,
-            regularizationRate
-          },
-          pending: pendingList
-        },
-        error: null
-      };
-
-    } catch (error: any) {
-      console.error('Error fetching safety talk stats:', error);
-      return { data: null, error: error.message };
-    }
-  }
   /**
    * Obtiene ranking de cumplimiento de charlas por estación
    */
-  static async getSafetyTalkStationStatus(filters?: { startDate?: string; endDate?: string; month?: string; stations?: string[] }) {
-    try {
-      const { start, end } = ComplianceService.getDateRange(filters);
+  static async getSafetyTalkStationStatus(filters ?: { startDate?: string; endDate?: string; month?: string; stations?: string[] }) {
+          try {
+            const { start, end } = ComplianceService.getDateRange(filters);
 
-      // 1. Obtener todas las estaciones activas
-      let stationsQuery = supabase
-        .from('stations')
-        .select('code, name')
-        .eq('is_active', true);
+            // 1. Obtener todas las estaciones activas
+            let stationsQuery = supabase
+              .from('stations')
+              .select('code, name')
+              .eq('is_active', true);
 
-      if (filters?.stations && filters.stations.length > 0) {
-        stationsQuery = stationsQuery.in('code', filters.stations);
+            if(filters?.stations && filters.stations.length > 0) {
+              stationsQuery = stationsQuery.in('code', filters.stations);
       }
 
       const { data: stations, error: stationsError } = await stationsQuery;
