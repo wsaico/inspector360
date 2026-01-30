@@ -754,4 +754,315 @@ export class ComplianceService {
       return { data: null, error: error.message };
     }
   }
+  /**
+   * Obtiene estadísticas de Cumplimiento de Charlas de Seguridad
+   * - Ejecución: Realizadas vs Programadas
+   * - Puntualidad: Realizadas a tiempo vs Total Realizadas
+   */
+  static async getSafetyTalkStats(filters?: { startDate?: string; endDate?: string; month?: string; stations?: string[]; station?: string }) {
+    try {
+      const { start, end } = ComplianceService.getDateRange(filters);
+
+      // 1. Obtener Programaciones (Scheduled) en el rango
+      let scheduleQuery = supabase
+        .from('talk_schedules')
+        .select(`
+          id, 
+          scheduled_date, 
+          station_code, 
+          is_completed,
+          bulletin:bulletins(title)
+        `, { count: 'exact', head: false })
+        .gte('scheduled_date', start)
+        .lte('scheduled_date', end);
+
+      // Filtro de estación para SCHEDULES (Nota: station_code pude ser null si es Global)
+      // Si el filtro de estaciones está activo, debemos incluir las globales O las específicas
+      if (filters?.stations && filters.stations.length > 0) {
+        // Lógica compleja para OR (station_code is NULL OR station_code in filters)
+        // Por simplicidad, asumimos que si hay filtro, queremos ver lo específico de esas estaciones + globales
+        // Supabase OR syntax: .or(`station_code.in.(${filters.stations.join(',')}),station_code.is.null`)
+        // Pero para "Cumplimiento" estricto de una estación, la global cuenta.
+        scheduleQuery = scheduleQuery.or(`station_code.in.(${filters.stations.map(s => `"${s}"`).join(',')}),station_code.is.null`);
+      } else if (filters?.station) {
+        scheduleQuery = scheduleQuery.or(`station_code.eq."${filters.station}",station_code.is.null`);
+      }
+
+      const { data: schedules, error: scheduleError } = await scheduleQuery;
+      if (scheduleError) throw scheduleError;
+
+      // 2. Obtener Ejecuciones (Executions) en el rango
+      let executionQuery = supabase
+        .from('talk_executions')
+        .select('id, executed_at, created_at, station_code, schedule_id')
+        .gte('executed_at', start)
+        .lte('executed_at', end);
+
+      if (filters?.stations && filters.stations.length > 0) {
+        executionQuery = executionQuery.in('station_code', filters.stations);
+      } else if (filters?.station) { // Fallback legacy
+        executionQuery = executionQuery.eq('station_code', filters.station);
+      }
+
+      const { data: executions, error: executionError } = await executionQuery;
+      if (executionError) throw executionError;
+
+      // --- CÁLCULOS ---
+
+      // A) EJECUCIÓN
+      // Total Programado: Todas las schedules en el rango.
+      // Total Ejecutado: Executions en el rango.
+      // Nota: Una ejecución puede no tener schedule (ad-hoc).
+      // 0. Determinar el "Universo" de estaciones aplicables para expandir las Globales
+      let applicableStationsCount = 0;
+      if (filters?.stations && filters.stations.length > 0) {
+        applicableStationsCount = filters.stations.length;
+      } else if (filters?.station) {
+        applicableStationsCount = 1;
+      } else {
+        // Si no hay filtro, obtenemos el total de estaciones activas
+        const { count, error: countError } = await supabase
+          .from('stations')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true);
+        if (!countError) {
+          applicableStationsCount = count || 0;
+        }
+      }
+
+      // --- CÁLCULOS ---
+
+      // A) EJECUCIÓN
+      // Total Programado: Expandir globales según el número de estaciones aplicables
+      let calculatedTotalScheduled = 0;
+      schedules?.forEach(sch => {
+        if (sch.station_code) {
+          // Programación específica: cuenta como 1
+          calculatedTotalScheduled += 1;
+        } else {
+          // Programación global: cuenta como N (todas las estaciones del alcance actual)
+          calculatedTotalScheduled += applicableStationsCount;
+        }
+      });
+
+      const totalScheduled = calculatedTotalScheduled;
+      const totalExecuted = executions?.length || 0;
+
+      const executionRate = totalScheduled > 0
+        ? Math.min(100, Math.round((totalExecuted / totalScheduled) * 100))
+        : (totalExecuted > 0 ? 100 : 0); // Si no hubo programado pero sí ejecutado, 100%.
+
+      // B) PUNTUALIDAD
+      // El usuario prefiere que la puntualidad refleje el cumplimiento GLOBAL.
+      // Es decir: % de PUNTUALES respecto al TOTAL PROGRAMADO.
+      // Si hay 10 programadas y solo 1 se hace (puntual), la puntualidad es 10% (no 100%).
+
+      let onTimeCount = 0;
+      let lateCount = 0;
+
+      executions?.forEach((ex: any) => {
+        if (!ex.created_at || !ex.executed_at) return;
+
+        const executedDate = new Date(ex.executed_at);
+        const createdDate = new Date(ex.created_at);
+        const execDay = new Date(executedDate.getFullYear(), executedDate.getMonth(), executedDate.getDate());
+        const createDay = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
+
+        const diffValid = createDay.getTime() - execDay.getTime();
+        const diffDays = Math.floor(diffValid / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 1) {
+          onTimeCount++;
+        } else {
+          lateCount++;
+        }
+      });
+
+      const punctualityRate = totalScheduled > 0
+        ? Math.round((onTimeCount / totalScheduled) * 100)
+        : (totalExecuted > 0 && onTimeCount > 0 ? 100 : 0); // Fallback si no hubo programado pero sí puntual
+
+      // C) REGULARIZACIÓN
+      // Ahora también respecto al TOTAL PROGRAMADO para que sumen lógico (Puntual + Tarde = Ejecutado)
+      const regularizationRate = totalScheduled > 0
+        ? Math.round((lateCount / totalScheduled) * 100)
+        : (totalExecuted > 0 && lateCount > 0 ? 100 : 0);
+
+      // D) LISTA DE PENDIENTES
+      const pendingList: Array<{ date: string; title: string; type: 'global' | 'specific'; missingCount: number }> = [];
+
+      // Mapa para contar ejecuciones por Schedule ID
+      const executionsBySchedule: Record<string, number> = {};
+      executions?.forEach((ex: any) => {
+        if (ex.schedule_id) {
+          executionsBySchedule[ex.schedule_id] = (executionsBySchedule[ex.schedule_id] || 0) + 1;
+        }
+      });
+
+      schedules?.forEach((sch: any) => {
+        const executionsCount = executionsBySchedule[sch.id] || 0;
+        let requiredCount = 0;
+        let type: 'global' | 'specific' = 'specific';
+
+        if (sch.station_code) {
+          requiredCount = 1;
+          type = 'specific';
+        } else {
+          requiredCount = applicableStationsCount;
+          type = 'global';
+        }
+
+        const missing = requiredCount - executionsCount;
+        if (missing > 0) {
+          pendingList.push({
+            date: sch.scheduled_date,
+            title: sch.bulletin?.title || 'Charla Programada',
+            type,
+            missingCount: missing
+          });
+        }
+      });
+
+      // Ordenar pendientes por fecha (más reciente primero)
+      pendingList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      return {
+        data: {
+          execution: {
+            totalScheduled,
+            totalExecuted,
+            rate: executionRate
+          },
+          punctuality: {
+            totalExecuted,
+            onTime: onTimeCount,
+            rate: punctualityRate,
+            regularizationRate
+          },
+          pending: pendingList
+        },
+        error: null
+      };
+
+    } catch (error: any) {
+      console.error('Error fetching safety talk stats:', error);
+      return { data: null, error: error.message };
+    }
+  }
+  /**
+   * Obtiene ranking de cumplimiento de charlas por estación
+   */
+  static async getSafetyTalkStationStatus(filters?: { startDate?: string; endDate?: string; month?: string; stations?: string[] }) {
+    try {
+      const { start, end } = ComplianceService.getDateRange(filters);
+
+      // 1. Obtener todas las estaciones activas
+      let stationsQuery = supabase
+        .from('stations')
+        .select('code, name')
+        .eq('is_active', true);
+
+      if (filters?.stations && filters.stations.length > 0) {
+        stationsQuery = stationsQuery.in('code', filters.stations);
+      }
+
+      const { data: stations, error: stationsError } = await stationsQuery;
+      if (stationsError) throw stationsError;
+
+      // 2. Fetch Schedules
+      const { data: schedules, error: scheduleError } = await supabase
+        .from('talk_schedules')
+        .select('id, station_code, is_completed')
+        .gte('scheduled_date', start)
+        .lte('scheduled_date', end);
+
+      if (scheduleError) throw scheduleError;
+
+      // 3. Fetch Executions
+      const { data: executions, error: executionError } = await supabase
+        .from('talk_executions')
+        .select('id, station_code, executed_at, created_at')
+        .gte('executed_at', start)
+        .lte('executed_at', end);
+
+      if (executionError) throw executionError;
+
+      // 4. Calcular stats por estación
+      const statsMap: Record<string, any> = {};
+
+      stations?.forEach(s => {
+        statsMap[s.code] = {
+          name: s.name,
+          code: s.code,
+          scheduled: 0,
+          executed: 0,
+          onTime: 0,
+          executionRate: 0,
+          punctualityRate: 0,
+          status: 'pending' // pending | good | warning | critical
+        };
+      });
+
+      // Procesar Schedules (Ejecución)
+      schedules?.forEach(sch => {
+        // Si tiene station_code, asignar a esa. Si es null (Global), asignar a TODAS las activas.
+        if (sch.station_code && statsMap[sch.station_code]) {
+          statsMap[sch.station_code].scheduled++;
+        } else if (!sch.station_code) {
+          // Charlas globales cuentan para todas
+          Object.keys(statsMap).forEach(code => {
+            statsMap[code].scheduled++;
+          });
+        }
+      });
+
+      // Procesar Executions (Ejecución y Puntualidad)
+      executions?.forEach(exc => {
+        if (statsMap[exc.station_code]) {
+          statsMap[exc.station_code].executed++;
+
+          // Puntualidad Check
+          if (exc.executed_at && exc.created_at) {
+            const execDate = new Date(exc.executed_at).setHours(0, 0, 0, 0);
+            const createDate = new Date(exc.created_at).setHours(0, 0, 0, 0);
+            const diffDays = (createDate - execDate) / (1000 * 60 * 60 * 24);
+
+            if (diffDays <= 1) { // Tolerancia 1 día
+              statsMap[exc.station_code].onTime++;
+            }
+          }
+        }
+      });
+
+      // Calcular Rates finales
+      const result = Object.values(statsMap).map((s: any) => {
+        const execRate = s.scheduled > 0
+          ? Math.round((s.executed / s.scheduled) * 100)
+          : (s.executed > 0 ? 100 : 0);
+
+        // Alineado con el KPI Global: Puntualidad sobre Total Programado
+        const punctRate = s.scheduled > 0
+          ? Math.round((s.onTime / s.scheduled) * 100)
+          : (s.executed > 0 && s.onTime > 0 ? 100 : 0);
+
+        return {
+          ...s,
+          executionRate: Math.min(100, execRate),
+          punctualityRate: punctRate
+        };
+      });
+
+      // Ordenar: Prioridad a los que tienen problemas (Menor Ejecución, luego Menor Puntualidad)
+      result.sort((a, b) => {
+        if (a.executionRate !== b.executionRate) return a.executionRate - b.executionRate;
+        return a.punctualityRate - b.punctualityRate;
+      });
+
+      return { data: result, error: null };
+
+    } catch (error: any) {
+      console.error('Error in getSafetyTalkStationStatus:', error);
+      return { data: null, error: error.message };
+    }
+  }
 }

@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import {
     Plus, X, PlayCircle, Clock, FileText, UserCheck, Users,
     ChevronRight, ChevronLeft, PenTool, CheckCircle,
-    AlertCircle, Search, Building2, Loader2
+    AlertCircle, Search, Building2, Loader2, Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -37,12 +37,16 @@ import { Info } from 'lucide-react';
 // 3: Signatures
 // 4: Summary
 
-export function SafetyTalkWizard() {
+export function SafetyTalkWizard({ editId }: { editId?: string }) {
     const { profile } = useAuth();
     const router = useRouter();
-    const [step, setStep] = useState(0);
+    const [step, setStep] = useState(editId ? 2 : 0);
     const [direction, setDirection] = useState(0);
     const [loading, setLoading] = useState(true);
+
+    // Edit Mode State
+    const isEditMode = !!editId;
+    const [originalAttendeeIds, setOriginalAttendeeIds] = useState<string[]>([]);
 
     // Data State
     const [currentStation, setCurrentStation] = useState<string>('LIM');
@@ -86,6 +90,48 @@ export function SafetyTalkWizard() {
     useEffect(() => {
         const load = async () => {
             setLoading(true);
+
+            if (isEditMode && editId) {
+                // Load existing execution
+                const { data: execution, error } = await SafetyTalksService.getExecution(editId);
+
+                if (error || !execution) {
+                    toast.error('Error cargando charla: ' + (error || 'No encontrada'));
+                    return;
+                }
+
+                // Set Schedule/Bulletin Data
+                setSchedule(execution.schedule || null);
+                setSelectedBulletin(execution.bulletin || null);
+                setPresenterId(execution.presenter_id || '');
+                setPresenterSignature(execution.presenter_signature || '');
+                setStartTime(execution.start_time || new Date().toISOString());
+                setObservations(execution.observations || '');
+                setActivityType(execution.activity_type || 'charla');
+                setCurrentStation(execution.station_code);
+
+                // Set Attendees
+                // We keep original IDs to lock them and identifying new ones
+                const originalIds = execution.attendees?.map((a: any) => a.employee_id) || [];
+                setOriginalAttendeeIds(originalIds);
+                setSelectedEmployees(originalIds);
+
+                // Restore signatures for display
+                const sigs: Record<string, string> = {};
+                execution.attendees?.forEach((a: any) => {
+                    if (a.signature) sigs[a.employee_id] = a.signature;
+                });
+                setAttendeeSignatures(sigs);
+
+                // Load station employees to allow adding new ones
+                const { data: emps } = await SafetyTalksService.getStationEmployees(execution.station_code);
+                setEmployees(sortEmployeesByHierarchy(emps || []));
+
+                setLoading(false);
+                return;
+            }
+
+            // Normal Create Mode
             const { data: talk } = await SafetyTalksService.getSuggestedTalk(currentStation);
             const { data: emps } = await SafetyTalksService.getStationEmployees(currentStation);
 
@@ -95,7 +141,7 @@ export function SafetyTalkWizard() {
             setLoading(false);
         };
         load();
-    }, [currentStation]);
+    }, [currentStation, isEditMode, editId]);
 
     // Load all bulletins when manual selection is active
     useEffect(() => {
@@ -126,6 +172,10 @@ export function SafetyTalkWizard() {
     };
 
     const handleBack = () => {
+        if (isEditMode && step <= 2) {
+            router.back(); // Go back to history if trying to go back from first step
+            return;
+        }
         setDirection(-1);
         setStep(prev => prev - 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -178,6 +228,12 @@ export function SafetyTalkWizard() {
     }, [employees]);
 
     const toggleEmp = (id: string) => {
+        // Prevent unselecting originally attended employees
+        if (isEditMode && originalAttendeeIds.includes(id)) {
+            toast.info('Este empleado ya registró su asistencia previamente.');
+            return;
+        }
+
         setSelectedEmployees(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
         );
@@ -208,35 +264,58 @@ export function SafetyTalkWizard() {
     const handleSubmitExecution = async () => {
         setLoading(true);
         try {
-            const endTime = new Date().toISOString();
-            const start = new Date(startTime!);
-            const end = new Date(endTime);
-            const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
+            if (isEditMode && editId) {
+                // EDIT MODE: Add extra attendees
+                const newAttendeeIds = selectedEmployees.filter(id => !originalAttendeeIds.includes(id));
 
-            const attendeesPayload = selectedEmployees.map(id => ({
-                employee_id: id,
-                signature: attendeeSignatures[id],
-                attended: true
-            }));
+                if (newAttendeeIds.length === 0) {
+                    toast.info('No hay nuevos firmas para agregar');
+                    router.push('/talks/history');
+                    return;
+                }
 
-            const { error } = await SafetyTalksService.registerExecution({
-                schedule_id: schedule?.id,
-                bulletin_id: !schedule ? selectedBulletin?.id : undefined,
-                station_code: currentStation,
-                executed_at: startTime!,
-                start_time: startTime!,
-                end_time: endTime,
-                scheduled_headcount: employees.length,
-                presenter_id: presenterId,
-                presenter_signature: presenterSignature,
-                observations,
-                duration_min: Math.max(1, durationMin),
-                activity_type: activityType
-            }, attendeesPayload);
+                const attendeesPayload = newAttendeeIds.map(id => ({
+                    employee_id: id,
+                    signature: attendeeSignatures[id],
+                    attended: true
+                }));
 
-            if (error) throw error;
+                const { error } = await SafetyTalksService.addAttendees(editId, attendeesPayload);
 
-            toast.success('Charla registrada correctamente');
+                if (error) throw error;
+                toast.success('Nuevas firmas agregadas correctamente');
+            } else {
+                // CREATE MODE
+                const endTime = new Date().toISOString();
+                const start = new Date(startTime!);
+                const end = new Date(endTime);
+                const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
+
+                const attendeesPayload = selectedEmployees.map(id => ({
+                    employee_id: id,
+                    signature: attendeeSignatures[id],
+                    attended: true
+                }));
+
+                const { error } = await SafetyTalksService.registerExecution({
+                    schedule_id: schedule?.id,
+                    bulletin_id: !schedule ? selectedBulletin?.id : undefined,
+                    station_code: currentStation,
+                    executed_at: startTime!,
+                    start_time: startTime!,
+                    end_time: endTime,
+                    scheduled_headcount: employees.length,
+                    presenter_id: presenterId,
+                    presenter_signature: presenterSignature,
+                    observations,
+                    duration_min: Math.max(1, durationMin),
+                    activity_type: activityType
+                }, attendeesPayload);
+
+                if (error) throw error;
+                toast.success('Charla registrada correctamente');
+            }
+
             router.push('/talks/history');
         } catch (err: any) {
             toast.error('Error: ' + err.message);
@@ -733,14 +812,18 @@ export function SafetyTalkWizard() {
                                                             className={`
                                                                 flex items-center justify-between p-4 cursor-pointer transition-colors hover:bg-slate-50 group
                                                                 ${isSelected ? 'bg-blue-50/30' : ''}
+                                                                ${isEditMode && originalAttendeeIds.includes(emp.id) ? '!cursor-not-allowed opacity-60 bg-slate-100' : ''}
                                                             `}
                                                         >
                                                             <div className="flex items-center gap-4 overflow-hidden">
                                                                 <div className={`
-                                                                    w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0
                                                                     ${isSelected ? 'bg-[#0A3161] border-[#0A3161] text-white' : 'border-slate-300 bg-white group-hover:border-[#0A3161]'}
                                                                 `}>
-                                                                    {isSelected && <CheckCircle className="w-4 h-4" />}
+                                                                    {isEditMode && originalAttendeeIds.includes(emp.id) ? (
+                                                                        <Lock className="w-3 h-3" />
+                                                                    ) : (
+                                                                        isSelected && <CheckCircle className="w-4 h-4" />
+                                                                    )}
                                                                 </div>
                                                                 <div className="min-w-0">
                                                                     <p className={`font-bold text-sm truncate ${isSelected ? 'text-[#0A3161]' : 'text-slate-700'}`}>{emp.full_name}</p>
@@ -769,7 +852,7 @@ export function SafetyTalkWizard() {
                                     disabled={selectedEmployees.length === 0}
                                     className="h-14 md:h-16 px-6 md:px-12 bg-[#0A3161] text-white hover:bg-[#0c3c75] font-black rounded-2xl shadow-xl tracking-widest text-[10px] md:text-sm uppercase flex items-center gap-3 w-full md:w-auto justify-center"
                                 >
-                                    <span className="truncate">Confirmar ({selectedEmployees.length})</span> <ChevronRight className="w-5 h-5 ml-auto md:ml-2 shrink-0" />
+                                    <span className="truncate">{isEditMode ? 'Siguiente' : `Confirmar (${selectedEmployees.length})`}</span> <ChevronRight className="w-5 h-5 ml-auto md:ml-2 shrink-0" />
                                 </Button>
                             </div>
                         </div>
@@ -935,7 +1018,7 @@ export function SafetyTalkWizard() {
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-4 justify-center">
-                                            FINALIZAR <CheckCircle className="w-5 h-5 md:w-6 md:h-6" />
+                                            {isEditMode ? 'AGREGAR FIRMAS EXTRA' : 'FINALIZAR'} <CheckCircle className="w-5 h-5 md:w-6 md:h-6" />
                                         </div>
                                     )}
                                 </Button>

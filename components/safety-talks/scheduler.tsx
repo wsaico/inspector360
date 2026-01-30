@@ -5,7 +5,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Bulletin, Station, TalkSchedule } from '@/types/safety-talks';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -179,8 +179,15 @@ export function SafetyTalkScheduler() {
         if (!confirm('¿Eliminar esta programación?')) return;
 
         const { error } = await supabase.from('talk_schedules').delete().eq('id', id);
-        if (error) toast.error(error.message);
-        else {
+
+        if (error) {
+            // FK Constraint Violation code (Postgres)
+            if (error.code === '23503') {
+                toast.error('No se puede eliminar: Esta charla ya fue ejecutada o tiene registros asociados.');
+                return;
+            }
+            toast.error(error.message);
+        } else {
             toast.success('Eliminado');
             loadSchedules();
         }
@@ -380,8 +387,8 @@ export function SafetyTalkScheduler() {
                             </Button>
 
                             <Dialog open={isDraftModalOpen} onOpenChange={setIsDraftModalOpen}>
-                                <DialogContent className="max-w-4xl p-0 overflow-hidden border-0 shadow-2xl rounded-[2rem] bg-slate-50">
-                                    <div className="flex flex-col h-[85vh]">
+                                <DialogContent className="max-w-4xl p-0 overflow-hidden border-0 shadow-2xl rounded-[2rem] bg-slate-50 flex flex-col max-h-[85vh]">
+                                    <div className="flex flex-col h-full overflow-hidden">
                                         {/* Header */}
                                         <div className="bg-[#0A3161] p-8 shrink-0">
                                             <div className="flex items-center justify-between">
@@ -432,10 +439,17 @@ export function SafetyTalkScheduler() {
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="GLOBAL">TODAS LAS BASES</SelectItem>
-                                                                {stations.map(s => (
-                                                                    <SelectItem key={s.code} value={s.code}>{s.name}</SelectItem>
-                                                                ))}
+                                                                <SelectGroup>
+                                                                    <SelectLabel className="px-2 py-1.5 text-[10px] uppercase font-black text-slate-400">Alcance Global</SelectLabel>
+                                                                    <SelectItem value="GLOBAL" className="font-bold text-[#0A3161]">GLOBAL / TODAS LAS BASES</SelectItem>
+                                                                </SelectGroup>
+                                                                <SelectSeparator />
+                                                                <SelectGroup>
+                                                                    <SelectLabel className="px-2 py-1.5 text-[10px] uppercase font-black text-slate-400">Estaciones</SelectLabel>
+                                                                    {stations.map(s => (
+                                                                        <SelectItem key={s.code} value={s.code}>{s.name}</SelectItem>
+                                                                    ))}
+                                                                </SelectGroup>
                                                             </SelectContent>
                                                         </Select>
                                                     </div>

@@ -6,7 +6,7 @@ import { TalkExecution } from '@/types/safety-talks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, Trash2 } from 'lucide-react';
+import { FileText, Calendar, Trash2, UserPlus, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks';
 import { SafetyTalksService } from '@/lib/services/safety-talks';
@@ -18,6 +18,10 @@ export default function HistoryPage() {
     const { profile } = useAuth();
     const [executions, setExecutions] = useState<TalkExecution[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     useEffect(() => {
         loadHistory();
@@ -100,65 +104,106 @@ export default function HistoryPage() {
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Fecha y Hora</th>
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Tema / Boletín</th>
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Estación</th>
+                                    <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Puntualidad</th>
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Expositor</th>
                                     <th className="p-5 text-right font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {executions.map((ex) => (
-                                    <tr key={ex.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="p-5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[#B3D400]/20 group-hover:text-[#0A3161] transition-all">
-                                                    <Calendar className="h-4 w-4" />
+                                {executions
+                                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                                    .map((ex) => (
+                                        <tr key={ex.id} className="hover:bg-slate-50/80 transition-colors group">
+                                            <td className="p-5">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[#B3D400]/20 group-hover:text-[#0A3161] transition-all">
+                                                        <Calendar className="h-4 w-4" />
+                                                    </div>
+                                                    <span className="font-bold text-[#0A3161]">{format(new Date(ex.executed_at), 'dd/MM/yyyy HH:mm')}</span>
                                                 </div>
-                                                <span className="font-bold text-[#0A3161]">{format(new Date(ex.executed_at), 'dd/MM/yyyy HH:mm')}</span>
-                                            </div>
-                                        </td>
-                                        <td className="p-5">
-                                            <div className="space-y-1">
-                                                <p className="font-black text-[#0A3161] leading-tight uppercase text-xs">{ex.schedule?.bulletin?.title || 'Tema General'}</p>
-                                                <p className="text-[10px] font-mono font-bold text-slate-400">{ex.schedule?.bulletin?.code}</p>
-                                            </div>
-                                        </td>
-                                        <td className="p-5">
-                                            <Badge className="bg-slate-100 text-[#0A3161] border-0 font-black px-3 py-1 rounded-lg text-[9px] uppercase tracking-widest">{ex.station_code}</Badge>
-                                        </td>
-                                        <td className="p-5 text-[#0A3161] font-bold text-xs uppercase">
-                                            {ex.presenter?.full_name}
-                                        </td>
-                                        <td className="p-5 text-right space-x-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleDownloadPdf(ex.id)}
-                                                disabled={downloading === ex.id}
-                                                className="border-[#0A3161] text-[#0A3161] font-black uppercase text-[9px] tracking-widest h-9 px-4 rounded-xl hover:bg-[#0A3161] hover:text-white transition-all shadow-sm"
-                                            >
-                                                {downloading === ex.id ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <div className="h-3 w-3 border-2 border-[#0A3161] border-t-transparent rounded-full animate-spin" />
-                                                    </span>
-                                                ) : (
-                                                    <>
-                                                        <FileText className="mr-2 h-3.5 w-3.5" /> Descargar PDF
-                                                    </>
-                                                )}
-                                            </Button>
+                                            </td>
+                                            <td className="p-5">
+                                                <div className="space-y-1">
+                                                    <p className="font-black text-[#0A3161] leading-tight uppercase text-xs">{ex.schedule?.bulletin?.title || 'Tema General'}</p>
+                                                    <p className="text-[10px] font-mono font-bold text-slate-400">{ex.schedule?.bulletin?.code}</p>
+                                                </div>
+                                            </td>
+                                            <td className="p-5">
+                                                <Badge className="bg-slate-100 text-[#0A3161] border-0 font-black px-3 py-1 rounded-lg text-[9px] uppercase tracking-widest">{ex.station_code}</Badge>
+                                            </td>
+                                            <td className="p-5">
+                                                {(() => {
+                                                    if (!ex.created_at) return <Badge variant="outline">N/A</Badge>;
+                                                    const execDate = new Date(ex.executed_at);
+                                                    const createDate = new Date(ex.created_at);
+                                                    const diffTime = createDate.getTime() - execDate.getTime();
+                                                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-                                            {profile?.role === 'admin' && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    onClick={() => handleDelete(ex.id)}
-                                                    className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white border-0 shadow-none h-9 w-9 p-0 rounded-xl transition-all"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                                    // Logic: <= 1 day = On Time (100%), > 1 day = Regularized (50%)
+                                                    // Future improvements: Compare with scheduled_date for Late (0%)
+
+                                                    if (diffDays <= 1) {
+                                                        return (
+                                                            <div className="flex flex-col">
+                                                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 w-fit">A Tiempo</Badge>
+                                                                <span className="text-[9px] font-bold text-emerald-600 mt-1">100% PUNTUAL</span>
+                                                            </div>
+                                                        );
+                                                    } else {
+                                                        return (
+                                                            <div className="flex flex-col">
+                                                                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 w-fit">Regularizado</Badge>
+                                                                <span className="text-[9px] font-bold text-amber-600 mt-1">REGISTRO TARDÍO</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                })()}
+                                            </td>
+                                            <td className="p-5 text-[#0A3161] font-bold text-xs uppercase">
+                                                {ex.presenter?.full_name}
+                                            </td>
+                                            <td className="p-5 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button
+                                                        size="icon"
+                                                        variant="outline"
+                                                        onClick={() => handleDownloadPdf(ex.id)}
+                                                        disabled={downloading === ex.id}
+                                                        className="border-[#0A3161] text-[#0A3161] h-9 w-9 rounded-xl hover:bg-[#0A3161] hover:text-white transition-all shadow-sm"
+                                                        title="Descargar PDF"
+                                                    >
+                                                        {downloading === ex.id ? (
+                                                            <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                        ) : (
+                                                            <Download className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+
+                                                    <Button
+                                                        size="icon"
+                                                        variant="outline"
+                                                        onClick={() => window.location.href = `/talks/register?edit=${ex.id}`}
+                                                        className="border-[#0A3161] text-[#0A3161] h-9 w-9 rounded-xl hover:bg-[#0A3161] hover:text-white transition-all shadow-sm"
+                                                        title="Agregar Personal"
+                                                    >
+                                                        <UserPlus className="h-4 w-4" />
+                                                    </Button>
+
+                                                    {profile?.role === 'admin' && (
+                                                        <Button
+                                                            size="icon"
+                                                            variant="destructive"
+                                                            onClick={() => handleDelete(ex.id)}
+                                                            className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white border-0 shadow-none h-9 w-9 rounded-xl transition-all"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 {executions.length === 0 && !loading && (
                                     <tr>
                                         <td colSpan={5} className="p-20 text-center space-y-4">
@@ -174,6 +219,31 @@ export default function HistoryPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Pagination Controls */}
+            {executions.length > itemsPerPage && (
+                <div className="flex justify-between items-center bg-white p-4 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.05)]">
+                    <Button
+                        variant="outline"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="text-[#0A3161] font-bold"
+                    >
+                        Anterior
+                    </Button>
+                    <span className="text-[#0A3161] font-bold text-sm">
+                        Página {currentPage} de {Math.ceil(executions.length / itemsPerPage)}
+                    </span>
+                    <Button
+                        variant="outline"
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(executions.length / itemsPerPage), p + 1))}
+                        disabled={currentPage >= Math.ceil(executions.length / itemsPerPage)}
+                        className="text-[#0A3161] font-bold"
+                    >
+                        Siguiente
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }

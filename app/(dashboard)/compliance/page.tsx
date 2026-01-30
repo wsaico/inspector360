@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { MultiSelect } from "@/components/ui/multi-select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
 
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -64,6 +66,16 @@ export default function CompliancePage() {
   const [stationComplianceStatus, setStationComplianceStatus] = useState<any[]>([]);
   const [stationDailyStatus, setStationDailyStatus] = useState<any[]>([]);
 
+  // New State for Safety Talks
+  const [safetyStats, setSafetyStats] = useState({
+    execution: { totalScheduled: 0, totalExecuted: 0, rate: 0 },
+    punctuality: { totalExecuted: 0, onTime: 0, rate: 0, regularizationRate: 0 },
+    pending: [] // Add pending array to state
+  });
+
+  // New State for Safety Talks Breakdown
+  const [safetyTalksBreakdown, setSafetyTalksBreakdown] = useState<any[]>([]);
+
   useEffect(() => {
     loadStations();
   }, []);
@@ -101,7 +113,9 @@ export default function CompliancePage() {
         issuesRes,
         dailyRes,
         stationStatusRes,
-        stationDailyStatusRes
+        stationDailyStatusRes,
+        safetyStatsRes,
+        safetyBreakdownRes
       ] = await Promise.all([
         ComplianceService.getOverallStats(filters),
         ComplianceService.getMonthlyTrends(filters),
@@ -109,7 +123,9 @@ export default function CompliancePage() {
         ComplianceService.getTopIssues(5, filters),
         ComplianceService.getDailyCompliance({ ...filters, aggregateAll: effectiveStations.length === 0 }),
         ComplianceService.getStationComplianceStatus(filters),
-        ComplianceService.getStationDailyStatus(filters)
+        ComplianceService.getStationDailyStatus(filters),
+        ComplianceService.getSafetyTalkStats(filters),
+        ComplianceService.getSafetyTalkStationStatus(filters) // New Call
       ]);
 
       if (statsRes.data) setStats(statsRes.data);
@@ -118,8 +134,12 @@ export default function CompliancePage() {
       if (issuesRes.data) setTopIssues(issuesRes.data);
       if (dailyRes.data) setDailyCompliance(dailyRes.data);
       if (stationStatusRes.data) setStationComplianceStatus(stationStatusRes.data);
+
       // @ts-ignore
       if (stationDailyStatusRes.data) setStationDailyStatus(stationDailyStatusRes.data);
+      if (safetyStatsRes.data) setSafetyStats(safetyStatsRes.data);
+      // @ts-ignore
+      if (safetyBreakdownRes.data) setSafetyTalksBreakdown(safetyBreakdownRes.data);
 
     } catch (error) {
       console.error("Error loading compliance data:", error);
@@ -173,191 +193,397 @@ export default function CompliancePage() {
         </div>
       </div>
 
+
       {/* Alert Section */}
-      <ComplianceAlert
-        missedDays={missedDays}
-        daysInMonth={dailyCompliance.daysInMonth}
-        currentDay={dailyCompliance.daysElapsed}
-      />
 
-      {/* KPIs */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cumplimiento Periodo</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {dailyCompliance.rate}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {dailyCompliance.daysWithInspection} de {dailyCompliance.daysElapsed} días cumplidos
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inspecciones Totales</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalInspections}</div>
-            <p className="text-xs text-muted-foreground">
-              En el periodo seleccionado
-            </p>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="talks" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="talks">Charlas de Seguridad</TabsTrigger>
+          <TabsTrigger value="inspections">Inspecciones Técnicas</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasa de Conformidad</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.complianceRate}%</div>
-            <p className="text-xs text-muted-foreground">
-              Items conformes vs totales
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Días Sin Inspección</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${missedDays > 0 ? 'text-red-500' : 'text-green-500'}`}>
-              {missedDays}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Días perdidos en el periodo
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Chart & Ranking Side by Side */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <ComplianceChart
-          data={dailyCompliance.breakdown || []}
-          daysInMonth={dailyCompliance.daysInMonth}
-          currentDay={dailyCompliance.daysWithInspection}
-          daysElapsed={dailyCompliance.daysElapsed}
-        />
-        <ComplianceTrend
-          data={stationComplianceStatus || []}
-          daysInPeriod={dailyCompliance.daysElapsed}
-        />
-      </div>
-
-      {/* Heatmap & Top Issues side by side to avoid empty space */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-12">
-        <div className="lg:col-span-8">
-          <StationComplianceHeatmap
-            data={stationDailyStatus || []}
-            daysInMonth={dailyCompliance.daysElapsed}
-            startDate={startDate}
-            endDate={endDate}
-          />
-        </div>
-
-        <Card className="lg:col-span-4 h-full shadow-lg border-t-2 border-t-red-200">
-          <CardHeader className="pb-3 pt-4">
-            <CardTitle className="text-lg font-bold">Top No Conformidades</CardTitle>
-            <CardDescription className="text-xs">
-              Items con mayor tasa de fallo en el periodo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topIssues.map((issue, i) => (
-                <div key={i} className="flex items-start py-2 border-b last:border-0 border-slate-50">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">
-                    {i + 1}
+        <TabsContent value="talks" className="space-y-4">
+          {/* SAFETY TALKS SECTION */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold tracking-tight text-[#0A3161] flex items-center gap-2">
+              <span className="bg-[#B3D400] w-2 h-6 rounded-full inline-block"></span>
+              Charlas de Seguridad (KPIs)
+            </h2>
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
+              {/* 1. Ejecución */}
+              <Card className="border-l-4 border-l-[#0A3161] shadow-md">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-bold text-slate-600">Ejecución Charlas</CardTitle>
+                  <Activity className="h-4 w-4 text-[#0A3161]" />
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-3xl font-black ${safetyStats.execution.rate >= 100 ? 'text-[#0A3161]' : 'text-amber-600'}`}>
+                      {safetyStats.execution.rate}%
+                    </span>
+                    <span className="text-xs text-muted-foreground font-bold">de la meta</span>
                   </div>
-                  <div className="ml-3 space-y-1 flex-1 min-w-0">
-                    <p className="text-xs font-semibold leading-tight text-slate-800 line-clamp-2">
-                      {issue.description}
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      ID: {issue.code} • <span className="font-bold text-red-500">{issue.count} casos</span>
-                    </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {safetyStats.execution.totalExecuted} realizadas vs {safetyStats.execution.totalScheduled} programadas
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* 2. Puntualidad */}
+              <Card className={`border-l-4 shadow-md ${safetyStats.punctuality.rate >= 90 ? 'border-l-green-500' : 'border-l-amber-500'}`}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-bold text-slate-600">Puntualidad Registro</CardTitle>
+                  <Calendar className="h-4 w-4 text-slate-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-3xl font-black ${safetyStats.punctuality.rate >= 90 ? 'text-green-600' : 'text-amber-600'}`}>
+                      {safetyStats.punctuality.rate}%
+                    </span>
+                    <span className="text-xs text-muted-foreground font-bold">a tiempo</span>
                   </div>
-                </div>
-              ))}
-              {topIssues.length === 0 && (
-                <div className="text-center text-muted-foreground py-10 text-xs italic">
-                  No hay datos insuficientes
-                </div>
-              )}
+                  <p className="text-xs text-slate-500 mt-1">
+                    {safetyStats.punctuality.onTime} registradas dentro de 24h
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* 3. Regularizadas (Inverso de Puntualidad para contexto) */}
+              <Card className="border-l-4 border-l-slate-300 shadow-sm bg-slate-50/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-500">Regularizadas (Tarde)</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-slate-600">
+                    {safetyStats.punctuality.regularizationRate}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Registradas después de fecha
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Placeholder for future metric or just empty/total */}
+              <Card className="border-l-4 border-l-slate-300 shadow-sm bg-slate-50/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-500">Total Registros</CardTitle>
+                  <FileText className="h-4 w-4 text-slate-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-slate-600">
+                    {safetyStats.punctuality.totalExecuted}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Charlas en base de datos
+                  </p>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      {/* Station Compliance & Pending List */}
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
-        <div className="lg:col-span-4">
-          <StationComplianceChart
-            data={stationComplianceStatus || []}
-            daysInPeriod={dailyCompliance.daysElapsed}
-          />
-        </div>
-        <PendingInspectionsList data={stationComplianceStatus || []} />
-      </div>
-
-      {/* Historical Trend & Compliance Detail */}
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
-        <Card className="lg:col-span-4 shadow-lg border-t-2 border-t-purple-500">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-              <Activity className="h-5 w-5 text-purple-600" />
-              Tendencia Histórica
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ fontSize: '11px' }} />
-                <Bar dataKey="inspections" fill="#9333EA" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-3 shadow-lg border-t-2 border-t-slate-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-bold">Estado de Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={complianceData}
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {complianceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={
-                      entry.name === 'Conforme' ? '#10b981' :
-                        entry.name === 'No Conforme' ? '#ef4444' : '#94a3b8'
-                    } />
+          {/* PENDING TALKS LIST */}
+          {/* @ts-ignore */}
+          {safetyStats.pending && safetyStats.pending.length > 0 && (
+            <Card className="shadow-md border-t-2 border-t-amber-500">
+              <CardHeader className="pb-3 pt-4">
+                <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-700">
+                  <AlertCircle className="h-5 w-5 text-amber-500" />
+                  Charlas Pendientes
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Charlas programadas que aún no cumplen con la ejecución esperada en el periodo seleccionado.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* @ts-ignore */}
+                  {safetyStats.pending.map((item: any, index: number) => (
+                    <div key={index} className="flex items-start justify-between border-b pb-2 last:border-0 last:pb-0">
+                      <div>
+                        <p className="font-medium text-sm text-slate-800">{item.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {item.date}
+                          </span>
+                          {item.type === 'global' && (
+                            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Global</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-amber-600">{item.missingCount}</span>
+                        <p className="text-[10px] text-muted-foreground">pendiente{item.missingCount > 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* SAFETY TALK RANKING TABLE */}
+          <div className="grid gap-4 grid-cols-1">
+            <Card className="shadow-lg border-t-2 border-t-[#0A3161]">
+              <CardHeader className="pb-3 pt-4">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-[#0A3161]" />
+                  Ranking de Cumplimiento - Charlas
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Desempeño de estaciones ordenado por menor ejecución.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-sm text-left text-slate-500">
+                    <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                      <tr>
+                        <th scope="col" className="px-4 py-3">Estación</th>
+                        <th scope="col" className="px-4 py-3 text-center">Programadas</th>
+                        <th scope="col" className="px-4 py-3 text-center">Ejecutadas</th>
+                        <th scope="col" className="px-4 py-3 text-center">Ejecución %</th>
+                        <th scope="col" className="px-4 py-3 text-center">A Tiempo</th>
+                        <th scope="col" className="px-4 py-3 text-center">Puntualidad %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {safetyTalksBreakdown.map((station, index) => (
+                        <tr key={station.code} className="bg-white border-b hover:bg-slate-50">
+                          <th scope="row" className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${station.executionRate >= 90 ? 'bg-green-500' : (station.executionRate >= 50 ? 'bg-amber-500' : 'bg-red-500')}`}></div>
+                            {station.name}
+                          </th>
+                          <td className="px-4 py-3 text-center text-slate-400">{station.scheduled}</td>
+                          <td className="px-4 py-3 text-center font-bold text-slate-700">{station.executed}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`font-black px-2 py-1 rounded text-xs ${station.executionRate >= 100 ? 'bg-green-100 text-green-800' :
+                              (station.executionRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800')
+                              }`}>
+                              {station.executionRate}%
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center text-slate-500">{station.onTime}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`font-bold text-xs ${station.punctualityRate >= 90 ? 'text-green-600' : 'text-red-500'
+                              }`}>
+                              {station.punctualityRate}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {safetyTalksBreakdown.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-4 text-xs italic text-slate-400">
+                            No hay datos disponibles para el periodo seleccionado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="inspections" className="space-y-4">
+          {/* Alert Section for Inspections */}
+          <ComplianceAlert
+            missedDays={missedDays}
+            daysInMonth={dailyCompliance.daysInMonth}
+            currentDay={dailyCompliance.daysElapsed}
+          />
+
+          {/* INSPECCIONES SECTION */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
+              <span className="bg-blue-500 w-2 h-6 rounded-full inline-block"></span>
+              Inspecciones Técnicas (KPIs)
+            </h2>
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Cumplimiento Periodo</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {dailyCompliance.rate}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {dailyCompliance.daysWithInspection} de {dailyCompliance.daysElapsed} días cumplidos
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Inspecciones Totales</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalInspections}</div>
+                  <p className="text-xs text-muted-foreground">
+                    En el periodo seleccionado
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Tasa de Conformidad</CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.complianceRate}%</div>
+                  <p className="text-xs text-muted-foreground">
+                    Items conformes vs totales
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Días Sin Inspección</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${missedDays > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    {missedDays}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Días perdidos en el periodo
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Main Chart & Ranking Side by Side */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            <ComplianceChart
+              data={dailyCompliance.breakdown || []}
+              daysInMonth={dailyCompliance.daysInMonth}
+              currentDay={dailyCompliance.daysWithInspection}
+              daysElapsed={dailyCompliance.daysElapsed}
+            />
+            <ComplianceTrend
+              data={stationComplianceStatus || []}
+              daysInPeriod={dailyCompliance.daysElapsed}
+            />
+          </div>
+
+          {/* Heatmap & Top Issues side by side to avoid empty space */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-12">
+            <div className="lg:col-span-8">
+              <StationComplianceHeatmap
+                data={stationDailyStatus || []}
+                daysInMonth={dailyCompliance.daysElapsed}
+                startDate={startDate}
+                endDate={endDate}
+              />
+            </div>
+
+            <Card className="lg:col-span-4 h-full shadow-lg border-t-2 border-t-red-200">
+              <CardHeader className="pb-3 pt-4">
+                <CardTitle className="text-lg font-bold">Top No Conformidades</CardTitle>
+                <CardDescription className="text-xs">
+                  Items con mayor tasa de fallo en el periodo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {topIssues.map((issue, i) => (
+                    <div key={i} className="flex items-start py-2 border-b last:border-0 border-slate-50">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">
+                        {i + 1}
+                      </div>
+                      <div className="ml-3 space-y-1 flex-1 min-w-0">
+                        <p className="text-xs font-semibold leading-tight text-slate-800 line-clamp-2">
+                          {issue.description}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          ID: {issue.code} • <span className="font-bold text-red-500">{issue.count} casos</span>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {topIssues.length === 0 && (
+                    <div className="text-center text-muted-foreground py-10 text-xs italic">
+                      No hay datos insuficientes
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Station Compliance & Pending List */}
+          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
+            <div className="lg:col-span-4">
+              <StationComplianceChart
+                data={stationComplianceStatus || []}
+                daysInPeriod={dailyCompliance.daysElapsed}
+              />
+            </div>
+            <PendingInspectionsList data={stationComplianceStatus || []} />
+          </div>
+
+          {/* Historical Trend & Compliance Detail */}
+          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
+            <Card className="lg:col-span-4 shadow-lg border-t-2 border-t-purple-500">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                  <Activity className="h-5 w-5 text-purple-600" />
+                  Tendencia Histórica
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip contentStyle={{ fontSize: '11px' }} />
+                    <Bar dataKey="inspections" fill="#9333EA" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-3 shadow-lg border-t-2 border-t-slate-200">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-bold">Estado de Items</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={complianceData}
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {complianceData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={
+                          entry.name === 'Conforme' ? '#10b981' :
+                            entry.name === 'No Conforme' ? '#ef4444' : '#94a3b8'
+                        } />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+
     </div >
   )
 }

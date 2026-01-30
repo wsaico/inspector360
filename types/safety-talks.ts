@@ -60,6 +60,7 @@ export interface TalkExecution {
     pdf_url?: string;
     observations?: string;
     activity_type?: string;
+    created_at?: string; // Added for punctuality tracking
     // Joins
     presenter?: Employee;
     schedule?: TalkSchedule;

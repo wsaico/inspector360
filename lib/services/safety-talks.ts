@@ -352,4 +352,58 @@ export class SafetyTalksService {
             return { data: null, error: error.message };
         }
     }
+    /**
+     * Obtiene los detalles completos de una ejecución (Cabecera + Asistentes)
+     */
+    static async getExecution(id: string): Promise<{ data: TalkExecution | null; error: any }> {
+        try {
+            const { data, error } = await supabase
+                .from('talk_executions')
+                .select(`
+                    *,
+                    bulletin:bulletins(*),
+                    presenter:employees!talk_executions_presenter_id_fkey(*),
+                    attendees:talk_attendees(
+                        *,
+                        employee:employees(*)
+                    )
+                `)
+                .eq('id', id)
+                .single();
+
+            if (error) throw error;
+            return { data: data as any, error: null };
+        } catch (error: any) {
+            console.error('[SafetyTalks] Error fetching execution:', error);
+            return { data: null, error: error.message };
+        }
+    }
+
+    /**
+     * Agrega asistentes adicionales a una charla ya ejecutada.
+     */
+    static async addAttendees(
+        executionId: string,
+        newAttendees: { employee_id: string; signature: string; attended: boolean }[]
+    ) {
+        try {
+            const attendeesToInsert = newAttendees.map(att => ({
+                talk_id: executionId,
+                employee_id: att.employee_id,
+                signature: att.signature,
+                attended: att.attended
+            }));
+
+            const { error } = await supabase
+                .from('talk_attendees')
+                .insert(attendeesToInsert);
+
+            if (error) throw error;
+
+            return { error: null };
+        } catch (error: any) {
+            console.error('[SafetyTalks] Error adding attendees:', error);
+            return { error: error.message };
+        }
+    }
 }
