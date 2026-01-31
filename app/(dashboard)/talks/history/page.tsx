@@ -6,7 +6,7 @@ import { TalkExecution } from '@/types/safety-talks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, Trash2, UserPlus, Download, Lock } from 'lucide-react';
+import { FileText, Calendar, Trash2, UserPlus, Download, Lock, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks';
 import { SafetyTalksService } from '@/lib/services/safety-talks';
@@ -90,9 +90,12 @@ export default function HistoryPage() {
                     </h1>
                     <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Registro maestro de capacitaciones ejecutadas</p>
                 </div>
-                <div className="w-12 h-12 bg-[#B3D400] rounded-2xl flex items-center justify-center shadow-lg shadow-[#B3D400]/20">
-                    <Calendar className="w-6 h-6 text-[#0A3161]" />
-                </div>
+                <Button
+                    className="bg-[#B3D400] text-[#0A3161] hover:bg-[#c9ee00] font-black uppercase tracking-widest shadow-lg hover:shadow-xl transition-all h-12 px-6 rounded-xl"
+                    onClick={() => window.location.href = '/talks/register'}
+                >
+                    <Plus className="w-5 h-5 mr-2" /> Nueva Charla
+                </Button>
             </div>
 
             <Card className="border-0 shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white rounded-3xl overflow-hidden">

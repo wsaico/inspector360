@@ -371,6 +371,16 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
 
     const handleNewShiftRegistration = async () => {
         setLoading(true);
+
+        // Reset volatile state for new shift
+        setShift(null as any);
+        setPresenterId('');
+        setPresenterSearch('');
+        setPresenterSignature('');
+        setAttendeeSignatures({});
+        setSelectedEmployees([]);
+        setObservations('');
+
         // Force manual mode or load daily topic again to allow new registration
         // Just reload daily topic but keep us in CREATE mode
         const { data: dailyTopic } = await SafetyTalksService.getDailyTopic(currentStation, executionDate);
@@ -1269,7 +1279,17 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                 </Card>
 
                                 <div className="flex flex-col md:flex-row gap-4 justify-between pt-6 items-center">
-                                    <Button variant="ghost" onClick={handleBack} disabled={loading} className="w-full md:w-auto px-10 font-bold text-slate-300 hover:text-[#0A3161] uppercase text-[10px] md:text-xs tracking-widest">Regresar</Button>
+                                    <div className="flex gap-4 w-full md:w-auto">
+                                        <Button variant="ghost" onClick={handleBack} disabled={loading} className="flex-1 md:flex-none px-6 font-bold text-slate-300 hover:text-[#0A3161] uppercase text-[10px] md:text-xs tracking-widest">Regresar</Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleNewShiftRegistration}
+                                            disabled={loading}
+                                            className="flex-1 md:flex-none px-6 font-black text-[#0A3161] border-2 border-[#0A3161]/20 hover:border-[#0A3161] hover:bg-[#0A3161] hover:text-white uppercase text-[10px] md:text-[10px] tracking-widest rounded-xl transition-all"
+                                        >
+                                            <Users className="w-4 h-4 mr-2" /> Otro Turno
+                                        </Button>
+                                    </div>
                                     <Button
                                         size="lg"
                                         onClick={handleSubmitExecution}
