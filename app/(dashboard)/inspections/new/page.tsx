@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 import { InspectionProvider, useInspectionForm } from '@/context/inspection-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Check, ClipboardList, Package, CheckSquare, MessageSquare, FileCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ClipboardList, Package, CheckSquare, MessageSquare, FileCheck, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Step1General from '@/components/forms/step1-general';
 import Step2Equipment from '@/components/forms/step2-equipment';
@@ -143,11 +143,21 @@ function InspectionWizardContent() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       {/* Header */}
-      <div>
-        <h2 className="text-3xl font-black text-[#0A3161] uppercase tracking-tighter">Nueva Inspección Técnica</h2>
-        <p className="text-sm font-medium text-slate-500 mt-1">
-          Complete los 4 pasos obligatorios para generar el reporte
-        </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div>
+          <h2 className="text-3xl font-black text-[#0A3161] uppercase tracking-tighter">Nueva Inspección Técnica</h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">
+            Complete los 4 pasos obligatorios para generar el reporte
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-bold shadow-sm transition-all"
+          onClick={() => window.open('https://drive.google.com/file/d/141Nmu285-EoQKXAXSzsMdySCf5j-H7bL/view?usp=sharing', '_blank')}
+        >
+          <Video className="w-5 h-5 mr-2" />
+          Ver Tutorial
+        </Button>
       </div>
 
       {/* Step Indicator (Mobile) - Modern App Design */}
