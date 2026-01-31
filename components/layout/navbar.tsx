@@ -3,7 +3,18 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Menu, Loader2, ChevronRight, Zap } from 'lucide-react';
+import { Bell, Menu, Loader2, ChevronRight, Zap, LogOut, Key, User as UserIcon } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChangePasswordDialog } from '@/components/settings/change-password-dialog';
+import { supabase } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { InspectionService } from '@/lib/services';
 import type { Inspection, Observation } from '@/types';
@@ -125,6 +136,13 @@ export function Navbar({ profile, user, canViewAllStations, onMenuToggle }: Navb
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.replace('/login');
+  };
 
   const loadInspections = useCallback(async () => {
     setLoading(true);
@@ -324,36 +342,63 @@ export function Navbar({ profile, user, canViewAllStations, onMenuToggle }: Navb
         </div>
 
         {/* Profile Info Section - Más compacto en móvil */}
-        <div className="flex items-center gap-2 pl-2 border-l border-gray-100 shrink-0">
-          <div className="flex flex-col items-end hidden md:flex">
-            <span className="text-[11px] font-black text-gray-900 uppercase tracking-tighter truncate max-w-[120px]">
-              {(() => {
-                let rawName = profile?.full_name || user?.user_metadata?.full_name || '';
-                if (rawName.includes('@')) rawName = '';
-                if (rawName.toLowerCase().includes('administrador principal')) return 'Administrador';
-                if (rawName) return rawName;
-                if (user?.email?.toLowerCase() === 'admin@inspector360.com') return 'Administrador';
-                return user?.email?.split('@')[0] || 'Usuario';
-              })()}
-            </span>
-            <div className="flex items-center gap-1 mt-0.5">
-              <Badge variant="outline" className="h-3.5 text-[7px] border-primary/20 text-primary px-1 font-black uppercase tracking-tighter leading-none">
-                {profile?.role}
-              </Badge>
-              {profile?.station && (
-                <span className="text-[8px] text-gray-400 font-bold uppercase truncate max-w-[40px]">
-                  {profile.station}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 pl-2 border-l border-gray-100 shrink-0 outline-none hover:bg-slate-50 p-1 rounded-lg transition-colors">
+              <div className="flex flex-col items-end hidden md:flex">
+                <span className="text-[11px] font-black text-gray-900 uppercase tracking-tighter truncate max-w-[120px]">
+                  {(() => {
+                    let rawName = profile?.full_name || user?.user_metadata?.full_name || '';
+                    if (rawName.includes('@')) rawName = '';
+                    if (rawName.toLowerCase().includes('administrador principal')) return 'Administrador';
+                    if (rawName) return rawName;
+                    if (user?.email?.toLowerCase() === 'admin@inspector360.com') return 'Administrador';
+                    return user?.email?.split('@')[0] || 'Usuario';
+                  })()}
                 </span>
-              )}
-            </div>
-          </div>
-          <div className="relative shrink-0">
-            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-xl bg-primary text-white font-black text-xs md:text-sm shadow-md ring-2 ring-white">
-              {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
-          </div>
-        </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Badge variant="outline" className="h-3.5 text-[7px] border-primary/20 text-primary px-1 font-black uppercase tracking-tighter leading-none">
+                    {profile?.role}
+                  </Badge>
+                  {profile?.station && (
+                    <span className="text-[8px] text-gray-400 font-bold uppercase truncate max-w-[40px]">
+                      {profile.station}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="relative shrink-0">
+                <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-xl bg-primary text-white font-black text-xs md:text-sm shadow-md ring-2 ring-white">
+                  {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setPasswordDialogOpen(true)} className="cursor-pointer">
+              <Key className="mr-2 h-4 w-4" />
+              <span>Cambiar Contraseña</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Cerrar Sesión</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {user && (
+          <ChangePasswordDialog
+            open={passwordDialogOpen}
+            onClose={() => setPasswordDialogOpen(false)}
+            userId={user.id}
+            userName={profile?.full_name || user.email || 'Usuario'}
+            isOwnProfile={true}
+          />
+        )}
       </div>
     </header>
   );
