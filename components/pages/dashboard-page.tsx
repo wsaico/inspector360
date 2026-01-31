@@ -202,7 +202,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-600 mb-6">
-              Aprende a registrar la charla diaria, asistencia y firmas digitales en menos de 2 minutos.
+              Aprende a registrar tus charlas paso a paso. Se recomienda ver el video tutorial para conocer el proceso correcto.
             </p>
             <div className="flex gap-3">
               <Button
@@ -235,7 +235,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-600 mb-6">
-              Guía paso a paso para realizar inspecciones de equipos y generar reportes PDF profesionales.
+              Guía rápida para realizar inspecciones de equipos y generar tus reportes. Mira el video para empezar correctamente.
             </p>
             <div className="flex gap-3">
               <Button
