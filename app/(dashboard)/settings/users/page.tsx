@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Loader2, UserPlus, MapPin, Key } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, UserPlus, MapPin, Key, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { User } from "@/types";
 import { UserFormDialog } from "@/components/settings/user-form-dialog";
@@ -28,6 +28,12 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const paginatedUsers = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
     if (!canManageUsers && !canAccessSettings) {
@@ -183,7 +189,7 @@ export default function UsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {paginatedUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.full_name}</TableCell>
                     <TableCell>{user.email}</TableCell>
@@ -235,19 +241,78 @@ export default function UsersPage() {
             </Table>
           )}
         </CardContent>
+        {/* Pagination Footer */}
+        {users.length > 0 && (
+          <div className="flex items-center justify-between p-4 border-t border-slate-100">
+            <span className="text-sm text-slate-500 font-medium">
+              Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, users.length)} - {Math.min(currentPage * itemsPerPage, users.length)} de {users.length} usuarios
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              >
+                <ChevronLeft className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Anterior</span>
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let pageNum = i + 1;
+                  // Simple sliding window for page numbers if totalPages > 5
+                  if (totalPages > 5) {
+                    if (currentPage > 3) {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    else {
+                      pageNum = i + 1;
+                    }
+                    if (pageNum > totalPages) return null;
+                  }
+
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`h-8 w-8 p-0 font-bold ${currentPage === pageNum ? 'bg-[#0A3161] hover:bg-[#0c3c75]' : 'text-slate-500'}`}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              >
+                <span className="hidden md:inline">Siguiente</span>
+                <ChevronRight className="h-4 w-4 md:ml-2" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <UserFormDialog open={dialogOpen} user={editingUser} onClose={handleDialogClose} />
 
-      {passwordUser && (
-        <ChangePasswordDialog
-          open={passwordDialogOpen}
-          onClose={handlePasswordDialogClose}
-          userId={passwordUser.id!}
-          userName={passwordUser.full_name}
-          isOwnProfile={false}
-        />
-      )}
-    </div>
+      {
+        passwordUser && (
+          <ChangePasswordDialog
+            open={passwordDialogOpen}
+            onClose={handlePasswordDialogClose}
+            userId={passwordUser.id!}
+            userName={passwordUser.full_name}
+            isOwnProfile={false}
+          />
+        )
+      }
+    </div >
   );
 }
