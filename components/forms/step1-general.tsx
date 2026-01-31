@@ -45,7 +45,8 @@ export default function Step1General() {
           station: g.station as InspectionGeneralFormData['station'],
         } satisfies InspectionGeneralFormData;
       }
-      const code = (profile?.station as any) || 'AQP';
+      // FIXED: Si hay perfil, usar su estación. Si no, no forzar 'AQP' todavía para evitar conflictos visuales
+      const code = (profile?.station as any) || '';
       return {
         inspection_date: new Date(),
         inspection_type: 'periodica',
@@ -57,27 +58,35 @@ export default function Step1General() {
 
   const currentStation = watch('station');
 
-  // Si el perfil llega tarde, sincronizar la estación por defecto
-  // y mantenerla fija para usuarios sin permiso global
+  // Sincronización robusta de estación para usuarios restringidos
   React.useEffect(() => {
-    const s = (profile?.station as any) || undefined;
-    if (s) {
-      setValue('station', s as InspectionGeneralFormData['station']);
-      // Trigger update immediately if needed
+    if (profile?.station) {
+      // Si el usuario tiene estación fija, imponerla siempre
+      const stationCode = profile.station as InspectionGeneralFormData['station'];
+
+      // Solo actualizar si es diferente para evitar loops, pero FORZAR si está vacío
+      if (currentStation !== stationCode) {
+        setValue('station', stationCode, { shouldValidate: true });
+      }
+    } else if (profile && !profile.station && !currentStation) {
+      // Fallback solo si ya cargó el perfil y es admin sin estación: AQP por defecto
+      setValue('station', 'AQP', { shouldValidate: true });
     }
-  }, [profile?.station]);
+  }, [profile, currentStation, setValue]);
 
   // Guardar datos cada vez que cambian los campos
-  // Usamos un effect que escucha cambios en el formulario en lugar de triggers manuales dispersos
   React.useEffect(() => {
     const subscription = watch(async (value) => {
+      // Solo guardar si tenemos una estación válida
+      if (!value.station) return;
+
       const isValid = await trigger();
       if (isValid) {
         setGeneralInfo({
           inspection_date: value.inspection_date ? new Date(value.inspection_date) : new Date(),
           inspection_type: value.inspection_type as any || 'periodica',
           inspector_name: value.inspector_name || '',
-          station: value.station as any || 'AQP'
+          station: value.station as any
         });
       }
     });
