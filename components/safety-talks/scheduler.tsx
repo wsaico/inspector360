@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase/client';
 import { Bulletin, Station, TalkSchedule } from '@/types/safety-talks';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { format, addDays, isWeekend, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export function SafetyTalkScheduler() {
-    const supabase = createClientComponentClient();
+
 
     // Data
     const [bulletins, setBulletins] = useState<Bulletin[]>([]);

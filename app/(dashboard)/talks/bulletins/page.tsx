@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase/client';
 import { Bulletin } from '@/types/safety-talks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,6 @@ import { SafetyTalksService } from '@/lib/services/safety-talks';
 
 export default function BulletinsPage() {
     const router = useRouter();
-    const supabase = createClientComponentClient();
 
     // List state
     const [bulletins, setBulletins] = useState<Bulletin[]>([]);

@@ -24,10 +24,11 @@ export function WhatsNewModal() {
 
         // Pequeño delay para que no aparezca de golpe al cargar
         const timer = setTimeout(() => {
-            const isDismissed = localStorage.getItem(VERSION_KEY);
-            if (!isDismissed) {
-                setIsOpen(true);
-            }
+            // DISABLED BY USER REQUEST: El modal no debe aparecer automáticamente
+            // const isDismissed = localStorage.getItem(VERSION_KEY);
+            // if (!isDismissed) {
+            //     setIsOpen(true);
+            // }
         }, 1000);
 
         return () => {
