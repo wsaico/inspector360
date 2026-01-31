@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks';
 import { SafetyTalksService } from '@/lib/services/safety-talks';
@@ -43,6 +43,11 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
     const [step, setStep] = useState(editId ? 2 : 0);
     const [direction, setDirection] = useState(0);
     const [loading, setLoading] = useState(true);
+    const dateInputRef = useRef<HTMLInputElement>(null);
+    const dateInputRefUser = useRef<HTMLInputElement>(null);
+
+    // Execution Date (Default Today) - For Retroactive Registration
+    const [executionDate, setExecutionDate] = useState<Date>(new Date());
 
     // Edit Mode State
     const isEditMode = !!editId;
@@ -156,9 +161,8 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
             }
 
             // Normal Create Mode
-            // Normal Create Mode
-            const { data: talk } = await SafetyTalksService.getSuggestedTalk(currentStation);
-            const { data: daily } = await SafetyTalksService.getDailyTopic(currentStation);
+            const { data: talk } = await SafetyTalksService.getSuggestedTalk(currentStation, executionDate);
+            const { data: daily } = await SafetyTalksService.getDailyTopic(currentStation, executionDate);
             const { data: emps } = await SafetyTalksService.getStationEmployees(currentStation);
 
             setSchedule(talk);
@@ -171,9 +175,10 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
             // No auto-detect shift for safety reasons (Explicit user selection required)
 
             setLoading(false);
+            setLoading(false);
         };
         load();
-    }, [currentStation, isEditMode, editId]);
+    }, [currentStation, isEditMode, editId, executionDate]);
 
     // Load all bulletins when manual selection is active
     useEffect(() => {
@@ -243,7 +248,15 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
             return;
         }
 
-        setStartTime(new Date().toISOString());
+
+
+        // Use selected execution date combined with current time for precision?
+        // Or just use the selected date as start time base
+        const now = new Date();
+        const finalStart = new Date(executionDate);
+        finalStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+
+        setStartTime(finalStart.toISOString());
         toast.success('¡Charla Iniciada!');
         handleNext();
     };
@@ -318,9 +331,8 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                 toast.success('Nuevas firmas agregadas correctamente');
             } else {
                 // CREATE MODE
-                const endTime = new Date().toISOString();
                 const start = new Date(startTime!);
-                const end = new Date(endTime);
+                const end = new Date(start.getTime() + 15 * 60000); // Assume 15 min if not tracked real time or just same day
                 const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
 
                 const attendeesPayload = selectedEmployees.map(id => ({
@@ -336,7 +348,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                     shift: shift as any, // Send Shift
                     executed_at: startTime!,
                     start_time: startTime!,
-                    end_time: endTime,
+                    end_time: end.toISOString(),
                     scheduled_headcount: employees.length,
                     presenter_id: presenterId,
                     presenter_signature: presenterSignature,
@@ -361,7 +373,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
         setLoading(true);
         // Force manual mode or load daily topic again to allow new registration
         // Just reload daily topic but keep us in CREATE mode
-        const { data: dailyTopic } = await SafetyTalksService.getDailyTopic(currentStation);
+        const { data: dailyTopic } = await SafetyTalksService.getDailyTopic(currentStation, executionDate);
         if (dailyTopic) {
             setSchedule(dailyTopic);
             setSelectedBulletin(dailyTopic.bulletin || null);
@@ -377,14 +389,27 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
     // --- RENDER ---
 
     if (loading && step === 0 && !schedule) {
-        return <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400 font-medium">
-            <div className="h-10 w-10 border-4 border-[#0A3161] border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="animate-pulse">Sincronizando con estación {currentStation}...</p>
-        </div>;
+        return (
+            <div className="w-full max-w-[1600px] mx-auto min-h-screen p-4 md:p-8 bg-[#F8FAFC]">
+                <div className="animate-pulse space-y-8 max-w-4xl mx-auto pt-10">
+                    <div className="h-12 w-48 mx-auto bg-slate-200 rounded-xl" />
+                    <div className="h-[500px] bg-white rounded-[32px] w-full shadow-xl border border-slate-100 p-8">
+                        <div className="flex gap-6">
+                            <div className="w-2/3 space-y-6">
+                                <div className="h-8 w-3/4 bg-slate-100 rounded-xl" />
+                                <div className="h-4 w-1/2 bg-slate-100 rounded-xl" />
+                                <div className="h-32 w-full bg-slate-50 rounded-2xl" />
+                            </div>
+                            <div className="w-1/3 bg-slate-50 rounded-2xl h-64" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
-        <div className="w-full max-w-6xl mx-auto min-h-screen p-3 md:p-8 bg-[#F8FAFC]">
+        <div className="w-full max-w-[1600px] mx-auto min-h-screen p-2 md:p-6 bg-[#F8FAFC]">
             {/* Stepper Indicator - AUTHENTIC STYLE - Refined for Mobile */}
             <div className="mb-8 md:mb-16 flex justify-between items-center max-w-3xl mx-auto relative px-2 md:px-4">
                 {[0, 1, 2, 3, 4].map(s => (
@@ -421,7 +446,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                 >
                     {/* STEP 0: START */}
                     {step === 0 && (
-                        <div className="max-w-4xl mx-auto space-y-6 md:space-y-10 py-2 md:py-4 logo-animate">
+                        <div className="w-full space-y-6 md:space-y-10 py-2 md:py-4 logo-animate">
                             <div className="text-center space-y-4 md:space-y-6">
                                 <h1 className="text-2xl md:text-5xl font-black tracking-tight text-[#0A3161] px-2">Charla de Seguridad</h1>
 
@@ -441,19 +466,92 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                                     <option key={s.code} value={s.code}>{s.name} — {s.code}</option>
                                                 ))}
                                             </select>
+
+
+                                            {/* Premium Date Selector for Admins */}
+                                            <div
+                                                className="mt-2 relative group w-full max-w-[280px] md:max-w-none cursor-pointer"
+                                                onClick={() => {
+                                                    try {
+                                                        dateInputRef.current?.showPicker();
+                                                    } catch (e) {
+                                                        dateInputRef.current?.click();
+                                                    }
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-3 bg-white border-2 border-slate-100 rounded-2xl px-5 py-2.5 shadow-sm group-hover:border-[#0A3161] group-hover:shadow-md transition-all">
+                                                    <div className="p-1.5 bg-blue-50 rounded-lg text-[#0A3161]">
+                                                        <Clock className="w-4 h-4 md:w-5 md:h-5" />
+                                                    </div>
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Fecha de Ejecución</span>
+                                                        <span className="text-sm md:text-base font-black text-[#0A3161] capitalize">
+                                                            {executionDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    ref={dateInputRef}
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 pointer-events-none w-full h-full z-20"
+                                                    value={executionDate.toISOString().split('T')[0]}
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                    onChange={(e) => {
+                                                        if (!e.target.value) return;
+                                                        const d = new Date(e.target.value + 'T12:00:00');
+                                                        setExecutionDate(d);
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
                                     ) : (
-                                        <p className="text-lg md:text-2xl text-slate-500 font-bold tracking-tight px-4 text-center">
-                                            Estación <span className="text-[#0A3161]">{currentStation}</span> • <span className="block md:inline mt-1 text-sm md:text-xl">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                                        </p>
+                                        <div className="flex flex-col items-center">
+                                            <p className="text-lg md:text-2xl text-slate-500 font-bold tracking-tight px-4 text-center">
+                                                Estación <span className="text-[#0A3161]">{currentStation}</span>
+                                            </p>
+
+                                            <div
+                                                className="mt-2 relative group cursor-pointer"
+                                                onClick={() => {
+                                                    try {
+                                                        dateInputRefUser.current?.showPicker();
+                                                    } catch (e) {
+                                                        dateInputRefUser.current?.click();
+                                                    }
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-3 bg-white border-2 border-slate-100 rounded-2xl px-5 py-2.5 shadow-sm group-hover:border-[#0A3161] group-hover:shadow-md transition-all">
+                                                    <div className="p-1.5 bg-blue-50 rounded-lg text-[#0A3161]">
+                                                        <Clock className="w-4 h-4 md:w-5 md:h-5" />
+                                                    </div>
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Fecha de Ejecución</span>
+                                                        <span className="text-sm md:text-base font-black text-[#0A3161] capitalize">
+                                                            {executionDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    ref={dateInputRefUser}
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 pointer-events-none w-full h-full z-10"
+                                                    value={executionDate.toISOString().split('T')[0]}
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                    onChange={(e) => {
+                                                        const d = new Date(e.target.value + 'T12:00:00'); // Force noon
+                                                        setExecutionDate(d);
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                     )}
                                     <div className="hidden sm:block h-[2px] w-8 md:w-12 bg-slate-200" />
                                 </div>
                             </div>
 
                             <Card className="border-0 shadow-2xl bg-white rounded-[32px] overflow-hidden w-full">
-                                <div className="grid grid-cols-1 md:grid-cols-5 h-full">
-                                    <div className="md:col-span-3 p-6 md:p-10 space-y-6 w-full">
+                                <div className="flex flex-col h-full bg-white">
+                                    <div className="p-6 md:p-10 space-y-6 w-full">
                                         {!schedule && !isManualSelection ? (
                                             <div className="space-y-8 animate-in fade-in zoom-in duration-500 text-center md:text-left">
                                                 <div className="flex flex-col gap-6">
@@ -707,8 +805,8 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                     </div>
                                 </div>
 
-                                <div className="grid md:grid-cols-2 gap-8">
-                                    <div className="space-y-6">
+                                <div className="grid md:grid-cols-5 gap-8">
+                                    <div className={`space-y-6 transition-all duration-500 ${presenterId ? 'md:col-span-3' : 'md:col-span-5'}`}>
                                         <Card className="border-0 shadow-xl rounded-3xl bg-white relative z-20">
                                             <CardHeader className="bg-slate-50/50 border-b">
                                                 <CardTitle className="text-[#0A3161] font-black uppercase text-sm tracking-widest">Seleccionar Atala (Expositor)</CardTitle>
@@ -820,52 +918,58 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                                         )}
                                                     </div>
 
-                                                    {presenterId && (
-                                                        <div className="bg-[#B3D400]/10 border-l-4 border-[#B3D400] p-6 rounded-r-2xl space-y-2">
-                                                            <p className="text-[10px] font-black text-[#0A3161]/60 uppercase tracking-widest">Cargo Operativo</p>
-                                                            <p className="text-xl font-black text-[#0A3161]">{employees.find(e => e.id === presenterId)?.position || 'Sin cargo asignado'}</p>
-                                                        </div>
-                                                    )}
+
                                                 </div>
+
+                                                {presenterId && (
+                                                    <div className="bg-[#B3D400]/10 border-l-4 border-[#B3D400] p-6 rounded-r-2xl space-y-2 animate-in slide-in-from-right-8 duration-500">
+                                                        <p className="text-[10px] font-black text-[#0A3161]/60 uppercase tracking-widest">Cargo Operativo</p>
+                                                        <p className="text-xl font-black text-[#0A3161]">{employees.find(e => e.id === presenterId)?.position || 'Sin cargo asignado'}</p>
+                                                    </div>
+                                                )}
+
                                             </CardContent>
                                         </Card>
                                     </div>
 
-                                    <Card className={`border-0 shadow-2xl rounded-3xl transition-all duration-700 bg-white ${presenterId ? 'opacity-100 translate-y-0' : 'opacity-40 translate-y-4 pointer-events-none'}`}>
-                                        <CardHeader className="bg-[#0A3161] text-white">
-                                            <CardTitle className="font-black uppercase text-xs tracking-[0.2em] flex items-center gap-2">
-                                                <PenTool className="w-4 h-4 text-[#B3D400]" /> Firma del Responsable
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="p-8 flex flex-col items-center">
-                                            <div className="relative w-full">
-                                                <SignaturePad
-                                                    key={`presenter-${presenterId}`}
-                                                    onSave={setPresenterSignature}
-                                                    label="Firma de Validación"
-                                                />
-                                                {!shift && (
-                                                    <div
-                                                        className="absolute inset-0 z-50 bg-slate-50/80 backdrop-blur-[2px] flex items-center justify-center cursor-not-allowed rounded-xl transition-all"
-                                                        onClick={() => toast.warning("⚠ Por favor, seleccione el TURNO antes de firmar.", { duration: 4000, style: { fontSize: '1.2em' } })}
-                                                    >
-                                                        <div className="bg-white text-red-500 px-6 py-3 rounded-2xl font-black shadow-2xl border-2 border-red-100 flex items-center gap-2 animate-bounce">
-                                                            <AlertCircle className="w-5 h-5" />
-                                                            SELECCIONE TURNO
+                                    <div className={`md:col-span-2 space-y-6 ${!presenterId ? 'hidden' : ''}`}>
+
+                                        <Card className={`border-0 shadow-2xl rounded-3xl transition-all duration-700 bg-white ${presenterId ? 'opacity-100 translate-y-0' : 'opacity-40 translate-y-4 pointer-events-none'}`}>
+                                            <CardHeader className="bg-[#0A3161] text-white">
+                                                <CardTitle className="font-black uppercase text-xs tracking-[0.2em] flex items-center gap-2">
+                                                    <PenTool className="w-4 h-4 text-[#B3D400]" /> Firma del Responsable
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="p-8 flex flex-col items-center">
+                                                <div className="relative w-full">
+                                                    <SignaturePad
+                                                        key={`presenter-${presenterId}`}
+                                                        onSave={setPresenterSignature}
+                                                        label="Firma de Validación"
+                                                    />
+                                                    {!shift && (
+                                                        <div
+                                                            className="absolute inset-0 z-50 bg-slate-50/80 backdrop-blur-[2px] flex items-center justify-center cursor-not-allowed rounded-xl transition-all"
+                                                            onClick={() => toast.warning("⚠ Por favor, seleccione el TURNO antes de firmar.", { duration: 4000, style: { fontSize: '1.2em' } })}
+                                                        >
+                                                            <div className="bg-white text-red-500 px-6 py-3 rounded-2xl font-black shadow-2xl border-2 border-red-100 flex items-center gap-2 animate-bounce">
+                                                                <AlertCircle className="w-5 h-5" />
+                                                                SELECCIONE TURNO
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    )}
+                                                </div>
+                                                {presenterSignature && (
+                                                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mt-4 bg-[#B3D400] text-[#0A3161] px-4 py-2 rounded-full font-black text-xs uppercase flex items-center gap-2 shadow-lg">
+                                                        <CheckCircle className="w-4 h-4" /> Firma Vinculada
+                                                    </motion.div>
                                                 )}
-                                            </div>
-                                            {presenterSignature && (
-                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mt-4 bg-[#B3D400] text-[#0A3161] px-4 py-2 rounded-full font-black text-xs uppercase flex items-center gap-2 shadow-lg">
-                                                    <CheckCircle className="w-4 h-4" /> Firma Vinculada
-                                                </motion.div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
                                 </div>
 
-                                <div className="flex justify-end pt-6 md:pt-10 border-t border-slate-100">
+                                <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-lg border-t border-slate-100 z-50 md:static md:bg-transparent md:border-t-0 md:p-0 md:pt-4 flex justify-end">
                                     <Button
                                         size="lg"
                                         onClick={handleNext}
@@ -999,17 +1103,17 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                     })}
                                 </div>
 
-                                <div className="fixed bottom-0 right-0 left-0 lg:left-72 p-4 md:p-6 bg-white/95 backdrop-blur-xl border-t z-40 flex items-center justify-between gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-[#0A3161]/5">
-                                    <Button variant="ghost" onClick={handleBack} className="h-12 md:h-14 px-4 md:px-8 font-black text-[#0A3161] hover:bg-slate-100 rounded-2xl tracking-widest uppercase text-[10px] md:text-xs shrink-0">
-                                        <ChevronLeft className="w-4 h-4 mr-2" /> <span className="hidden md:inline">Atrás</span><span className="md:hidden">Atrás</span>
+                                <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-lg border-t border-slate-100 z-50 md:static md:bg-transparent md:border-0 md:p-0 flex flex-col md:flex-row gap-4 justify-between pt-4 md:pt-10">
+                                    <Button variant="ghost" onClick={handleBack} className="w-full md:w-auto font-black text-[#0A3161] uppercase tracking-widest text-[10px] md:text-xs">
+                                        ← Volver
                                     </Button>
                                     <Button
                                         size="lg"
                                         onClick={handleNext}
                                         disabled={selectedEmployees.length === 0}
-                                        className="h-14 md:h-16 px-6 md:px-12 bg-[#0A3161] text-white hover:bg-[#0c3c75] font-black rounded-2xl shadow-xl tracking-widest text-[10px] md:text-sm uppercase flex items-center gap-3 w-full md:w-auto justify-center"
+                                        className={`w-full md:w-auto h-14 md:h-20 px-6 md:px-16 rounded-xl md:rounded-2xl font-black text-sm md:text-lg transition-all duration-700 shadow-xl md:shadow-2xl ${selectedEmployees.length > 0 ? 'bg-[#0A3161] text-white hover:bg-[#0c3c75] hover:scale-105' : 'bg-slate-200 text-slate-400'}`}
                                     >
-                                        <span className="truncate">{isEditMode ? 'Siguiente' : `Confirmar (${selectedEmployees.length})`}</span> <ChevronRight className="w-5 h-5 ml-auto md:ml-2 shrink-0" />
+                                        <span className="truncate">{isEditMode ? 'Siguiente' : `Confirmar (${selectedEmployees.length})`}</span> <ChevronRight className="w-5 h-5 md:w-6 md:h-6 ml-2" />
                                     </Button>
                                 </div>
                             </div>
@@ -1073,7 +1177,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                     />
                                 </div>
 
-                                <div className="flex flex-col md:flex-row gap-4 justify-between pt-6 md:pt-10">
+                                <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-lg border-t border-slate-100 z-50 md:static md:bg-transparent md:border-0 md:p-0 flex flex-col md:flex-row gap-4 justify-between pt-4 md:pt-10">
                                     <Button variant="ghost" onClick={handleBack} className="w-full md:w-auto font-black text-[#0A3161] uppercase tracking-widest text-[10px] md:text-xs">
                                         ← Volver al Personal
                                     </Button>
@@ -1081,9 +1185,9 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                         size="lg"
                                         onClick={handleNext}
                                         disabled={Object.keys(attendeeSignatures).length < selectedEmployees.length}
-                                        className={`h-16 md:h-20 px-10 md:px-16 rounded-2xl font-black text-base md:text-lg transition-all duration-700 shadow-2xl ${Object.keys(attendeeSignatures).length === selectedEmployees.length ? 'bg-[#0A3161] text-white hover:bg-[#0c3c75] hover:scale-105' : 'bg-slate-200 text-slate-400'}`}
+                                        className={`w-full md:w-auto h-14 md:h-20 px-6 md:px-16 rounded-xl md:rounded-2xl font-black text-sm md:text-lg transition-all duration-700 shadow-xl md:shadow-2xl ${Object.keys(attendeeSignatures).length === selectedEmployees.length ? 'bg-[#0A3161] text-white hover:bg-[#0c3c75] hover:scale-105' : 'bg-slate-200 text-slate-400'}`}
                                     >
-                                        Ver Resumen Final <ChevronRight className="w-6 h-6 ml-2" />
+                                        Ver Resumen Final <ChevronRight className="w-5 h-5 md:w-6 md:h-6 ml-2" />
                                     </Button>
                                 </div>
                             </div>

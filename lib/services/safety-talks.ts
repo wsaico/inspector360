@@ -19,10 +19,10 @@ export class SafetyTalksService {
      * 2. Charla programada GLOBAL (station_code = null) para esta fecha.
      * 3. Charlas atrasadas (opcional, por ahora solo del día).
      */
-    static async getSuggestedTalk(stationCode: string): Promise<{ data: TalkSchedule | null; error: any }> {
+    static async getSuggestedTalk(stationCode: string, dateObj?: Date): Promise<{ data: TalkSchedule | null; error: any }> {
         try {
             // Fix: Use local date to avoid timezone issues (UTC vs Local)
-            const date = new Date();
+            const date = dateObj || new Date();
             const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
             // 1. Buscar TODAS las charlas candidatas para HOY (Globales o Locales)
@@ -121,10 +121,10 @@ export class SafetyTalksService {
      * Obtiene el tema sugerido del día, independientemente de si ya se ejecutó.
      * Útil para el botón "Registrar Nuevo Turno".
      */
-    static async getDailyTopic(stationCode: string): Promise<{ data: TalkSchedule | null; error: any }> {
+    static async getDailyTopic(stationCode: string, dateObj?: Date): Promise<{ data: TalkSchedule | null; error: any }> {
         try {
             // Fix: Use local date
-            const date = new Date();
+            const date = dateObj || new Date();
             const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
             const { data: candidates, error } = await supabase

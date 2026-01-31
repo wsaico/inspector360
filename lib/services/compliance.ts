@@ -512,8 +512,8 @@ export class ComplianceService {
             const diffTime = createdDay.getTime() - inspectionDay.getTime();
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-            // Considerar puntual si se creó el mismo día o hasta 2 días después
-            if (diffDays >= 0 && diffDays <= 2) {
+            // Considerar puntual SOLO si se creó el mismo día (diffDays === 0)
+            if (diffDays === 0) {
               onTimeCount++;
             }
           }
@@ -855,7 +855,9 @@ export class ComplianceService {
         const diffValid = createDay.getTime() - execDay.getTime();
         const diffDays = Math.floor(diffValid / (1000 * 60 * 60 * 24));
 
-        if (diffDays <= 1) {
+        // Punctuality Check - Strict Same Day for High Standards
+        // User Requirement: "por no hacerlo en el mismo dia debe estar menos"
+        if (diffDays === 0) {
           onTimeCount++;
         } else {
           lateCount++;
@@ -1013,7 +1015,7 @@ export class ComplianceService {
             const createDate = new Date(exc.created_at).setHours(0, 0, 0, 0);
             const diffDays = (createDate - execDate) / (1000 * 60 * 60 * 24);
 
-            if (diffDays <= 1) { // Tolerancia 1 día
+            if (diffDays === 0) { // Estricto: Mismo día
               statsMap[exc.station_code].onTime++;
             }
           }
