@@ -43,28 +43,32 @@ export function AttendeeSignatureCapture({
         handleQuickSave(currentSignature);
     };
 
-    const handleQuickSave = (sig: string) => {
-        if (!sig) return;
-        // Guardar firma en el padre
-        onSaveSignature(currentAttendee.id, sig);
-        setCurrentSignature(null);
+    const moveToNextUnsigned = () => {
+        // Buscamos el siguiente índice que NO tenga firma
+        let nextIndex = currentIndex + 1;
+        while (nextIndex < attendees.length && existingSignatures[attendees[nextIndex].id]) {
+            nextIndex++;
+        }
 
-        // Avanzar al siguiente
-        if (currentIndex < attendees.length - 1) {
-            setCurrentIndex(prev => prev + 1);
+        if (nextIndex < attendees.length) {
+            setCurrentIndex(nextIndex);
+            setCurrentSignature(null);
         } else {
-            toast.success('¡Todos los asistentes han firmado!');
+            toast.success('¡Ronda finalizada! Todos han firmado.');
             onClose();
         }
     };
 
+    const handleQuickSave = (sig: string) => {
+        if (!sig) return;
+        // Guardar firma en el padre
+        onSaveSignature(currentAttendee.id, sig);
+
+        moveToNextUnsigned();
+    };
+
     const handleSkip = () => {
-        if (currentIndex < attendees.length - 1) {
-            setCurrentIndex(prev => prev + 1);
-            setCurrentSignature(null);
-        } else {
-            onClose();
-        }
+        moveToNextUnsigned();
     };
 
     const progress = ((Object.keys(existingSignatures).length) / attendees.length) * 100;
