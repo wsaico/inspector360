@@ -69,8 +69,8 @@ export default function Step1General() {
         setValue('station', stationCode, { shouldValidate: true });
       }
     } else if (profile && !profile.station && !currentStation) {
-      // Fallback solo si ya cargó el perfil y es admin sin estación: AQP por defecto
-      setValue('station', 'AQP', { shouldValidate: true });
+      // Fallback solo si ya cargó el perfil y es admin sin estación: No forzar AQP, dejar que el usuario seleccione
+      // setValue('station', '', { shouldValidate: true });
     }
   }, [profile, currentStation, setValue]);
 
@@ -204,7 +204,7 @@ export default function Step1General() {
             </Label>
 
             <EmployeeSelect
-              stationCode={currentStation || 'AQP'}
+              stationCode={currentStation || ''}
               value={watch('inspector_name')}
               onChange={(val) => {
                 setValue('inspector_name', val, { shouldValidate: true, shouldDirty: true });

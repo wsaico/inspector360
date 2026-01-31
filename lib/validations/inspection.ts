@@ -11,7 +11,7 @@ export const inspectionGeneralSchema = z.object({
   inspection_date: z.date().max(new Date(), 'La fecha no puede ser futura'),
   inspection_type: z.enum(['inicial', 'periodica', 'post_mantenimiento'], 'Tipo de inspección requerido'),
   inspector_name: z.string().min(1, 'Nombre del inspector requerido'),
-  station: z.enum(['AQP', 'CUZ', 'CIX', 'TRU', 'CJA', 'TPP', 'PIU'], 'Estación requerida'),
+  station: z.string().min(1, 'Estación requerida'),
 });
 
 export const inspectionSchema = z

@@ -483,7 +483,7 @@ export default function Step4Finalize() {
             </Label>
 
             <EmployeeSelect
-              stationCode={formData.general?.station || 'AQP'}
+              stationCode={formData.general?.station || ''}
               value={supervisorName}
               onChange={(val) => {
                 setSupervisorName(val);
@@ -545,7 +545,7 @@ export default function Step4Finalize() {
             </Label>
 
             <EmployeeSelect
-              stationCode={formData.general?.station || 'AQP'}
+              stationCode={formData.general?.station || ''}
               value={mechanicName}
               onChange={(val) => {
                 setMechanicName(val);
