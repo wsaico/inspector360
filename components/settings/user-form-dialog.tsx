@@ -31,7 +31,9 @@ const userSchema = z.object({
   full_name: z.string().min(3, 'Nombre debe tener al menos 3 caracteres'),
   role: z.enum(['admin', 'supervisor', 'sig', 'inspector', 'operador', 'mecanico'], 'Rol requerido'),
   station: z.string().optional(),
-  password: z.string().min(6, 'Contraseña debe tener al menos 6 caracteres').optional(),
+  password: z.string().optional().refine(val => !val || val.length >= 6, {
+    message: 'Contraseña debe tener al menos 6 caracteres',
+  }),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
@@ -89,6 +91,12 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
       reset();
     }
   }, [user, reset, setValue]);
+
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      console.log('UserFormDialog Validation Errors:', errors);
+    }
+  }, [errors]);
 
   const onSubmit = async (data: UserFormData) => {
     try {

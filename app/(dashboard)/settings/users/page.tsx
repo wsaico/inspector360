@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Loader2, UserPlus, MapPin, Key, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, UserPlus, MapPin, Key, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { User } from "@/types";
 import { UserFormDialog } from "@/components/settings/user-form-dialog";
@@ -29,11 +30,27 @@ export default function UsersPage() {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
 
-  // Pagination State
+  // Search and Pagination State
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const totalPages = Math.ceil(users.length / itemsPerPage);
-  const paginatedUsers = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const filteredUsers = users.filter((user) => {
+    const searchLow = searchTerm.toLowerCase();
+    return (
+      user.full_name.toLowerCase().includes(searchLow) ||
+      user.email.toLowerCase().includes(searchLow) ||
+      (user.station || "").toLowerCase().includes(searchLow)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (!canManageUsers && !canAccessSettings) {
@@ -150,9 +167,18 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar usuario o estación..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
         {canManageUsers && (
-          <Button onClick={handleCreateUser}>
+          <Button onClick={handleCreateUser} className="w-full md:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Usuario
           </Button>
@@ -160,8 +186,10 @@ export default function UsersPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Todos los Usuarios ({users.length})</CardTitle>
+        <CardHeader className="pb-3 text-center md:text-left">
+          <CardTitle className="text-xl">
+            {searchTerm ? `Resultados (${filteredUsers.length})` : `Todos los Usuarios (${users.length})`}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {users.length === 0 ? (
@@ -242,10 +270,10 @@ export default function UsersPage() {
           )}
         </CardContent>
         {/* Pagination Footer */}
-        {users.length > 0 && (
+        {filteredUsers.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-slate-100">
             <span className="text-sm text-slate-500 font-medium">
-              Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, users.length)} - {Math.min(currentPage * itemsPerPage, users.length)} de {users.length} usuarios
+              Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, filteredUsers.length)} - {Math.min(currentPage * itemsPerPage, filteredUsers.length)} de {filteredUsers.length} usuarios
             </span>
             <div className="flex items-center gap-2">
               <Button
