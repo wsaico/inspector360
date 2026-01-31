@@ -4,10 +4,13 @@ import { SafetyTalkWizard } from "@/components/safety-talks/wizard/safety-talk-w
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Video } from "lucide-react";
+import { TutorialModal } from "@/components/shared/tutorial-modal";
+import { useState } from "react";
 
 export default function RegisterTalkPage() {
     const searchParams = useSearchParams();
     const editId = searchParams.get('edit');
+    const [showTutorial, setShowTutorial] = useState(false);
 
     return (
         <div className="p-6 space-y-6">
@@ -23,12 +26,19 @@ export default function RegisterTalkPage() {
                 <Button
                     variant="outline"
                     className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-bold shadow-sm transition-all"
-                    onClick={() => window.open('https://drive.google.com/file/d/17bP9h0eQzSJn0GvhLm7mOK97nbQlgUaV/view?usp=sharing', '_blank')}
+                    onClick={() => setShowTutorial(true)}
                 >
                     <Video className="w-5 h-5 mr-2" />
                     Ver Tutorial
                 </Button>
             </div>
+
+            <TutorialModal
+                isOpen={showTutorial}
+                onOpenChange={setShowTutorial}
+                title="Charlas de Seguridad"
+                url="https://drive.google.com/file/d/17bP9h0eQzSJn0GvhLm7mOK97nbQlgUaV/view?usp=sharing"
+            />
 
             <SafetyTalkWizard editId={editId || undefined} />
         </div>

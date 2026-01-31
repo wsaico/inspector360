@@ -15,6 +15,9 @@ import {
   Lock,
   ArrowRight,
   ShieldCheck,
+  Video,
+  Play,
+  HelpCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -34,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { TutorialModal } from '@/components/shared/tutorial-modal';
 
 
 export default function DashboardPage() {
@@ -56,6 +60,13 @@ export default function DashboardPage() {
   const [recentInspections, setRecentInspections] = useState<any[]>([]);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [selectedType, setSelectedType] = useState<InspectionSystemType | null>(null);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [activeTutorial, setActiveTutorial] = useState<{ title: string; url: string } | null>(null);
+
+  const openTutorial = (title: string, url: string) => {
+    setActiveTutorial({ title, url });
+    setShowTutorialModal(true);
+  };
 
   // No elevar a global por "estación vacía"; solo admin/SIG o estación explícita "todas"
   const showAllStations = canViewAllStations || String(profile?.station || '').toLowerCase() === 'todas';
@@ -170,25 +181,85 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
-      {/* Action Buttons Header */}
-      <div className="flex justify-end items-center gap-4 pt-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href="/talks/register">
-            <Button variant="outline" className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 shadow-sm transition-all font-bold">
-              <ShieldCheck className="mr-2 h-4 w-4" />
-              Registrar Charla
-            </Button>
-          </Link>
-          {canCreateInspections && (
-            <Link href="/inspections/new">
-              <Button className="bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all font-bold">
-                <Plus className="mr-2 h-4 w-4" />
-                Nueva Inspección
+      {/* Quick Start / Learning Center */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid gap-6 md:grid-cols-2"
+      >
+        <Card className="overflow-hidden border-2 border-indigo-100 bg-gradient-to-br from-white to-indigo-50/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <ShieldCheck className="h-6 w-6 text-indigo-600" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-black text-indigo-900 uppercase">Charlas de Seguridad</CardTitle>
+                <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider">Inicio Rápido</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-600 mb-6">
+              Aprende a registrar la charla diaria, asistencia y firmas digitales en menos de 2 minutos.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => openTutorial('Charlas de Seguridad', 'https://drive.google.com/file/d/17bP9h0eQzSJn0GvhLm7mOK97nbQlgUaV/view?usp=sharing')}
+                className="flex-1 bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-bold shadow-sm"
+                variant="outline"
+              >
+                <Video className="mr-2 h-4 w-4" /> Ver Tutorial
               </Button>
-            </Link>
-          )}
-        </div>
+              <Link href="/talks/register" className="flex-1">
+                <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md">
+                  Comenzar <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <ClipboardList className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-black text-blue-900 uppercase">Inspección Técnica</CardTitle>
+                <p className="text-xs text-blue-600 font-bold uppercase tracking-wider">Inicio Rápido</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-600 mb-6">
+              Guía paso a paso para realizar inspecciones de equipos y generar reportes PDF profesionales.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => openTutorial('Inspección Técnica', 'https://drive.google.com/file/d/141Nmu285-EoQKXAXSzsMdySCf5j-H7bL/view?usp=sharing')}
+                className="flex-1 bg-white text-blue-600 border-blue-200 hover:bg-blue-50 font-bold shadow-sm"
+                variant="outline"
+              >
+                <Video className="mr-2 h-4 w-4" /> Ver Tutorial
+              </Button>
+              <Link href="/inspections/new" className="flex-1">
+                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md">
+                  Comenzar <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Action Buttons Header - Hidden or simplified if redundant */}
+      <div className="flex justify-between items-center gap-4 pt-2">
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-indigo-600" /> Resumen Operativo
+        </h2>
       </div>
 
       {/* Filtros */}
@@ -493,6 +564,13 @@ export default function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Modal Tutorial */}
+      <TutorialModal
+        isOpen={showTutorialModal}
+        onOpenChange={setShowTutorialModal}
+        title={activeTutorial?.title || ''}
+        url={activeTutorial?.url || ''}
+      />
     </div>
   );
 }

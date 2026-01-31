@@ -19,13 +19,15 @@ import { useAuth } from '@/hooks';
 import { InspectionService } from '@/lib/services';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
+import { TutorialModal } from '@/components/shared/tutorial-modal';
 
 function InspectionWizardContent() {
   const { currentStep, nextStep, prevStep, canProceed, formData, draftInspectionId, setDraftInspectionId, setGeneralInfo, addEquipment, updateChecklist, addObservation, setEquipmentDbId } = useInspectionForm();
   const { profile } = useAuth();
   const searchParams = useSearchParams();
   const [isAdvancing, setIsAdvancing] = React.useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Wrap searchParams usage in Suspense
   const draftId = searchParams.get('draft');
@@ -153,12 +155,19 @@ function InspectionWizardContent() {
         <Button
           variant="outline"
           className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-bold shadow-sm transition-all"
-          onClick={() => window.open('https://drive.google.com/file/d/141Nmu285-EoQKXAXSzsMdySCf5j-H7bL/view?usp=sharing', '_blank')}
+          onClick={() => setShowTutorial(true)}
         >
           <Video className="w-5 h-5 mr-2" />
           Ver Tutorial
         </Button>
       </div>
+
+      <TutorialModal
+        isOpen={showTutorial}
+        onOpenChange={setShowTutorial}
+        title="Inspección Técnica"
+        url="https://drive.google.com/file/d/141Nmu285-EoQKXAXSzsMdySCf5j-H7bL/view?usp=sharing"
+      />
 
       {/* Step Indicator (Mobile) - Modern App Design */}
       <div className="md:hidden sticky top-0 z-30 pt-2 -mx-4 px-4 bg-gray-50/95 backdrop-blur-sm">
