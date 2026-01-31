@@ -6,7 +6,7 @@ import { TalkExecution } from '@/types/safety-talks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, Trash2, UserPlus, Download } from 'lucide-react';
+import { FileText, Calendar, Trash2, UserPlus, Download, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks';
 import { SafetyTalksService } from '@/lib/services/safety-talks';
@@ -104,6 +104,7 @@ export default function HistoryPage() {
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Fecha y Hora</th>
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Tema / Boletín</th>
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Estación</th>
+                                    <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Turno</th>
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Puntualidad</th>
                                     <th className="p-5 text-left font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Expositor</th>
                                     <th className="p-5 text-right font-black text-[#B3D400] text-[10px] uppercase tracking-widest">Acciones</th>
@@ -130,6 +131,9 @@ export default function HistoryPage() {
                                             </td>
                                             <td className="p-5">
                                                 <Badge className="bg-slate-100 text-[#0A3161] border-0 font-black px-3 py-1 rounded-lg text-[9px] uppercase tracking-widest">{ex.station_code}</Badge>
+                                            </td>
+                                            <td className="p-5">
+                                                <span className="text-xs font-bold text-slate-500">{ex.shift || 'N/A'}</span>
                                             </td>
                                             <td className="p-5">
                                                 {(() => {
@@ -179,15 +183,27 @@ export default function HistoryPage() {
                                                         )}
                                                     </Button>
 
-                                                    <Button
-                                                        size="icon"
-                                                        variant="outline"
-                                                        onClick={() => window.location.href = `/talks/register?edit=${ex.id}`}
-                                                        className="border-[#0A3161] text-[#0A3161] h-9 w-9 rounded-xl hover:bg-[#0A3161] hover:text-white transition-all shadow-sm"
-                                                        title="Agregar Personal"
-                                                    >
-                                                        <UserPlus className="h-4 w-4" />
-                                                    </Button>
+                                                    {(() => {
+                                                        const execDate = new Date(ex.executed_at).getTime();
+                                                        const nowView = new Date().getTime();
+                                                        const hoursDiff = (nowView - execDate) / (1000 * 60 * 60);
+                                                        const isLocked = hoursDiff > 24;
+
+                                                        return (
+                                                            <div className="relative group/tooltip">
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="outline"
+                                                                    onClick={() => !isLocked && (window.location.href = `/talks/register?edit=${ex.id}`)}
+                                                                    disabled={isLocked}
+                                                                    className={`h-9 w-9 rounded-xl transition-all shadow-sm ${isLocked ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'border-[#0A3161] text-[#0A3161] hover:bg-[#0A3161] hover:text-white'}`}
+                                                                    title={isLocked ? "Bloqueado por límite de 24h" : "Agregar Personal"}
+                                                                >
+                                                                    {isLocked ? <Lock className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                                                                </Button>
+                                                            </div>
+                                                        );
+                                                    })()}
 
                                                     {profile?.role === 'admin' && (
                                                         <Button
@@ -221,29 +237,31 @@ export default function HistoryPage() {
             </Card>
 
             {/* Pagination Controls */}
-            {executions.length > itemsPerPage && (
-                <div className="flex justify-between items-center bg-white p-4 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.05)]">
-                    <Button
-                        variant="outline"
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="text-[#0A3161] font-bold"
-                    >
-                        Anterior
-                    </Button>
-                    <span className="text-[#0A3161] font-bold text-sm">
-                        Página {currentPage} de {Math.ceil(executions.length / itemsPerPage)}
-                    </span>
-                    <Button
-                        variant="outline"
-                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(executions.length / itemsPerPage), p + 1))}
-                        disabled={currentPage >= Math.ceil(executions.length / itemsPerPage)}
-                        className="text-[#0A3161] font-bold"
-                    >
-                        Siguiente
-                    </Button>
-                </div>
-            )}
-        </div>
+            {
+                executions.length > itemsPerPage && (
+                    <div className="flex justify-between items-center bg-white p-4 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.05)]">
+                        <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="text-[#0A3161] font-bold"
+                        >
+                            Anterior
+                        </Button>
+                        <span className="text-[#0A3161] font-bold text-sm">
+                            Página {currentPage} de {Math.ceil(executions.length / itemsPerPage)}
+                        </span>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(p => Math.min(Math.ceil(executions.length / itemsPerPage), p + 1))}
+                            disabled={currentPage >= Math.ceil(executions.length / itemsPerPage)}
+                            className="text-[#0A3161] font-bold"
+                        >
+                            Siguiente
+                        </Button>
+                    </div>
+                )
+            }
+        </div >
     );
 }

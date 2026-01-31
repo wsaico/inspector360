@@ -68,41 +68,40 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const load = async () => {
+      // Evitar cargar si la sesión no está activa
+      if (!user) {
+        return;
+      }
+      // Evitar cargar datos globales si el usuario no puede ver todas
+      // y aún no se ha establecido su estación.
+      if (!showAllStations && !station) {
+        return;
+      }
+
       setLoading(true);
       try {
-        // Evitar cargar si la sesión no está activa
-        if (!user) {
-          return;
-        }
-        // Evitar cargar datos globales si el usuario no puede ver todas
-        // y aún no se ha establecido su estación.
-        if (!showAllStations && !station) {
-          return;
-        }
-        const overall = await ComplianceService.getOverallStats({ station, month });
-        const daily = await ComplianceService.getDailyCompliance({ station, month, aggregateAll: showAllStations && !station });
+        const { start, end } = ComplianceService.getDateRange({ month });
+
+        const [overall, daily, { data: scoped }, { data: recent }] = await Promise.all([
+          ComplianceService.getOverallStats({ station, month }),
+          ComplianceService.getDailyCompliance({ station, month, aggregateAll: showAllStations && !station }),
+          InspectionService.getInspections({ station: station || undefined, start, end }),
+          InspectionService.getInspections({
+            page: 1,
+            pageSize: 5,
+            station: station || undefined,
+          })
+        ]);
 
         const total = overall.data?.totalInspections || 0;
         const completed = overall.data?.completedThisMonth || 0;
         const complianceRate = daily.data?.rate || 0;
-
-        // Calcular pendientes: inspecciones con observaciones del operador sin respuesta del mecánico
-        // o con firmas faltantes, dentro del rango del mes seleccionado y alcance de estación.
-        const { start, end } = ComplianceService.getDateRange({ month });
-        // Obtener inspecciones ya filtradas por estación y mes para evitar mezclar estaciones
-        const { data: scoped } = await InspectionService.getInspections({ station: station || undefined, start, end });
 
         const pendingReview = (scoped || []).reduce((acc: number, i: any) => {
           const hasPending = !!getMissingSignaturesLabel(i);
           return acc + (hasPending ? 1 : 0);
         }, 0);
 
-        // Fetch recent inspections
-        const { data: recent } = await InspectionService.getInspections({
-          page: 1,
-          pageSize: 5,
-          station: station || undefined,
-        });
         setRecentInspections(recent || []);
 
         setStats({

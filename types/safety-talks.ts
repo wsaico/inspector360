@@ -50,6 +50,7 @@ export interface TalkExecution {
     schedule_id?: string;
     station_code: string;
     executed_at: string;
+    shift?: 'MAÑANA' | 'TARDE' | 'NOCHE'; // New: Shift differentiation
     start_time?: string; // New: Punch In
     end_time?: string;   // New: Punch Out
     scheduled_headcount?: number; // New: Total active at time of talk

@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import {
     Plus, X, PlayCircle, Clock, FileText, UserCheck, Users,
     ChevronRight, ChevronLeft, PenTool, CheckCircle,
-    AlertCircle, Search, Building2, Loader2, Lock
+    AlertCircle, Search, Building2, Loader2, Lock, User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -51,6 +51,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
     // Data State
     const [currentStation, setCurrentStation] = useState<string>('LIM');
     const [schedule, setSchedule] = useState<TalkSchedule | null>(null);
+    const [dailyTopic, setDailyTopic] = useState<TalkSchedule | null>(null); // For "Register New Shift" check
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [allStations, setAllStations] = useState<StationConfig[]>([]);
 
@@ -62,6 +63,27 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
     const [attendeeSignatures, setAttendeeSignatures] = useState<Record<string, string>>({});
     const [observations, setObservations] = useState('');
     const [activityType, setActivityType] = useState('charla');
+    const [shift, setShift] = useState<'MAÑANA' | 'TARDE' | 'NOCHE' | ''>('');
+
+    // Autocomplete State
+    const [presenterSearch, setPresenterSearch] = useState('');
+    const [showPresenterSuggestions, setShowPresenterSuggestions] = useState(false);
+
+    const presenterSuggestions = useMemo(() => {
+        if (!presenterSearch || presenterSearch.length < 3) return [];
+        return employees.filter(e =>
+            e.full_name.toLowerCase().includes(presenterSearch.toLowerCase()) ||
+            (e.dni && e.dni.includes(presenterSearch))
+        ).slice(0, 50);
+    }, [employees, presenterSearch]);
+
+    // Sync search text if presenterId exists (e.g. loaded from DB or mismatch)
+    useEffect(() => {
+        if (presenterId && !presenterSearch && employees.length > 0) {
+            const p = employees.find(e => e.id === presenterId);
+            if (p) setPresenterSearch(p.full_name);
+        }
+    }, [presenterId, employees, presenterSearch]); // New State for Shift
     const [selectedBulletin, setSelectedBulletin] = useState<Bulletin | null>(null);
     const [isManualSelection, setIsManualSelection] = useState(false);
     const [allBulletins, setAllBulletins] = useState<Bulletin[]>([]);
@@ -105,10 +127,12 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                 setSelectedBulletin(execution.bulletin || null);
                 setPresenterId(execution.presenter_id || '');
                 setPresenterSignature(execution.presenter_signature || '');
-                setStartTime(execution.start_time || new Date().toISOString());
+                setStartTime(execution.start_time || '');
                 setObservations(execution.observations || '');
                 setActivityType(execution.activity_type || 'charla');
-                setCurrentStation(execution.station_code);
+                setShift((execution.shift as any) || '');
+                setPresenterSearch(execution.presenter?.full_name || ''); // Pre-fill search
+                setPresenterSignature(execution.presenter_signature || '');
 
                 // Set Attendees
                 // We keep original IDs to lock them and identifying new ones
@@ -132,12 +156,20 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
             }
 
             // Normal Create Mode
+            // Normal Create Mode
             const { data: talk } = await SafetyTalksService.getSuggestedTalk(currentStation);
+            const { data: daily } = await SafetyTalksService.getDailyTopic(currentStation);
             const { data: emps } = await SafetyTalksService.getStationEmployees(currentStation);
 
             setSchedule(talk);
+            setDailyTopic(daily);
+            setSchedule(talk);
+            setDailyTopic(daily);
             setSelectedBulletin(talk?.bulletin || null);
             setEmployees(sortEmployeesByHierarchy(emps || []));
+
+            // No auto-detect shift for safety reasons (Explicit user selection required)
+
             setLoading(false);
         };
         load();
@@ -301,6 +333,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                     schedule_id: schedule?.id,
                     bulletin_id: !schedule ? selectedBulletin?.id : undefined,
                     station_code: currentStation,
+                    shift: shift as any, // Send Shift
                     executed_at: startTime!,
                     start_time: startTime!,
                     end_time: endTime,
@@ -322,6 +355,23 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleNewShiftRegistration = async () => {
+        setLoading(true);
+        // Force manual mode or load daily topic again to allow new registration
+        // Just reload daily topic but keep us in CREATE mode
+        const { data: dailyTopic } = await SafetyTalksService.getDailyTopic(currentStation);
+        if (dailyTopic) {
+            setSchedule(dailyTopic);
+            setSelectedBulletin(dailyTopic.bulletin || null);
+            setStep(0); // Go to start
+            setIsManualSelection(false); // Reset manual selection
+        } else {
+            // Fallback if no daily topic found
+            toast.error('No se encontró una charla programada para hoy.');
+        }
+        setLoading(false);
     };
 
     // --- RENDER ---
@@ -413,7 +463,9 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                                     <h2 className="text-xl md:text-3xl font-black text-[#0A3161] leading-tight">
                                                         ¡Estación al día!
                                                     </h2>
-                                                    <p className="text-slate-500 font-medium">No hay charlas programadas pendientes para este turno.</p>
+                                                    <p className="text-slate-500 font-medium">
+                                                        La charla programada ya fue registrada. <span className="block mt-1 font-bold text-[#0A3161]">¿Deseas registrar otro turno? Utiliza la opción inferior.</span>
+                                                    </p>
                                                 </div>
                                                 <Button
                                                     variant="outline"
@@ -422,6 +474,14 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                                 >
                                                     <Plus className="w-4 h-4 mr-2" /> Realizar Charla Especial
                                                 </Button>
+                                                {dailyTopic && (
+                                                    <Button
+                                                        className="w-full md:w-auto bg-[#B3D400] text-[#0A3161] font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 px-6 rounded-xl hover:bg-[#c9ee00]"
+                                                        onClick={handleNewShiftRegistration}
+                                                    >
+                                                        <Users className="w-4 h-4 mr-2" /> Registrar Otro Turno
+                                                    </Button>
+                                                )}
                                             </div>
                                         ) : isManualSelection && !selectedBulletin ? (
                                             <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
@@ -630,7 +690,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
 
                             <div className="grid md:grid-cols-2 gap-8">
                                 <div className="space-y-6">
-                                    <Card className="border-0 shadow-xl rounded-3xl overflow-hidden bg-white">
+                                    <Card className="border-0 shadow-xl rounded-3xl bg-white relative z-20">
                                         <CardHeader className="bg-slate-50/50 border-b">
                                             <CardTitle className="text-[#0A3161] font-black uppercase text-sm tracking-widest">Seleccionar Atala (Expositor)</CardTitle>
                                         </CardHeader>
@@ -665,17 +725,80 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                                 </div>
 
                                                 <div>
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Líder / Expositor</label>
-                                                    <select
-                                                        className="w-full p-4 text-xl border-2 border-slate-100 rounded-2xl bg-white focus:border-[#0A3161] outline-none font-bold text-[#0A3161] transition-all"
-                                                        value={presenterId}
-                                                        onChange={(e) => setPresenterId(e.target.value)}
-                                                    >
-                                                        <option value="">-- Seleccione Líder --</option>
-                                                        {employees.map(emp => (
-                                                            <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                                                        Turno <span className="text-red-500 ml-1">* REQUERIDO</span>
+                                                    </label>
+                                                    {!shift && <p className="text-[10px] text-amber-600 font-bold mb-2 animate-pulse">⚠ Seleccione un turno para continuar</p>}
+                                                    <div className="grid grid-cols-3 gap-3">
+                                                        {['MAÑANA', 'TARDE', 'NOCHE'].map(s => (
+                                                            <button
+                                                                key={s}
+                                                                type="button"
+                                                                onClick={() => setShift(s as any)}
+                                                                className={`
+                                                                    px-4 py-3 rounded-xl border-2 font-bold text-xs transition-all relative z-10 flex items-center justify-center gap-2
+                                                                    ${shift === s
+                                                                        ? 'bg-[#0A3161] border-[#0A3161] text-white shadow-md transform scale-[1.02]'
+                                                                        : 'bg-white border-slate-100 text-slate-400 hover:border-[#0A3161]/30 hover:text-[#0A3161]'}
+                                                                `}
+                                                            >
+                                                                {shift === s && <CheckCircle className="w-3 h-3" />}
+                                                                {s}
+                                                            </button>
                                                         ))}
-                                                    </select>
+                                                    </div>
+                                                </div>
+
+                                                <div className="relative">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Líder / Expositor (Mín. 3 letras)</label>
+                                                    <div className="relative">
+                                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
+                                                        <Input
+                                                            className="w-full pl-12 pr-4 py-6 text-lg md:text-xl border-2 border-slate-100 rounded-2xl bg-white focus:border-[#0A3161] outline-none font-bold text-[#0A3161] transition-all"
+                                                            placeholder="Buscar por nombre..."
+                                                            value={presenterSearch}
+                                                            onChange={(e) => {
+                                                                setPresenterSearch(e.target.value);
+                                                                setPresenterId(''); // Clear selection on type
+                                                                setShowPresenterSuggestions(true);
+                                                            }}
+                                                            onFocus={() => setShowPresenterSuggestions(true)}
+                                                        />
+                                                    </div>
+
+                                                    {/* Suggestions List */}
+                                                    {showPresenterSuggestions && presenterSearch.length >= 3 && (
+                                                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 max-h-64 overflow-y-auto z-50 animate-in fade-in zoom-in-95 duration-200">
+                                                            {presenterSuggestions.length > 0 ? (
+                                                                presenterSuggestions.map(emp => (
+                                                                    <div
+                                                                        key={emp.id}
+                                                                        onClick={() => {
+                                                                            setPresenterId(emp.id);
+                                                                            setPresenterSearch(emp.full_name);
+                                                                            setShowPresenterSuggestions(false);
+                                                                        }}
+                                                                        className="p-4 hover:bg-[#F8FAFC] cursor-pointer border-b border-slate-50 last:border-0 flex items-center justify-between group transition-colors"
+                                                                    >
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-[#0A3161] group-hover:text-white transition-colors">
+                                                                                <User className="w-4 h-4" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="font-bold text-[#0A3161] text-sm md:text-base">{emp.full_name}</p>
+                                                                                <p className="text-[10px] text-slate-400 uppercase tracking-wider">{emp.position || 'Sin cargo'}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#B3D400]" />
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="p-6 text-center text-slate-400 text-sm font-medium">
+                                                                    No se encontraron colaboradores con ese nombre.
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {presenterId && (
@@ -696,11 +819,24 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="p-8 flex flex-col items-center">
-                                        <SignaturePad
-                                            key={`presenter-${presenterId}`}
-                                            onSave={setPresenterSignature}
-                                            label="Firma de Validación"
-                                        />
+                                        <div className="relative w-full">
+                                            <SignaturePad
+                                                key={`presenter-${presenterId}`}
+                                                onSave={setPresenterSignature}
+                                                label="Firma de Validación"
+                                            />
+                                            {!shift && (
+                                                <div
+                                                    className="absolute inset-0 z-50 bg-slate-50/80 backdrop-blur-[2px] flex items-center justify-center cursor-not-allowed rounded-xl transition-all"
+                                                    onClick={() => toast.warning("⚠ Por favor, seleccione el TURNO antes de firmar.", { duration: 4000, style: { fontSize: '1.2em' } })}
+                                                >
+                                                    <div className="bg-white text-red-500 px-6 py-3 rounded-2xl font-black shadow-2xl border-2 border-red-100 flex items-center gap-2 animate-bounce">
+                                                        <AlertCircle className="w-5 h-5" />
+                                                        SELECCIONE TURNO
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                         {presenterSignature && (
                                             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mt-4 bg-[#B3D400] text-[#0A3161] px-4 py-2 rounded-full font-black text-xs uppercase flex items-center gap-2 shadow-lg">
                                                 <CheckCircle className="w-4 h-4" /> Firma Vinculada
@@ -714,8 +850,8 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
                                 <Button
                                     size="lg"
                                     onClick={handleNext}
-                                    disabled={!presenterId || !presenterSignature}
-                                    className={`h-16 md:h-20 w-full md:w-auto px-10 md:px-16 rounded-2xl font-black text-base md:text-lg transition-all duration-500 shadow-xl ${presenterSignature ? 'bg-[#0A3161] hover:bg-[#0c3c75] text-white' : 'bg-slate-200 text-slate-400'}`}
+                                    disabled={!presenterId || !presenterSignature || !shift}
+                                    className={`h-16 md:h-20 w-full md:w-auto px-10 md:px-16 rounded-2xl font-black text-base md:text-lg transition-all duration-500 shadow-xl ${presenterSignature && shift ? 'bg-[#0A3161] hover:bg-[#0c3c75] text-white' : 'bg-slate-200 text-slate-400'}`}
                                 >
                                     Siguiente: Equipos <ChevronRight className="w-5 h-5 ml-2" />
                                 </Button>

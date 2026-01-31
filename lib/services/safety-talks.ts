@@ -21,7 +21,9 @@ export class SafetyTalksService {
      */
     static async getSuggestedTalk(stationCode: string): Promise<{ data: TalkSchedule | null; error: any }> {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            // Fix: Use local date to avoid timezone issues (UTC vs Local)
+            const date = new Date();
+            const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
             // 1. Buscar TODAS las charlas candidatas para HOY (Globales o Locales)
             // No filtramos por is_completed aquí porque eso es compartido globalmente.
@@ -116,6 +118,32 @@ export class SafetyTalksService {
     }
 
     /**
+     * Obtiene el tema sugerido del día, independientemente de si ya se ejecutó.
+     * Útil para el botón "Registrar Nuevo Turno".
+     */
+    static async getDailyTopic(stationCode: string): Promise<{ data: TalkSchedule | null; error: any }> {
+        try {
+            // Fix: Use local date
+            const date = new Date();
+            const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+            const { data: candidates, error } = await supabase
+                .from('talk_schedules')
+                .select(`*, bulletin:bulletins(*)`)
+                .eq('scheduled_date', today)
+                .or(`station_code.eq.${stationCode},station_code.is.null`)
+                .order('is_mandatory', { ascending: false })
+                .limit(1);
+
+            if (error) throw error;
+            return { data: candidates?.[0] || null, error: null };
+        } catch (error: any) {
+            console.error('[SafetyTalks] Error fetching daily topic:', error);
+            return { data: null, error: error.message };
+        }
+    }
+
+    /**
      * Registra la ejecución de una charla con sus asistentes y firmas.
      * Realiza múltiples inserciones (Header + Detalle) en "transacción".
      */
@@ -131,6 +159,7 @@ export class SafetyTalksService {
                     schedule_id: executionData.schedule_id,
                     station_code: executionData.station_code,
                     executed_at: executionData.executed_at || new Date().toISOString(),
+                    shift: executionData.shift, // Nuevo campo Turno
                     start_time: executionData.start_time,
                     end_time: executionData.end_time,
                     scheduled_headcount: executionData.scheduled_headcount || 0,
@@ -159,31 +188,14 @@ export class SafetyTalksService {
                 .insert(attendeesToInsert);
 
             if (attendeesError) {
-                // Nota: En un sistema real idealmente haríamos rollback manual o usaríamos RPC.
-                // Por ahora, asumimos éxito y alertamos error parcial.
                 console.error('[SafetyTalks] Error registering attendees:', attendeesError);
                 throw attendeesError;
-            }
-
-            // 3. Marcar Schedule como completado
-            // NO TOCAR 'is_completed' en schedules globales si queremos que siga pendiente para otros.
-            // La validación ahora es dinámica (paso 2 de getSuggestedTalk).
-            // Solo marcamos si es una charla ESPECÍFICA de esta estación (opcional, por ahora lo omitimos para consistencia)
-            if (executionData.schedule_id) {
-                // Check if it's local? For now, simpler to rely on dynamic check.
-                // We leave this empty or remove it.
             }
 
             return { data: execution, error: null };
 
         } catch (error: any) {
-            console.error('[SafetyTalks] Error executing talk:', {
-                message: error.message,
-                code: error.code,
-                details: error.details,
-                hint: error.hint,
-                full: error
-            });
+            console.error('[SafetyTalks] Error executing talk:', error);
             return { data: null, error: error.message || 'Unknown error' };
         }
     }
@@ -381,12 +393,31 @@ export class SafetyTalksService {
 
     /**
      * Agrega asistentes adicionales a una charla ya ejecutada.
+     * Incorpora validación de 24 horas.
      */
     static async addAttendees(
         executionId: string,
         newAttendees: { employee_id: string; signature: string; attended: boolean }[]
     ) {
         try {
+            // 1. Verificar fecha de ejecución
+            const { data: execution, error: fetchError } = await supabase
+                .from('talk_executions')
+                .select('executed_at')
+                .eq('id', executionId)
+                .single();
+
+            if (fetchError || !execution) throw new Error('No se encontró la ejecución');
+
+            const executedTime = new Date(execution.executed_at).getTime();
+            const now = new Date().getTime();
+            const hoursDiff = (now - executedTime) / (1000 * 60 * 60);
+
+            if (hoursDiff > 24) {
+                throw new Error('El periodo de 24 horas para firmas ha finalizado. No se permiten más cambios.');
+            }
+
+            // 2. Insertar asistentes
             const attendeesToInsert = newAttendees.map(att => ({
                 talk_id: executionId,
                 employee_id: att.employee_id,
