@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Menu, Loader2, ChevronRight, Sparkles, Zap } from 'lucide-react';
+import { Bell, Menu, Loader2, ChevronRight, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InspectionService } from '@/lib/services';
 import type { Inspection, Observation } from '@/types';
@@ -239,19 +239,7 @@ export function Navbar({ profile, user, canViewAllStations, onMenuToggle }: Navb
       </div>
 
       <div className="flex items-center gap-1.5 md:gap-4 shrink-0">
-        {/* Botón Inteligente de Novedades - Más compacto en móvil */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex items-center gap-1 md:gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter px-2 h-9"
-          onClick={() => window.dispatchEvent(new CustomEvent('i360_open_whats_new'))}
-        >
-          <div className="relative">
-            <Sparkles className="h-4 w-4 animate-pulse" />
-            <div className="absolute -top-1 -right-1 h-1.5 w-1.5 bg-blue-500 rounded-full border border-white" />
-          </div>
-          <span className="hidden sm:inline">Lo Nuevo</span>
-        </Button>
+
 
         <div className="relative">
           <Button

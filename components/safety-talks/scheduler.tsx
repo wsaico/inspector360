@@ -387,7 +387,7 @@ export function SafetyTalkScheduler() {
                             </Button>
 
                             <Dialog open={isDraftModalOpen} onOpenChange={setIsDraftModalOpen}>
-                                <DialogContent className="max-w-4xl p-0 overflow-hidden border-0 shadow-2xl rounded-[2rem] bg-slate-50 flex flex-col max-h-[85vh]">
+                                <DialogContent hideClose className="max-w-4xl p-0 overflow-hidden border-0 shadow-2xl rounded-[2rem] bg-slate-50 flex flex-col max-h-[85vh]">
                                     <div className="flex flex-col h-full overflow-hidden">
                                         {/* Header */}
                                         <div className="bg-[#0A3161] p-8 shrink-0">
