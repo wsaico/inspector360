@@ -148,37 +148,9 @@ export class ComplianceService {
       // Inspecciones completadas en el rango (mismo valor que totalInspections en este contexto de rango)
       const completedThisMonth = totalInspections;
 
-      // Total de equipos inspeccionados
-      const baseIdsQuery = supabase
-        .from('inspections')
-        .select('id')
-        .eq('status', 'completed')
-        .gte('inspection_date', start)
-        .lte('inspection_date', end);
-
-      let idsQuery = baseIdsQuery;
-      if (filters?.stations && filters.stations.length > 0) {
-        idsQuery = idsQuery.in('station', filters.stations);
-      } else if (filters?.station) {
-        idsQuery = idsQuery.eq('station', filters.station);
-      }
-
-      const { data: inspectionsForRange, error: idsError } = await idsQuery;
-      if (idsError) throw idsError;
-
-      const ids = (inspectionsForRange || [])
-        .map((i: { id?: string | null }) => i?.id || null)
-        .filter((v: string | null): v is string => typeof v === 'string' && v.length > 0);
-
-      let equipmentInspected = 0;
-      if (ids.length > 0) {
-        const { count, error: equipmentError } = await supabase
-          .from('equipment')
-          .select('*', { count: 'exact', head: true })
-          .in('inspection_id', ids);
-        if (equipmentError) throw equipmentError;
-        equipmentInspected = count || 0;
-      }
+      // OPTIMIZACIÓN: Se elimina el cálculo de 'equipmentInspected' ya que no se usa en el Dashboard
+      // y generaba una query pesada de IDs (potencial error de URL length).
+      const equipmentInspected = 0;
 
       // Calcular tasa de cumplimiento (items conformes vs totales)
       // OPTIMIZACIÓN: Se calculaba iterando todos los items, pero el dashboard usa daily.rate (basado en días).
