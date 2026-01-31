@@ -181,34 +181,9 @@ export class ComplianceService {
       }
 
       // Calcular tasa de cumplimiento (items conformes vs totales)
-      // Nota: Esto podría ser costoso si el rango es muy amplio, optimizar si es necesario
-      const eqDataQuery = supabase
-        .from('equipment')
-        .select('checklist_data')
-        .in('inspection_id', ids); // Solo equipos de las inspecciones filtradas
-
-      const { data: allEquipment, error: equipmentDataError } = await eqDataQuery;
-
-      if (equipmentDataError) throw equipmentDataError;
-
-      let totalItems = 0;
-      let conformeItems = 0;
-
-      allEquipment?.forEach((eq: EquipmentChecklistRow) => {
-        const checklist = eq.checklist_data as Record<string, ChecklistItem>;
-        if (checklist) {
-          Object.values(checklist).forEach((item) => {
-            totalItems++;
-            if (item.status === 'conforme') {
-              conformeItems++;
-            }
-          });
-        }
-      });
-
-      const complianceRate = totalItems > 0
-        ? Math.round((conformeItems / totalItems) * 100)
-        : 0;
+      // OPTIMIZACIÓN: Se calculaba iterando todos los items, pero el dashboard usa daily.rate (basado en días).
+      // Se elimina la carga de checklist_data para evitar "hanging" con muchos datos.
+      const complianceRate = 0;
 
       return {
         data: {
