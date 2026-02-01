@@ -303,7 +303,7 @@ const buildProfileFromMetadata = (supabaseUser: SupabaseUser): UserProfile | nul
       full_name = 'Administrador';
     }
     const metaRoleRaw = meta?.role as string | undefined;
-    const allowedRoles = ['admin', 'supervisor', 'inspector', 'sig'] as const;
+    const allowedRoles = ['admin', 'supervisor', 'inspector', 'sig', 'operador', 'mecanico'] as const;
     const normalizedRole = typeof metaRoleRaw === 'string' ? metaRoleRaw.trim().toLowerCase() : undefined;
     const synonyms: Record<string, UserProfile['role']> = {
       admin: 'admin',
@@ -314,6 +314,8 @@ const buildProfileFromMetadata = (supabaseUser: SupabaseUser): UserProfile | nul
       inspector: 'inspector',
       sig: 'sig',
       'sistema de información geográfica': 'sig',
+      operador: 'operador',
+      mecanico: 'mecanico',
     };
     const mappedRole = normalizedRole ? (synonyms[normalizedRole] || normalizedRole) : undefined;
     let role = mappedRole && (allowedRoles as readonly string[]).includes(mappedRole)

@@ -54,7 +54,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
     const [originalAttendeeIds, setOriginalAttendeeIds] = useState<string[]>([]);
 
     // Data State
-    const [currentStation, setCurrentStation] = useState<string>('LIM');
+    const [currentStation, setCurrentStation] = useState<string>('');
     const [schedule, setSchedule] = useState<TalkSchedule | null>(null);
     const [dailyTopic, setDailyTopic] = useState<TalkSchedule | null>(null); // For "Register New Shift" check
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -116,6 +116,7 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
 
     useEffect(() => {
         const load = async () => {
+            if (!currentStation) return;
             setLoading(true);
 
             if (isEditMode && editId) {
@@ -167,14 +168,11 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
 
             setSchedule(talk);
             setDailyTopic(daily);
-            setSchedule(talk);
-            setDailyTopic(daily);
             setSelectedBulletin(talk?.bulletin || null);
             setEmployees(sortEmployeesByHierarchy(emps || []));
 
             // No auto-detect shift for safety reasons (Explicit user selection required)
 
-            setLoading(false);
             setLoading(false);
         };
         load();
