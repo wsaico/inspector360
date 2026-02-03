@@ -446,20 +446,23 @@ export class ComplianceService {
           const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString();
           uniqueDays.add(dayKey);
 
-          // Punctuality Check - Considerar puntual si se registra el mismo día o dentro de 2 días
+          // Punctuality Check - Considerar puntual SOLO si se registra el mismo día
           if (i.created_at && i.inspection_date) {
             const created = new Date(i.created_at);
             const inspectionDate = new Date(i.inspection_date);
 
-            // Normalizar a medianoche para comparar solo fechas
-            const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
-            const inspectionDay = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate());
+            // Normalizar a medianoche UTC para comparar solo fechas (evitar problemas de timezone)
+            const createdDay = new Date(Date.UTC(created.getUTCFullYear(), created.getUTCMonth(), created.getUTCDate()));
+            const inspectionDay = new Date(Date.UTC(inspectionDate.getUTCFullYear(), inspectionDate.getUTCMonth(), inspectionDate.getUTCDate()));
 
             // Calcular diferencia en días
             const diffTime = createdDay.getTime() - inspectionDay.getTime();
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
             // Considerar puntual SOLO si se creó el mismo día (diffDays === 0)
+            // diffDays = 0: mismo día (PUNTUAL) ✅
+            // diffDays < 0: antes de la fecha (ANTICIPADO, NO puntual) ❌
+            // diffDays > 0: después de la fecha (TARDÍO, NO puntual) ❌
             if (diffDays === 0) {
               onTimeCount++;
             }
@@ -473,6 +476,8 @@ export class ComplianceService {
         const daysWithInspection = uniqueDays.size;
         const complianceRate = daysElapsed > 0 ? Math.min(100, Math.round((daysWithInspection / daysElapsed) * 100)) : 0;
 
+        // Puntualidad: Porcentaje de inspecciones completadas que se registraron a tiempo
+        // (el mismo día o antes de la fecha de inspección)
         const punctualityRate = completedInspections.length > 0
           ? Math.round((onTimeCount / completedInspections.length) * 100)
           : 0;
@@ -769,14 +774,25 @@ export class ComplianceService {
         }
       }
 
+      // Obtener fecha actual para filtrar charlas futuras
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
       // A) EJECUCIÓN
+      // Solo contar charlas programadas cuya fecha ya pasó o es hoy
       let calculatedTotalScheduled = 0;
       schedules?.forEach((sch: any) => {
-        if (sch.station_code) {
-          calculatedTotalScheduled += 1;
-        } else {
-          // Programación global: cuenta como N (todas las estaciones del alcance actual)
-          calculatedTotalScheduled += applicableStationsCount;
+        const scheduledDate = new Date(sch.scheduled_date);
+        const scheduledEndOfDay = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate(), 23, 59, 59);
+
+        // Solo contar si la fecha ya pasó o es hoy
+        if (scheduledEndOfDay <= today) {
+          if (sch.station_code) {
+            calculatedTotalScheduled += 1;
+          } else {
+            // Programación global: cuenta como N (todas las estaciones del alcance actual)
+            calculatedTotalScheduled += applicableStationsCount;
+          }
         }
       });
 
@@ -821,6 +837,8 @@ export class ComplianceService {
         : (totalExecuted > 0 && lateCount > 0 ? 100 : 0);
 
       // D) LISTA DE PENDIENTES
+      // Solo considerar pendientes las charlas cuya fecha ya pasó o es hoy
+
       const pendingList: Array<{ date: string; title: string; type: 'global' | 'specific'; missingCount: number }> = [];
       const executionsBySchedule: Record<string, number> = {};
       executions?.forEach((ex: any) => {
@@ -830,26 +848,33 @@ export class ComplianceService {
       });
 
       schedules?.forEach((sch: any) => {
-        const executionsCount = executionsBySchedule[sch.id] || 0;
-        let requiredCount = 0;
-        let type: 'global' | 'specific' = 'specific';
+        // Verificar si la fecha programada ya pasó o es hoy
+        const scheduledDate = new Date(sch.scheduled_date);
+        const scheduledEndOfDay = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate(), 23, 59, 59);
 
-        if (sch.station_code) {
-          requiredCount = 1;
-          type = 'specific';
-        } else {
-          requiredCount = applicableStationsCount;
-          type = 'global';
-        }
+        // Solo procesar si la fecha ya pasó o es hoy
+        if (scheduledEndOfDay <= today) {
+          const executionsCount = executionsBySchedule[sch.id] || 0;
+          let requiredCount = 0;
+          let type: 'global' | 'specific' = 'specific';
 
-        const missing = requiredCount - executionsCount;
-        if (missing > 0) {
-          pendingList.push({
-            date: sch.scheduled_date,
-            title: sch.bulletin?.title || 'Charla Programada',
-            type,
-            missingCount: missing
-          });
+          if (sch.station_code) {
+            requiredCount = 1;
+            type = 'specific';
+          } else {
+            requiredCount = applicableStationsCount;
+            type = 'global';
+          }
+
+          const missing = requiredCount - executionsCount;
+          if (missing > 0) {
+            pendingList.push({
+              date: sch.scheduled_date,
+              title: sch.bulletin?.title || 'Charla Programada',
+              type,
+              missingCount: missing
+            });
+          }
         }
       });
 
