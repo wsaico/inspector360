@@ -42,7 +42,7 @@ import Image from 'next/image';
 import { getChecklistItem } from '@/lib/checklist-template';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { usePermissions } from '@/hooks';
+import { usePermissions, useAuth } from '@/hooks';
 import { withTimeout } from '@/lib/utils/async';
 import dynamic from 'next/dynamic';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,7 @@ export default function InspectionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { canEditInspections } = usePermissions();
+  const { profile } = useAuth();
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedEquipment, setExpandedEquipment] = useState<string[]>([]);
@@ -438,12 +439,12 @@ export default function InspectionDetailPage() {
           {canEditInspections && (!isSupervisorSigned(inspection) || !isMechanicSigned(inspection)) && (
             <div className="flex flex-col gap-2 w-full md:w-auto">
               {hasPendingObservations(inspection) && (
-                <p className="text-xs text-muted-foreground">
-                  Hay observaciones registradas. La inspección puede estar completada, se recomienda revisarlas.
+                <p className="text-xs text-muted-foreground hidden md:block">
+                  Hay observaciones registradas.
                 </p>
               )}
               <div className="flex gap-2">
-                {!isSupervisorSigned(inspection) && (
+                {!isSupervisorSigned(inspection) && (profile?.role === 'admin' || profile?.role === 'supervisor') && (
                   <Button
                     variant="outline"
                     className="w-full md:w-auto"
@@ -460,7 +461,7 @@ export default function InspectionDetailPage() {
                     Firmar Supervisor
                   </Button>
                 )}
-                {!isMechanicSigned(inspection) && (
+                {!isMechanicSigned(inspection) && (profile?.role === 'admin' || profile?.role === 'mecanico') && (
                   <Button
                     variant="outline"
                     className="w-full md:w-auto"
