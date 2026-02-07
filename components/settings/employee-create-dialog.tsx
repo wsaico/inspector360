@@ -48,9 +48,7 @@ const employeeSchema = z.object({
         .min(3, 'El nombre debe tener al menos 3 caracteres')
         .transform(val => val.trim().toUpperCase()),
     position: z.string().optional(),
-    area: z.enum(['RAMPA', 'PAX', 'MANTTO', 'ADMIN'], {
-        required_error: 'Debe seleccionar un área'
-    }),
+    area: z.enum(['RAMPA', 'PAX', 'MANTTO', 'ADMIN'] as const),
     station_code: z.string().min(1, 'Debe seleccionar una estación'),
 });
 
