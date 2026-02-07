@@ -31,8 +31,14 @@ export function ENEquipmentHeatmap({ startDate, endDate, selectedStations }: ENE
         setError(null);
 
         try {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
+            // Fix: Parse dates explicitly as local time to avoid UTC-5 offset issues
+            // new Date("2026-02-01") -> UTC 00:00 -> Local 19:00 (prev day)
+            // Solution: Split and create date or append T00:00:00
+            const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+            const start = new Date(startYear, startMonth - 1, startDay);
+
+            const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+            const end = new Date(endYear, endMonth - 1, endDay);
 
             // Pasar el array completo de estaciones seleccionadas
             // Si está vacío, el backend cargará todas las estaciones
