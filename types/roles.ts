@@ -25,6 +25,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export interface RolePermissions {
   canManageUsers: boolean;
+  canManageEmployees: boolean; // Gestionar empleados (crear, editar, cesar)
   canViewAllStations: boolean;
   canCreateInspections: boolean;
   canEditInspections: boolean;
@@ -36,6 +37,7 @@ export interface RolePermissions {
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
     canManageUsers: true,
+    canManageEmployees: true,
     canViewAllStations: true,
     canCreateInspections: true,
     canEditInspections: true,
@@ -45,15 +47,17 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
   supervisor: {
     canManageUsers: false,
+    canManageEmployees: true, // Puede gestionar empleados de su estación
     canViewAllStations: false,
     canCreateInspections: true,
     canEditInspections: true,
     canDeleteInspections: false,
     canExportReports: true,
-    canAccessSettings: false,
+    canAccessSettings: true, // Ahora puede acceder a configuración
   },
   inspector: {
     canManageUsers: false,
+    canManageEmployees: false,
     canViewAllStations: false,
     canCreateInspections: true,
     canEditInspections: false,
@@ -63,6 +67,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
   sig: {
     canManageUsers: false,
+    canManageEmployees: false,
     canViewAllStations: true,
     canCreateInspections: false,
     canEditInspections: false,
@@ -72,6 +77,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
   operador: {
     canManageUsers: false,
+    canManageEmployees: false,
     canViewAllStations: false,
     canCreateInspections: true,
     canEditInspections: true,
@@ -81,6 +87,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
   mecanico: {
     canManageUsers: false,
+    canManageEmployees: false,
     canViewAllStations: false,
     canCreateInspections: true,
     canEditInspections: true,

@@ -110,72 +110,117 @@ export function SafetyTalkWizard({ editId }: { editId?: string }) {
     useEffect(() => {
         if (profile?.station) setCurrentStation(profile.station);
         if (profile?.role === 'admin') {
-            StationsService.listActive().then(res => setAllStations(res.data));
+            StationsService.listActive().then(res => setAllStations(res.data)).catch(() => {
+                // Silently fail for stations list, not critical
+            });
         }
     }, [profile]);
 
     useEffect(() => {
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout;
+
         const load = async () => {
             if (!currentStation) return;
+
+            // Set timeout to prevent infinite loading
+            timeoutId = setTimeout(() => {
+                if (isMounted && loading) {
+                    console.error('Load timeout - forcing loading to false');
+                    setLoading(false);
+                    toast.error('La carga está tomando más tiempo del esperado. Por favor, recargue la página.');
+                }
+            }, 15000); // 15 second timeout
+
             setLoading(true);
 
-            if (isEditMode && editId) {
-                // Load existing execution
-                const { data: execution, error } = await SafetyTalksService.getExecution(editId);
+            try {
+                if (isEditMode && editId) {
+                    // Load existing execution
+                    const { data: execution, error } = await SafetyTalksService.getExecution(editId);
 
-                if (error || !execution) {
-                    toast.error('Error cargando charla: ' + (error || 'No encontrada'));
+                    if (!isMounted) return;
+
+                    if (error || !execution) {
+                        toast.error('Error cargando charla: ' + (error || 'No encontrada'));
+                        setLoading(false);
+                        return;
+                    }
+
+                    // Set Schedule/Bulletin Data
+                    setSchedule(execution.schedule || null);
+                    setSelectedBulletin(execution.bulletin || null);
+                    setPresenterId(execution.presenter_id || '');
+                    setPresenterSignature(execution.presenter_signature || '');
+                    setStartTime(execution.start_time || '');
+                    setObservations(execution.observations || '');
+                    setActivityType(execution.activity_type || 'charla');
+                    setShift((execution.shift as any) || '');
+                    setPresenterSearch(execution.presenter?.full_name || ''); // Pre-fill search
+                    setPresenterSignature(execution.presenter_signature || '');
+
+                    // Set Attendees
+                    // We keep original IDs to lock them and identifying new ones
+                    const originalIds = execution.attendees?.map((a: any) => a.employee_id) || [];
+                    setOriginalAttendeeIds(originalIds);
+                    setSelectedEmployees(originalIds);
+
+                    // Restore signatures for display
+                    const sigs: Record<string, string> = {};
+                    execution.attendees?.forEach((a: any) => {
+                        if (a.signature) sigs[a.employee_id] = a.signature;
+                    });
+                    setAttendeeSignatures(sigs);
+
+                    // Load station employees to allow adding new ones
+                    const { data: emps } = await SafetyTalksService.getStationEmployees(execution.station_code);
+                    if (isMounted) {
+                        setEmployees(sortEmployeesByHierarchy(emps || []));
+                        setLoading(false);
+                    }
                     return;
                 }
 
-                // Set Schedule/Bulletin Data
-                setSchedule(execution.schedule || null);
-                setSelectedBulletin(execution.bulletin || null);
-                setPresenterId(execution.presenter_id || '');
-                setPresenterSignature(execution.presenter_signature || '');
-                setStartTime(execution.start_time || '');
-                setObservations(execution.observations || '');
-                setActivityType(execution.activity_type || 'charla');
-                setShift((execution.shift as any) || '');
-                setPresenterSearch(execution.presenter?.full_name || ''); // Pre-fill search
-                setPresenterSignature(execution.presenter_signature || '');
+                // Normal Create Mode - Load in parallel for better performance
+                const [talkResult, dailyResult, empsResult] = await Promise.allSettled([
+                    SafetyTalksService.getSuggestedTalk(currentStation, executionDate),
+                    SafetyTalksService.getDailyTopic(currentStation, executionDate),
+                    SafetyTalksService.getStationEmployees(currentStation)
+                ]);
 
-                // Set Attendees
-                // We keep original IDs to lock them and identifying new ones
-                const originalIds = execution.attendees?.map((a: any) => a.employee_id) || [];
-                setOriginalAttendeeIds(originalIds);
-                setSelectedEmployees(originalIds);
+                if (!isMounted) return;
 
-                // Restore signatures for display
-                const sigs: Record<string, string> = {};
-                execution.attendees?.forEach((a: any) => {
-                    if (a.signature) sigs[a.employee_id] = a.signature;
-                });
-                setAttendeeSignatures(sigs);
+                // Extract data from settled promises
+                const talk = talkResult.status === 'fulfilled' ? talkResult.value.data : null;
+                const daily = dailyResult.status === 'fulfilled' ? dailyResult.value.data : null;
+                const emps = empsResult.status === 'fulfilled' ? empsResult.value.data : [];
 
-                // Load station employees to allow adding new ones
-                const { data: emps } = await SafetyTalksService.getStationEmployees(execution.station_code);
+                setSchedule(talk);
+                setDailyTopic(daily);
+                setSelectedBulletin(talk?.bulletin || null);
                 setEmployees(sortEmployeesByHierarchy(emps || []));
 
+                // No auto-detect shift for safety reasons (Explicit user selection required)
+
                 setLoading(false);
-                return;
+            } catch (error: any) {
+                console.error('Error loading wizard data:', error);
+                if (isMounted) {
+                    setLoading(false);
+                    toast.error('Error al cargar los datos: ' + (error.message || 'Error desconocido'));
+                }
+            } finally {
+                clearTimeout(timeoutId);
             }
-
-            // Normal Create Mode
-            const { data: talk } = await SafetyTalksService.getSuggestedTalk(currentStation, executionDate);
-            const { data: daily } = await SafetyTalksService.getDailyTopic(currentStation, executionDate);
-            const { data: emps } = await SafetyTalksService.getStationEmployees(currentStation);
-
-            setSchedule(talk);
-            setDailyTopic(daily);
-            setSelectedBulletin(talk?.bulletin || null);
-            setEmployees(sortEmployeesByHierarchy(emps || []));
-
-            // No auto-detect shift for safety reasons (Explicit user selection required)
-
-            setLoading(false);
         };
+
         load();
+
+        // Cleanup function
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, [currentStation, isEditMode, editId, executionDate]);
 
     // Load all bulletins when manual selection is active

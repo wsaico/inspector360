@@ -98,8 +98,8 @@ const navigationGroups: NavGroup[] = [
         icon: Settings,
         permission: 'canAccessSettings',
         submenu: [
-          { name: 'Gestión de Usuarios', href: '/settings/users' },
-          { name: 'Base de Empleados', href: '/settings/employees' },
+          { name: 'Gestión de Usuarios', href: '/settings/users', permission: 'canManageUsers' },
+          { name: 'Base de Empleados', href: '/settings/employees', permission: 'canManageEmployees' },
           { name: 'Ajustes de Sistema', href: '/settings' },
         ]
       },

@@ -25,6 +25,7 @@ import { ComplianceTrend } from "@/components/dashboard/compliance-trend"
 import { StationComplianceChart } from "@/components/dashboard/station-compliance-chart"
 import { PendingInspectionsList } from "@/components/dashboard/pending-inspections-list"
 import { StationComplianceHeatmap } from "@/components/dashboard/station-compliance-heatmap"
+import { ENEquipmentHeatmap } from "@/components/inspections/en-equipment-heatmap"
 
 export default function CompliancePage() {
   const { profile, loading: profileLoading, user } = useAuth();
@@ -466,6 +467,13 @@ export default function CompliancePage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* EN Equipment Heatmap */}
+            <ENEquipmentHeatmap
+              startDate={startDate}
+              endDate={endDate}
+              selectedStations={selectedStations}
+            />
           </div>
 
           {/* Main Chart & Ranking Side by Side */}

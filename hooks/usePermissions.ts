@@ -11,6 +11,7 @@ import { ROLE_PERMISSIONS, RolePermissions } from '@/types/roles';
 
 const DEFAULT_PERMISSIONS: RolePermissions = {
   canManageUsers: false,
+  canManageEmployees: false,
   canViewAllStations: false,
   canCreateInspections: false,
   canEditInspections: false,

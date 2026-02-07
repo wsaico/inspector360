@@ -25,7 +25,11 @@ export function useEmployees(stationCode?: string) {
         },
         enabled: !!stationCode, // Solo ejecutar si hay estación
         staleTime: 1000 * 60 * 10, // 10 minutos de cache (datos estables)
+        gcTime: 1000 * 60 * 15, // 15 minutos antes de garbage collection
         refetchOnWindowFocus: false,
+        refetchOnMount: false, // No refetch si hay datos en cache
+        retry: 2, // Solo 2 reintentos para evitar loops infinitos
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
     });
 
     // Mutación: Agregar empleado nuevo (Quick Create)

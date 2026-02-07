@@ -221,6 +221,55 @@ export class SafetyTalksService {
     }
 
     /**
+     * Crea un nuevo empleado con validaciones
+     */
+    static async createEmployee(employee: {
+        dni: string;
+        full_name: string;
+        position?: string;
+        area?: string;
+        station_code: string;
+        is_active?: boolean;
+    }) {
+        try {
+            // Validar DNI (8 dígitos)
+            if (!/^\d{8}$/.test(employee.dni)) {
+                throw new Error('El DNI debe tener exactamente 8 dígitos numéricos');
+            }
+
+            // Verificar si el DNI ya existe
+            const { data: existing } = await supabase
+                .from('employees')
+                .select('dni')
+                .eq('dni', employee.dni)
+                .single();
+
+            if (existing) {
+                throw new Error('Ya existe un empleado con este DNI');
+            }
+
+            // Convertir nombre a MAYÚSCULAS y limpiar espacios
+            const employeeData = {
+                ...employee,
+                full_name: employee.full_name.trim().toUpperCase(),
+                is_active: employee.is_active !== undefined ? employee.is_active : true
+            };
+
+            const { data, error } = await supabase
+                .from('employees')
+                .insert(employeeData)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return { data, error: null };
+        } catch (error: any) {
+            console.error('[SafetyTalks] Error creating employee:', error);
+            return { data: null, error: error.message };
+        }
+    }
+
+    /**
      * Bulk Upload: Carga masiva de empleados.
      * Usa "Upsert" (Actualiza si existe DNI, Crea si no).
      */

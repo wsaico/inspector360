@@ -55,6 +55,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EmployeeCreateDialog } from '@/components/settings/employee-create-dialog';
 
 
 const PREDEFINED_POSITIONS = [
@@ -110,6 +111,7 @@ export default function EmployeesPage() {
 
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCustomPosition, setIsCustomPosition] = useState(false);
 
@@ -178,11 +180,10 @@ export default function EmployeesPage() {
                             Carga Masiva
                         </Button>
                     </Link>
-                    {/* Futuro: Crear individual */}
-                    {/* <Button className="gap-2">
+                    <Button className="gap-2" onClick={() => setIsCreateDialogOpen(true)}>
                         <Plus className="h-4 w-4" />
                         Nuevo Empleado
-                    </Button> */}
+                    </Button>
                 </div>
             </div>
 
@@ -442,6 +443,16 @@ export default function EmployeesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Modal de Creación */}
+            <EmployeeCreateDialog
+                open={isCreateDialogOpen}
+                onClose={(refresh) => {
+                    setIsCreateDialogOpen(false);
+                    if (refresh) loadEmployees();
+                }}
+                supervisorStation={profile?.station}
+            />
         </div>
     );
 }
