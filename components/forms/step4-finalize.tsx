@@ -15,6 +15,7 @@ import { CheckCircle2, Loader2, AlertCircle, Wrench, MessageSquare, PenTool, Use
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { EmployeeSelect } from './employee-select';
+import { Badge } from '@/components/ui/badge';
 
 export default function Step4Finalize() {
   const router = useRouter();
@@ -186,6 +187,39 @@ export default function Step4Finalize() {
     }
   };
 
+  // Helper logic for permissions
+  const role = profile?.role;
+  const canSignSupervisor = role === 'admin' || role === 'supervisor';
+  const canSignMechanic = role === 'admin' || role === 'mecanico';
+  const canRespondMechanic = role === 'admin' || role === 'mecanico';
+
+  // Helper component for read-only signature
+  const ReadOnlySignature = ({ label, name, signature }: { label: string, name: string | null, signature: string | null }) => (
+    <div className="rounded-xl border-2 border-slate-200 border-dashed bg-slate-50 p-6 flex flex-col items-center justify-center text-center space-y-3 cursor-not-allowed opacity-80">
+      <div className="h-12 w-12 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
+        <PenTool className="h-6 w-6" />
+      </div>
+      <div>
+        <p className="font-bold text-slate-700 uppercase tracking-wide text-sm">{label}</p>
+        {name ? (
+          <p className="text-sm font-medium text-slate-900 mt-1">{name}</p>
+        ) : (
+          <p className="text-xs text-slate-400 mt-1 italic">Pendiente de firma</p>
+        )}
+      </div>
+      {signature ? (
+        <div className="mt-2 border rounded bg-white p-2">
+          <img src={signature} alt="Firma" className="max-h-24 object-contain" />
+        </div>
+      ) : (
+        <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-200">
+          Solo Lectura / No Disponible para tu Rol
+        </Badge>
+      )}
+    </div>
+  );
+
+
   const handleComplete = async () => {
 
     if (!profile?.id) {
@@ -282,11 +316,14 @@ export default function Step4Finalize() {
           const key = `${o.equipment_code}::${o.obs_id}`;
           const existing = existingObsMap.get(key);
 
+          // Solo guardar respuesta de mantenimiento si el rol lo permite
+          const maintenanceResponse = canRespondMechanic ? (o.obs_maintenance ?? null) : (existing?.obs_maintenance ?? null);
+
           if (existing) {
             // Actualizar observación existente
             await InspectionService.updateObservation(existing.id, {
               obs_operator: o.obs_operator,
-              obs_maintenance: o.obs_maintenance ?? null,
+              obs_maintenance: maintenanceResponse,
               order_index: i,
             });
           } else {
@@ -296,19 +333,26 @@ export default function Step4Finalize() {
               obs_id: o.obs_id,
               equipment_code: o.equipment_code,
               obs_operator: o.obs_operator,
-              obs_maintenance: o.obs_maintenance ?? null,
+              obs_maintenance: maintenanceResponse,
               order_index: i,
             });
           }
         }
       }
 
-      // 3. Completar con firmas
+      // 3. Completar con firmas (respetando permisos)
+      // Si no tiene permiso de firmar, mantener lo que ya estaba (si existe) o null
+      const finalSupervisorName = canSignSupervisor ? supervisorName : (savedSupervisorName || formData.signatures.supervisor_name || null);
+      const finalSupervisorSig = canSignSupervisor ? supervisorSignature : (formData.signatures.supervisor_signature || null);
+
+      const finalMechanicName = canSignMechanic ? mechanicName : (savedMechanicName || formData.signatures.mechanic_name || null);
+      const finalMechanicSig = canSignMechanic ? mechanicSignature : (formData.signatures.mechanic_signature || null);
+
       await InspectionService.completeInspection(inspectionId!, {
-        supervisorName: supervisorName || null,
-        supervisorSignature: supervisorSignature || null,
-        mechanicName: mechanicName || null,
-        mechanicSignature: mechanicSignature || null,
+        supervisorName: finalSupervisorName || null,
+        supervisorSignature: finalSupervisorSig || null,
+        mechanicName: finalMechanicName || null,
+        mechanicSignature: finalMechanicSig || null,
       });
 
       toast.success('Inspección completada exitosamente');
@@ -391,31 +435,39 @@ export default function Step4Finalize() {
 
                         <div className="space-y-2">
                           <Label className="text-xs font-bold uppercase text-slate-500 tracking-wide">Respuesta del Mecánico:</Label>
-                          <Textarea
-                            placeholder="Describa la acción correctiva tomada o el plan de reparación..."
-                            value={mechanicResponses[key] || ''}
-                            onChange={(e) => handleMechanicResponseChange(index, obs.equipment_code, obs.obs_id, e.target.value)}
-                            className="min-h-[80px] text-sm rounded-xl border-slate-200 focus:border-[#0A3161] focus:ring-[#0A3161]"
-                            rows={3}
-                            disabled={hasResponse}
-                          />
-                          {hasResponse ? (
-                            <div className="px-4 py-3 bg-green-50 rounded-xl border border-green-200 shadow-sm">
-                              <p className="text-sm font-bold text-green-800 flex items-center gap-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                Respuesta guardada
-                              </p>
-                            </div>
+                          {canRespondMechanic ? (
+                            <>
+                              <Textarea
+                                placeholder="Describa la acción correctiva tomada o el plan de reparación..."
+                                value={mechanicResponses[key] || ''}
+                                onChange={(e) => handleMechanicResponseChange(index, obs.equipment_code, obs.obs_id, e.target.value)}
+                                className="min-h-[80px] text-sm rounded-xl border-slate-200 focus:border-[#0A3161] focus:ring-[#0A3161]"
+                                rows={3}
+                                disabled={hasResponse}
+                              />
+                              {hasResponse ? (
+                                <div className="px-4 py-3 bg-green-50 rounded-xl border border-green-200 shadow-sm">
+                                  <p className="text-sm font-bold text-green-800 flex items-center gap-2">
+                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                    Respuesta guardada
+                                  </p>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSaveMechanicResponse(index, obs.equipment_code, obs.obs_id)}
+                                  className="w-full bg-[#0A3161] hover:bg-[#152d6f] text-white font-bold rounded-xl"
+                                  disabled={!mechanicResponses[key]?.trim()}
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4 text-[#B3D400]" />
+                                  Guardar Respuesta
+                                </Button>
+                              )}
+                            </>
                           ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveMechanicResponse(index, obs.equipment_code, obs.obs_id)}
-                              className="w-full bg-[#0A3161] hover:bg-[#152d6f] text-white font-bold rounded-xl"
-                              disabled={!mechanicResponses[key]?.trim()}
-                            >
-                              <CheckCircle2 className="mr-2 h-4 w-4 text-[#B3D400]" />
-                              Guardar Respuesta
-                            </Button>
+                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm text-slate-500 italic">
+                              {mechanicResponses[key] ? mechanicResponses[key] : 'Sin respuesta registrada'}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -476,51 +528,61 @@ export default function Step4Finalize() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 p-6 bg-slate-50/50">
-          <div className="space-y-3 relative z-20">
-            <Label htmlFor="supervisor-name" className="text-xs font-black uppercase text-[#0A3161] tracking-wider flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Nombre del Supervisor
-            </Label>
+          {canSignSupervisor ? (
+            <>
+              <div className="space-y-3 relative z-20">
+                <Label htmlFor="supervisor-name" className="text-xs font-black uppercase text-[#0A3161] tracking-wider flex items-center gap-2">
+                  <UserCheck className="h-4 w-4" />
+                  Nombre del Supervisor
+                </Label>
 
-            <EmployeeSelect
-              stationCode={formData.general?.station || ''}
-              value={supervisorName}
-              onChange={(val) => {
-                setSupervisorName(val);
-                setSignatures({
-                  ...formData.signatures,
-                  supervisor_name: val,
-                });
-              }}
-              className="h-12 rounded-xl border-slate-200 bg-white"
-              placeholder="Seleccione al supervisor..."
+                <EmployeeSelect
+                  stationCode={formData.general?.station || ''}
+                  value={supervisorName}
+                  onChange={(val) => {
+                    setSupervisorName(val);
+                    setSignatures({
+                      ...formData.signatures,
+                      supervisor_name: val,
+                    });
+                  }}
+                  className="h-12 rounded-xl border-slate-200 bg-white"
+                  placeholder="Seleccione al supervisor..."
+                />
+
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1 fa-fade">
+                  {supervisorName ? '✓ Personal Seleccionado' : 'Seleccione de la lista oficial'}
+                </p>
+              </div>
+              <SignaturePad
+                label="Firma del Supervisor"
+                storageKey="inspector360.signature.supervisor"
+                onSave={(sig) => {
+                  setSupervisorSignature(sig);
+                  setSignatures({
+                    ...formData.signatures,
+                    supervisor_signature: sig,
+                    supervisor_name: supervisorName,
+                  });
+                }}
+                onChange={(sig) => {
+                  setSupervisorSignature(sig);
+                  setSignatures({
+                    ...formData.signatures,
+                    supervisor_signature: sig,
+                    supervisor_name: supervisorName,
+                  });
+                }}
+                initialValue={supervisorSignature || formData.signatures.supervisor_signature || undefined}
+              />
+            </>
+          ) : (
+            <ReadOnlySignature
+              label="Firma del Supervisor"
+              name={formData.signatures.supervisor_name || supervisorName}
+              signature={formData.signatures.supervisor_signature || supervisorSignature}
             />
-
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1 fa-fade">
-              {supervisorName ? '✓ Personal Seleccionado' : 'Seleccione de la lista oficial'}
-            </p>
-          </div>
-          <SignaturePad
-            label="Firma del Supervisor"
-            storageKey="inspector360.signature.supervisor"
-            onSave={(sig) => {
-              setSupervisorSignature(sig);
-              setSignatures({
-                ...formData.signatures,
-                supervisor_signature: sig,
-                supervisor_name: supervisorName,
-              });
-            }}
-            onChange={(sig) => {
-              setSupervisorSignature(sig);
-              setSignatures({
-                ...formData.signatures,
-                supervisor_signature: sig,
-                supervisor_name: supervisorName,
-              });
-            }}
-            initialValue={supervisorSignature || formData.signatures.supervisor_signature || undefined}
-          />
+          )}
         </CardContent>
       </Card>
 
@@ -538,51 +600,61 @@ export default function Step4Finalize() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 p-6 bg-slate-50/50">
-          <div className="space-y-3 relative z-10">
-            <Label htmlFor="mechanic-name" className="text-xs font-black uppercase text-[#0A3161] tracking-wider flex items-center gap-2">
-              <Wrench className="h-4 w-4" />
-              Nombre del Mecánico
-            </Label>
+          {canSignMechanic ? (
+            <>
+              <div className="space-y-3 relative z-10">
+                <Label htmlFor="mechanic-name" className="text-xs font-black uppercase text-[#0A3161] tracking-wider flex items-center gap-2">
+                  <Wrench className="h-4 w-4" />
+                  Nombre del Mecánico
+                </Label>
 
-            <EmployeeSelect
-              stationCode={formData.general?.station || ''}
-              value={mechanicName}
-              onChange={(val) => {
-                setMechanicName(val);
-                setSignatures({
-                  ...formData.signatures,
-                  mechanic_name: val,
-                });
-              }}
-              className="h-12 rounded-xl border-slate-200 bg-white"
-              placeholder="Seleccione al mecánico..."
+                <EmployeeSelect
+                  stationCode={formData.general?.station || ''}
+                  value={mechanicName}
+                  onChange={(val) => {
+                    setMechanicName(val);
+                    setSignatures({
+                      ...formData.signatures,
+                      mechanic_name: val,
+                    });
+                  }}
+                  className="h-12 rounded-xl border-slate-200 bg-white"
+                  placeholder="Seleccione al mecánico..."
+                />
+
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1 fa-fade">
+                  {mechanicName ? '✓ Personal Seleccionado' : 'Seleccione de la lista oficial'}
+                </p>
+              </div>
+              <SignaturePad
+                label="Firma del Mecánico"
+                storageKey="inspector360.signature.mechanic"
+                onSave={(sig) => {
+                  setMechanicSignature(sig);
+                  setSignatures({
+                    ...formData.signatures,
+                    mechanic_signature: sig,
+                    mechanic_name: mechanicName,
+                  });
+                }}
+                onChange={(sig) => {
+                  setMechanicSignature(sig);
+                  setSignatures({
+                    ...formData.signatures,
+                    mechanic_signature: sig,
+                    mechanic_name: mechanicName,
+                  });
+                }}
+                initialValue={mechanicSignature || formData.signatures.mechanic_signature || undefined}
+              />
+            </>
+          ) : (
+            <ReadOnlySignature
+              label="Firma del Mecánico"
+              name={formData.signatures.mechanic_name || mechanicName}
+              signature={formData.signatures.mechanic_signature || mechanicSignature}
             />
-
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1 fa-fade">
-              {mechanicName ? '✓ Personal Seleccionado' : 'Seleccione de la lista oficial'}
-            </p>
-          </div>
-          <SignaturePad
-            label="Firma del Mecánico"
-            storageKey="inspector360.signature.mechanic"
-            onSave={(sig) => {
-              setMechanicSignature(sig);
-              setSignatures({
-                ...formData.signatures,
-                mechanic_signature: sig,
-                mechanic_name: mechanicName,
-              });
-            }}
-            onChange={(sig) => {
-              setMechanicSignature(sig);
-              setSignatures({
-                ...formData.signatures,
-                mechanic_signature: sig,
-                mechanic_name: mechanicName,
-              });
-            }}
-            initialValue={mechanicSignature || formData.signatures.mechanic_signature || undefined}
-          />
+          )}
         </CardContent>
       </Card>
 
