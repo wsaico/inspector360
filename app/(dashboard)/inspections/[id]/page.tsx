@@ -481,9 +481,14 @@ export default function InspectionDetailPage() {
               </div>
             </div>
           )}
-          <Button onClick={handleDownloadPDF} className="w-full md:w-auto">
+          <Button
+            onClick={handleDownloadPDF}
+            className="w-full md:w-auto"
+            disabled={!isSupervisorSigned(inspection)}
+            title={!isSupervisorSigned(inspection) ? "Firma del supervisor requerida para descargar" : "Descargar PDF"}
+          >
             <Download className="mr-2 h-4 w-4" />
-            Descargar PDF
+            {!isSupervisorSigned(inspection) ? "Falta Firma Supervisor" : "Descargar PDF"}
           </Button>
         </div>
       </div>
