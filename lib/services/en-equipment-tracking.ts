@@ -126,7 +126,9 @@ export async function getENEquipmentInspections(
         const inspectionsByDateAndStation: Record<string, Record<string, { total: number; inspected: number; hasObservations: boolean }>> = {};
 
         inspectionsData?.forEach((inspection: any) => {
-            const dateKey = format(new Date(inspection.inspection_date), 'yyyy-MM-dd');
+            // Fix: Use substring to get YYYY-MM-DD directly from the string
+            // This avoids the UTC->Local conversion shift that happens with new Date()
+            const dateKey = inspection.inspection_date.substring(0, 10);
             const station = inspection.station;
 
             if (!inspectionsByDateAndStation[dateKey]) {
