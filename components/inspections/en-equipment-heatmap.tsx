@@ -26,19 +26,21 @@ export function ENEquipmentHeatmap({ startDate, endDate, selectedStations }: ENE
         loadData();
     }, [startDate, endDate, selectedStations]);
 
+    // Helper to parse "YYYY-MM-DD" as local date 00:00:00
+    function parseLocalDate(dateStr: string) {
+        if (!dateStr) return new Date();
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
     async function loadData() {
         setLoading(true);
         setError(null);
 
         try {
             // Fix: Parse dates explicitly as local time to avoid UTC-5 offset issues
-            // new Date("2026-02-01") -> UTC 00:00 -> Local 19:00 (prev day)
-            // Solution: Split and create date or append T00:00:00
-            const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-            const start = new Date(startYear, startMonth - 1, startDay);
-
-            const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
-            const end = new Date(endYear, endMonth - 1, endDay);
+            const start = parseLocalDate(startDate);
+            const end = parseLocalDate(endDate);
 
             // Pasar el array completo de estaciones seleccionadas
             // Si está vacío, el backend cargará todas las estaciones
@@ -156,7 +158,7 @@ export function ENEquipmentHeatmap({ startDate, endDate, selectedStations }: ENE
                     <div>
                         <CardTitle>Cumplimiento de Escaleras (EN) por Estación</CardTitle>
                         <CardDescription>
-                            {format(new Date(startDate), "d 'de' MMMM", { locale: es })} - {format(new Date(endDate), "d 'de' MMMM 'de' yyyy", { locale: es })}
+                            {format(parseLocalDate(startDate), "d 'de' MMMM", { locale: es })} - {format(parseLocalDate(endDate), "d 'de' MMMM 'de' yyyy", { locale: es })}
                         </CardDescription>
                     </div>
                 </CardHeader>
@@ -190,7 +192,7 @@ export function ENEquipmentHeatmap({ startDate, endDate, selectedStations }: ENE
                                         Estación
                                     </th>
                                     {data.dailyInspections.map((day) => {
-                                        const dayDate = new Date(day.date);
+                                        const dayDate = parseLocalDate(day.date);
                                         const dayNum = format(dayDate, 'd');
                                         const monthAbbr = format(dayDate, 'MMM', { locale: es });
                                         const isToday = day.date === today;
