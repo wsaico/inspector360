@@ -34,12 +34,23 @@ export default function CompliancePage() {
 
   // State for filters
   const [startDate, setStartDate] = useState<string>(() => {
+    // Fix: Use local date for default (1st of month)
     const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]; // First day of current month
+    d.setDate(1); // 1st of current month
+    // format as YYYY-MM-DD using local time manually to avoid UTC conversion
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
+
   const [endDate, setEndDate] = useState<string>(() => {
+    // Fix: Use local date for default (today)
     const d = new Date();
-    return d.toISOString().split('T')[0]; // Today
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
 
   // Multi-select state for stations
